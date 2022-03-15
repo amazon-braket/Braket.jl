@@ -1,0 +1,5 @@
+[deps]
+amazon-braket-sdk = ""
+
+[pip.deps]
+amazon-braket-default-simulator = "@ https://github.com/aws/amazon-braket-default-simulator-python/archive/refs/heads/feature/neutral-atom-simulator.zip"
