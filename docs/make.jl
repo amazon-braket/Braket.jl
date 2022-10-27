@@ -4,4 +4,4 @@ using Documenter, Braket
 
 makedocs(sitename="Braket.jl")
 
-deploydocs(repo="github.com/awslabs/Braket.jl.git",)
+deploydocs(repo="github.com/awslabs/braket-jl.git",)
