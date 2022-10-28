@@ -22,8 +22,8 @@ groups = GROUP == "All" ? ["PyBraket-integ", "PyBraket-unit"] : [GROUP]
 
 for group in groups
     @info "Testing $group"
-    pkg_name  = String(split(group, '-')[1])
-    test_type = String(split(group, '-')[2])
+    pkg_name  = String(split(group, "-")[1])
+    test_type = String(split(group, "-")[2])
 
     set_aws_creds(test_type)
 
