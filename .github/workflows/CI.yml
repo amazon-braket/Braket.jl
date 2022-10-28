@@ -1,5 +1,5 @@
 name: CI
-#r Run on main, any tag or any pull request
+# Run on main, any tag or any pull request
 on:
   pull_request:
     branches:
@@ -23,12 +23,13 @@ jobs:
     continue-on-error: ${{ matrix.version == 'nightly' }}
     strategy:
       fail-fast: true
+      max-parallel: 4
       matrix:
         group:
           - Braket-unit
           - PyBraket-unit
+        os: [windows-latest, ubuntu-latest, macOS-latest]        
         version: ['1.6', '1.7', '1.8', 'nightly']
-        os: [ubuntu-latest, windows-latest, macOS-latest]        
         arch: ['x64']
     steps:
       - uses: actions/checkout@v1
