@@ -51,7 +51,16 @@ function upload_local_data(local_prefix::String, s3_prefix::String)
         elseif startswith(relpath(root, base_dir), relative_prefix)
             fns = map(fn->joinpath(relpath(root, base_dir), fn), files)
         end
-        foreach(fn->upload_to_s3(fn, replace(fn, relative_prefix=>s3_prefix)), fns)
+        # need to fix s3 URIs on Windows
+        foreach(fns) do fn
+            if !Sys.iswindows()
+                upload_to_s3(fn, replace(fn, relative_prefix=>s3_prefix))
+            else
+                s3_uri = replace(fn, relative_prefix=>s3_prefix)
+                s3_uri = replace(s3_uri, "\\"=>"/")
+                upload_to_s3(fn, s3_uri)
+            end
+        end
     end
 end
 
