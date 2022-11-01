@@ -148,11 +148,18 @@ MOCK_DWAVE_QPU() = """{
     req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
     apply(req_patch) do
         Braket.refresh_metadata!(dev)
+        @test arn(dev) == "fake:arn"
         @test dev._name == "fake_name"
+        @test name(dev) == "fake_name"
         @test dev._status == "fake_status"
+        @test status(dev) == "fake_status"
         @test dev._type == "fake_type"
+        @test type(dev) == "fake_type"
         @test dev._provider_name == "fake_provider"
+        @test provider_name(dev) == "fake_provider"
         @test isnothing(dev._properties)
+        @test isnothing(properties(dev))
+        @test sprint(show, dev) == "AwsDevice(arn=fake:arn)"
     end
     execution_window = Braket.DeviceExecutionWindow("everyday",Dates.Time("00:00:00"),Dates.Time("23:59:59"))
     dsp = Braket.DeviceServiceProperties(Braket.header_dict[Braket.DeviceServiceProperties], [execution_window], (0, 1000), nothing, nothing, nothing, nothing)
@@ -192,6 +199,63 @@ MOCK_DWAVE_QPU() = """{
                 @test dev._provider_name == qpu_dict["providerName"]
                 @test dev._topology_graph == graph
             end
+        end
+    end
+    @testset "construction and region search" begin
+        SIMULATOR_ARN = "arn:aws:braket:::device/quantum-simulator/fake_provider/fake_sim"
+        NO_REGION_QPU_ARN = "arn:aws:braket:::device/qpu/fake_provider/fake_qpu"
+        REGION_QPU_ARN = "arn:aws:braket:fake-region::device/qpu/fake_provider/fake_qpu"
+        
+        resp_dict = Dict("deviceName"=>"fake_sim", "deviceStatus"=>"fake_status", "deviceType"=>"SIMULATOR", "providerName"=>"fake_provider", "deviceCapabilities"=>nothing)
+        req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        apply(req_patch) do
+            dev = AwsDevice(SIMULATOR_ARN)
+            @test name(dev) == "fake_sim"
+            @test status(dev) == "fake_status"
+            @test type(dev) == "SIMULATOR"
+            @test provider_name(dev) == "fake_provider"
+            @test isnothing(properties(dev))
+            @test Braket.AWS.region(dev._config) == Braket.AWS.region(Braket.AWS.global_aws_config())
+        end
+
+        resp_dict = Dict("deviceName"=>"fake_qpu", "deviceStatus"=>"fake_status", "deviceType"=>"QPU", "providerName"=>"fake_provider", "deviceCapabilities"=>nothing)
+        req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        apply(req_patch) do
+            dev = AwsDevice(REGION_QPU_ARN)
+            @test name(dev) == "fake_qpu"
+            @test status(dev) == "fake_status"
+            @test type(dev) == "QPU"
+            @test provider_name(dev) == "fake_provider"
+            @test isnothing(properties(dev))
+            @test Braket.AWS.region(dev._config) == "fake-region"
+        end
+        
+        resp_dict = Dict("deviceName"=>"fake_qpu", "deviceStatus"=>"fake_status", "deviceType"=>"QPU", "providerName"=>"fake_provider", "deviceCapabilities"=>nothing)
+        req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        apply(req_patch) do
+            dev = AwsDevice(NO_REGION_QPU_ARN)
+            @test name(dev) == "fake_qpu"
+            @test status(dev) == "fake_status"
+            @test type(dev) == "QPU"
+            @test provider_name(dev) == "fake_provider"
+            @test isnothing(properties(dev))
+            @test Braket.AWS.region(dev._config) == Braket.AWS.region(Braket.AWS.global_aws_config())
+        end
+
+        # test fails
+        msg = "Could not resolve host: braket.fake-region.amazonaws.com while requesting https://braket.fake-region.amazonaws.com/device/arn%3Aaws%3Abraket%3A%3A%3Adevice%2Fquantum_simulator%2Ffake_provider%2Ffake_sim"
+        dl_ex  = Braket.Downloads.RequestError("", 404, msg, Braket.Downloads.Response("", "https://braket.fake-region.amazonaws.com/device/arn%3Aaws%3Abraket%3A%3A%3Adevice%2Fquantum_simulator%2Ffake_provider%2Ffake_sim", 404, msg, ["foo"=>"bar"])) 
+        req_patch = @patch Braket.AWS._http_request(a...; b...) = throw(dl_ex)
+        apply(req_patch) do
+            current_region = Braket.AWS.region(Braket.AWS.global_aws_config())
+            @test_throws ErrorException("Simulator $SIMULATOR_ARN not found in '$current_region'") AwsDevice(SIMULATOR_ARN)
+        end
+        
+        msg = "Could not resolve host: braket.fake-region.amazonaws.com while requesting https://braket.fake-region.amazonaws.com/device/arn%3Aaws%3Abraket%3Afake-region%3A%3Adevice%2Fqpu%2Ffake_provider%2Ffake_qpu"
+        dl_ex  = Braket.Downloads.RequestError("", 404, msg, Braket.Downloads.Response("", "https://braket.fake-region.amazonaws.com/device/arn%3Aaws%3Abraket%3Afake-region%3A%3Adevice%2Fqpu%2Ffake_provider%2Ffake_qpu", 404, msg, ["foo"=>"bar"])) 
+        req_patch = @patch Braket.AWS._http_request(a...; b...) = throw(dl_ex)
+        apply(req_patch) do
+            @test_throws ErrorException("QPU arn:aws:braket:::device/qpu/fake_provider/fake_qpu not found") AwsDevice(NO_REGION_QPU_ARN)
         end
     end
 end
