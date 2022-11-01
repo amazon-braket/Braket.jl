@@ -1,5 +1,5 @@
 [deps]
-amazon-braket-sdk = ""
+python = ">=3.7,<3.11"
 
 [pip.deps]
-amazon-braket-default-simulator = "@ https://github.com/aws/amazon-braket-default-simulator-python/archive/refs/heads/feature/neutral-atom-simulator.zip"
+amazon-braket-sdk = ">=1.33.0.dev0"
