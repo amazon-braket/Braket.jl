@@ -1,6 +1,6 @@
 
-function Py(x::Braket.IR.AhsProgram)
-    fns = filter(n->!(n==:braketSchemaHeader), fieldnames(IR.AhsProgram))
+function Py(x::Braket.IR.AHSProgram)
+    fns = filter(n->!(n==:braketSchemaHeader), fieldnames(IR.AHSProgram))
     args = arg_gen(x, fns)
     return pyahs.Program(; args...)
 end

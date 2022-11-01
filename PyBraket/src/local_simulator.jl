@@ -14,7 +14,7 @@ struct LocalSimulator <: Braket.Device
 end
 Braket.name(ls::LocalSimulator) = pyconvert(String, ls.name)
 
-function Base.run(d::LocalSimulator, task_spec::Braket.IR.AhsProgram; shots::Int=0, kwargs...)
+function Base.run(d::LocalSimulator, task_spec::Braket.IR.AHSProgram; shots::Int=0, kwargs...)
     py_ir = Py(task_spec)
     py_raw_result = d._delegate.run(py_ir, shots; kwargs...)
     jl_raw_result = pyconvert(Braket.AnalogHamiltonianSimulationTaskResult, py_raw_result)

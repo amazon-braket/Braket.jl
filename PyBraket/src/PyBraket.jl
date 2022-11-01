@@ -4,7 +4,7 @@ module PyBraket
     using Braket
     import Braket: Instruction
     using Braket.IR
-    import Braket.IR: TimeSeries, AtomArrangement, DrivingField, PhysicalField, ShiftingField, Setup, Hamiltonian, AhsProgram
+    import Braket.IR: TimeSeries, AtomArrangement, DrivingField, PhysicalField, ShiftingField, Setup, Hamiltonian, AHSProgram
     export LocalSimulator, LocalJob, PyCircuit
     import PythonCall: Py
 
@@ -64,18 +64,6 @@ module PyBraket
             return fn=>Py(val)
         end
         return args
-    end
-
-    for (irT, pyT) in ((:(Braket.IR.Expectation), :(pyjaqcd.Expectation)),
-        (:(Braket.IR.Variance), :(pyjaqcd.Variance)),
-        (:(Braket.IR.Sample), :(pyjaqcd.Sample)),
-        (:(Braket.IR.Amplitude), :(pyjaqcd.Amplitude)),
-        (:(Braket.IR.StateVector), :(pyjaqcd.StateVector)),
-        (:(Braket.IR.Probability), :(pyjaqcd.Probability)),
-        (:(Braket.IR.DensityMatrix), :(pyjaqcd.DensityMatrix)))
-        @eval begin
-            Py(o::$irT) = $pyT(;arg_gen(o, fieldnames($irT))...)
-        end
     end
     
     include("pyahs.jl")

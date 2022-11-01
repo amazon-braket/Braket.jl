@@ -112,7 +112,7 @@ end
         sf = ShiftingField(Field(ts, pt))
         H = AnalogHamiltonianSimulation(register, [df, sf])
         prog = ir(H)
-        @test JSON3.read(JSON3.write(prog), Braket.AhsProgram) == prog
+        @test JSON3.read(JSON3.write(prog), Braket.AHSProgram) == prog
 
         @test vacant == "vacant"
         @test "filled" == filled

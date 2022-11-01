@@ -72,7 +72,7 @@ Launches an [`AwsQuantumTask`](@ref) based on `task_spec` on the device associat
   - `Problem`
   - `Program`
   - [`Circuit`](@ref)
-  - `AhsProgram`
+  - `AHSProgram`
   - [`AnalogHamiltonianSimulation`](@ref)
 
 Valid `kwargs` are:
@@ -139,7 +139,7 @@ function prepare_task_input(ahs::AnalogHamiltonianSimulation, device_arn::String
     return prepare_task_input(ir(ahs), device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; kwargs...)
 end
 
-function prepare_task_input(program::Union{AhsProgram, BlackbirdProgram, OpenQasmProgram}, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(program::Union{AHSProgram, BlackbirdProgram, OpenQasmProgram}, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     device_parameters = Dict{String, Any}() # not currently used
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())

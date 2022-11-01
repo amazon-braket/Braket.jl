@@ -19,7 +19,7 @@ Note: to run this notebook you'll need the `Braket.jl` package installed (it com
 "
 
 # ╔═╡ 0c324f97-0c92-44d3-9b78-ed89dd55cb79
-path_to_braketjl = "/Users/hyatkath/.julia/dev/Braket"
+path_to_braketjl = joinpath(ENV["HOME"], ".julia/dev/Braket")
 
 # ╔═╡ 5fa5436f-2ad0-4893-b10e-30643467cb6c
 import Pkg; Pkg.develop(Pkg.PackageSpec(path=path_to_braketjl)); Pkg.develop(Pkg.PackageSpec(path=joinpath(path_to_braketjl, "PyBraket"))) 

@@ -181,7 +181,7 @@ StructTypes.StructType(::Type{H}) where {H<:Hamiltonian} = StructTypes.Unordered
 Generate IR from an [`AnalogHamiltonianSimulation`](@ref) which can be run on
 a neutral atom simulator or quantum device.
 """
-ir(ahs::AnalogHamiltonianSimulation; kwargs...) = AhsProgram(header_dict[AhsProgram], IR.Setup(ir(ahs.register)), ir(ahs.hamiltonian))
+ir(ahs::AnalogHamiltonianSimulation; kwargs...) = AHSProgram(header_dict[AHSProgram], IR.Setup(ir(ahs.register)), ir(ahs.hamiltonian))
 ir(aa::AtomArrangement) = IR.AtomArrangement([collect(site.coordinate) for site in aa], [site.site_type == filled ? 1 : 0 for site in aa])
 function ir(h::Vector{<:Hamiltonian})
     h_dict = Dict("drivingFields"=>[], "shiftingFields"=>[])
