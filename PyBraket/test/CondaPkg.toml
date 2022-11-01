@@ -1,5 +1,6 @@
 [deps]
 python = ">=3.7,<3.11"
+numpy = ">=1.8"
 
 [pip.deps]
 amazon-braket-sdk = ">=1.33.0.dev0"
