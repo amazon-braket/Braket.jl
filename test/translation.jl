@@ -136,9 +136,4 @@ using Braket: operator, target
             @test StructTypes.constructfrom(Braket.AbstractProgram, raw) == p
         end
     end
-
-    @testset "parse_raw_schema error" begin
-        d = Braket.Detection(0.1, 0.1, 0.1, 0.1)
-        @test_throws ArgumentError Braket.parse_raw_schema(JSON3.write(d))
-    end
 end

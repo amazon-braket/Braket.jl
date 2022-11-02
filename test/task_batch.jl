@@ -8,7 +8,7 @@ mock_result(c) = Braket.GateModelTaskResult(
             [Braket.ResultTypeValue(Braket.IR.Amplitude(["011000"], "amplitude"), Dict("011000"=>0.9999999999999982))],
             collect(0:5),
             Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 0, "arn1", nothing, nothing, nothing, nothing, nothing),
-            Braket.AdditionalMetadata(Braket.Program(c), nothing, nothing, nothing, nothing, nothing)
+            Braket.AdditionalMetadata(Braket.Program(c), nothing, nothing, nothing, nothing, nothing, nothing)
         )
 
 RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-11"

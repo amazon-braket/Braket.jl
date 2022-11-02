@@ -1,9 +1,15 @@
 using Braket, Test, JSON3, StructTypes, UUIDs, DecFP
 
+struct MockRydbergLocal
+    timeResolution::Dec128
+    commonDetuningResolution::Dec128
+    localDetuningResolution::Dec128
+end
+
 struct MockRydberg
     c6coefficient::Dec128
     rydbergGlobal::Braket.RydbergGlobal
-    rydbergLocal::Braket.RydbergLocal
+    rydbergLocal::MockRydbergLocal
 end
 
 struct MockAhsParadigmProperties
@@ -156,7 +162,7 @@ end
         pt = Pattern(Dec128.(["0.5", "1.0", "0.5", "0.5", "0.5", "0.5"]))
         sf = ShiftingField(Field(ts, pt))
         ahs = AnalogHamiltonianSimulation(register, [df, sf])
-        rl = Braket.RydbergLocal((Dec128("0.1"), Dec128("1.0")), Dec128("2000.0"), Dec128("0.01"), Dec128("1.0"), Dec128("100"), Dec128("0.001"), Dec128("1e-9"), Dec128("1e-8"))
+        rl = MockRydbergLocal(Dec128("1e-9"), Dec128("2000.0"), Dec128("0.01"))
         rg = Braket.RydbergGlobal((Dec128("1.0"), Dec128("1e6")), Dec128("400.0"), Dec128("0.2"), (Dec128("1.0"), Dec128("1e6")), Dec128("0.2"), Dec128("0.2"), (Dec128("1.0"), Dec128("1e6")), Dec128("5e-7"), Dec128("1e-9"), Dec128("1e-5"), Dec128("0.0"), Dec128("100.0"))
         dev = Braket.AwsDevice(_arn="arn:fake_device")
         para_props = MockAhsParadigmProperties(

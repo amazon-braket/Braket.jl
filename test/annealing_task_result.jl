@@ -30,7 +30,7 @@ using Braket, JSON3, Test
         Dict(0=>0.3333, 1=>-0.333, 4=>-0.333, 5=>0.333),
         Dict("0,4"=> 0.667, "0,5"=> -1, "1,4"=> 0.667, "1,5"=> 0.667),
     )
-    additional_metadata = Braket.AdditionalMetadata(problem, dwave_metadata, nothing, nothing, nothing, nothing)
+    additional_metadata = Braket.AdditionalMetadata(problem, dwave_metadata, nothing, nothing, nothing, nothing, nothing)
     function result_str_1()
         result = Braket.AnnealingTaskResult(Braket.header_dict[Braket.AnnealingTaskResult],
             solutions,

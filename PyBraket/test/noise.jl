@@ -5,7 +5,7 @@ using PythonCall: Py, pyconvert, pyisTrue
     circ  = CNot(H(Circuit(), 0), 0, 1)
     noise = BitFlip(0.1)
     circ  = Braket.apply_gate_noise!(circ, noise)
-    
+
     device = LocalSimulator("braket_dm")
     # run the circuit on the local simulator
     task = run(device, circ, shots=1000)

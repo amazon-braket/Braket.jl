@@ -71,9 +71,8 @@ const shared_models = PythonCall.pynew()
 const schema_header = PythonCall.pynew()
 const openqasm_device_action_properties = PythonCall.pynew()
 
-
 function union_convert(union_type, x)
-    union_ts = Type[]
+    union_ts = union_type isa Union ? Type[] : [union_type]
     union_t = union_type
     while union_t isa Union
         union_t.a != Nothing && push!(union_ts, union_t.a)
@@ -84,15 +83,25 @@ function union_convert(union_type, x)
     for t_ in union_ts
         try
             if pyisinstance(x, PythonCall.pybuiltins.list) && t_ <: Vector
-                arg = [pyconvert(eltype(t_), attr_) for attr_ in x]
-                break
+                return [union_convert(Union{eltype(t_)}, attr_) for attr_ in x]
+            elseif pyisinstance(x, pybuiltins.str) && t_ <: Integer
+                return tryparse(t_, pyconvert(String, x))
+            elseif t_ == ResultTypeValue
+                if pyhasattr(x, "value")
+                    typ = jl_convert(AbstractProgramResult, pygetattr(x, "type"))
+                    val = union_convert(Union{Dict{String, ComplexF64}, Float64, Vector}, pygetattr(x, "value"))
+                    return PythonCall.pyconvert_return(ResultTypeValue(typ, val))
+                else
+                    rt = jl_convert(AbstractProgramResult, x)
+                    return PythonCall.pyconvert_return(ResultTypeValue(rt, 0.0))
+                end
             else
-                arg = pyconvert(t_, x)
-                break
+                return pyconvert(t_, x)
             end
         catch e
         end
     end
+    arg isa Vector{Nothing} && (arg = nothing)
     return arg
 end
 
@@ -139,6 +148,7 @@ function jl_convert(::Type{T}, x::Py) where {T<:AbstractIR}
     end
     PythonCall.pyconvert_return(T(args..., pyconvert(String, pygetattr(x, "type"))))
 end
+
 function jl_convert(::Type{AbstractProgram}, x::Py)
     T = Braket.lookup_type(pyconvert(braketSchemaHeader, pygetattr(x, "braketSchemaHeader")))
     return PythonCall.pyconvert_return(pyconvert(T, x))
@@ -148,18 +158,6 @@ function jl_convert(::Type{AbstractProgramResult}, x::Py)
     T = Dict("expectation"=>Expectation, "variance"=>Variance, "statevector"=>StateVector, "densitymatrix"=>DensityMatrix, "sample"=>Sample, "amplitude"=>Amplitude, "probability"=>Probability)
     return PythonCall.pyconvert_return(pyconvert(T[T_], x))
 end
-for (irT, pyT) in ((:(Braket.IR.Expectation), :(pyjaqcd.Expectation)),
-                   (:(Braket.IR.Variance), :(pyjaqcd.Variance)),
-                   (:(Braket.IR.Sample), :(pyjaqcd.Sample)),
-                   (:(Braket.IR.Amplitude), :(pyjaqcd.Amplitude)),
-                   (:(Braket.IR.StateVector), :(pyjaqcd.StateVector)),
-                   (:(Braket.IR.Probability), :(pyjaqcd.Probability)),
-                   (:(Braket.IR.DensityMatrix), :(pyjaqcd.DensityMatrix)))
-    @eval begin
-        Py(o::$irT) = $pyT(;arg_gen(o, fieldnames($irT))...) 
-    end
-end
-
 
 function __init__()
     PythonCall.pycopy!(instructions, pyimport("braket.ir.jaqcd.instructions"))
@@ -388,9 +386,12 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.device_schema.openqasm_device_action_properties:OpenQASMDeviceActionProperties", OpenQASMDeviceActionProperties, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", Program, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", AbstractProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:OpenQasmProgram", AbstractProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.blackbird.program_v1:BlackbirdProgram", AbstractProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.ahs.program_v1:AHSProgram", AbstractProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", AbstractProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.blackbird.program_v1:Program", BlackbirdProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.blackbird.program_v1:Program", AbstractProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.ahs.program_v1:Program", AHSProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.ahs.program_v1:Program", AbstractProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Amplitude", AbstractProgramResult, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Expectation", AbstractProgramResult, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Probability", AbstractProgramResult, jl_convert)
