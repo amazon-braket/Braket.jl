@@ -28,6 +28,7 @@ function set_aws_creds(test_type)
 end
 
 groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-integ", "PyBraket-unit"] : GROUP
+groups = (groups == String ? [groups] : groups)
 
 for group in groups
     @info "Testing $group"
