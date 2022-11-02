@@ -3,7 +3,7 @@ using Pkg, Test, Aqua, Braket
 Aqua.test_all(Braket, ambiguities=false, unbound_args=false)
 Aqua.test_ambiguities(Braket)
 
-const GROUP = get(ENV, "GROUP", ["Braket-unit"])
+const GROUP = get(ENV, "GROUP", "Braket-unit")
 
 subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
 develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
@@ -28,7 +28,7 @@ function set_aws_creds(test_type)
 end
 
 groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-integ", "PyBraket-unit"] : GROUP
-groups = (groups == String ? [groups] : groups)
+groups = (groups isa String ? [groups] : groups)
 
 for group in groups
     @info "Testing $group"
