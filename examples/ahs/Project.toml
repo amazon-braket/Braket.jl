@@ -1,0 +1,7 @@
+[deps]
+Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PyBraket = "e85266a6-1825-490b-a80e-9b9469c53660"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"

@@ -1,0 +1,50 @@
+{
+    "arch": "arm64",
+    "build": "h4653dfc_0",
+    "build_number": 0,
+    "build_string": "h4653dfc_0",
+    "channel": "https://conda.anaconda.org/conda-forge/osx-arm64",
+    "constrains": [],
+    "depends": [],
+    "extracted_package_dir": "/Users/maolinml/.julia/scratchspaces/0b3b1443-0f03-428d-bdfb-f27f9c1191ea/root/pkgs/ca-certificates-2022.9.24-h4653dfc_0",
+    "files": [
+        "ssl/cacert.pem",
+        "ssl/cert.pem"
+    ],
+    "fn": "ca-certificates-2022.9.24-h4653dfc_0.tar.bz2",
+    "license": "ISC",
+    "link": {
+        "source": "/Users/maolinml/.julia/scratchspaces/0b3b1443-0f03-428d-bdfb-f27f9c1191ea/root/pkgs/ca-certificates-2022.9.24-h4653dfc_0",
+        "type": 1
+    },
+    "md5": "5911a50099ce7b46f7f32e90dd4adffa",
+    "name": "ca-certificates",
+    "package_tarball_full_path": "/Users/maolinml/.julia/scratchspaces/0b3b1443-0f03-428d-bdfb-f27f9c1191ea/root/pkgs/ca-certificates-2022.9.24-h4653dfc_0.tar.bz2",
+    "paths_data": {
+        "paths": [
+            {
+                "_path": "ssl/cacert.pem",
+                "path_type": "hardlink",
+                "sha256": "de5f02716b7fa8be36d37d2b1a2783dd22ee7c80855f46d8b4684397f11754f2",
+                "sha256_in_prefix": "de5f02716b7fa8be36d37d2b1a2783dd22ee7c80855f46d8b4684397f11754f2",
+                "size_in_bytes": 286370
+            },
+            {
+                "_path": "ssl/cert.pem",
+                "path_type": "softlink",
+                "sha256_in_prefix": "de5f02716b7fa8be36d37d2b1a2783dd22ee7c80855f46d8b4684397f11754f2",
+                "size_in_bytes": 286370
+            }
+        ],
+        "paths_version": 1
+    },
+    "platform": "osx",
+    "requested_spec": "",
+    "sha256": "de523ce2a7037367f5f6f2389ca064bc22c2cb88f1ed808c44bd3f57c70bf733",
+    "size": 154049,
+    "subdir": "osx-arm64",
+    "timestamp": 1664052652679,
+    "track_features": "",
+    "url": "https://conda.anaconda.org/conda-forge/osx-arm64/ca-certificates-2022.9.24-h4653dfc_0.tar.bz2",
+    "version": "2022.9.24"
+}

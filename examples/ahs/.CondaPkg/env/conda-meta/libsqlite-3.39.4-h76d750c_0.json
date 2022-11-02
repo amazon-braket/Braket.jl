@@ -1,0 +1,76 @@
+{
+    "arch": "arm64",
+    "build": "h76d750c_0",
+    "build_number": 0,
+    "build_string": "h76d750c_0",
+    "channel": "https://conda.anaconda.org/conda-forge/osx-arm64",
+    "constrains": [],
+    "depends": [
+        "libzlib >=1.2.12,<1.3.0a0"
+    ],
+    "extracted_package_dir": "/Users/maolinml/.julia/scratchspaces/0b3b1443-0f03-428d-bdfb-f27f9c1191ea/root/pkgs/libsqlite-3.39.4-h76d750c_0",
+    "files": [
+        "include/sqlite3.h",
+        "include/sqlite3ext.h",
+        "lib/libsqlite3.0.dylib",
+        "lib/libsqlite3.dylib",
+        "lib/pkgconfig/sqlite3.pc"
+    ],
+    "fn": "libsqlite-3.39.4-h76d750c_0.tar.bz2",
+    "license": "Unlicense",
+    "link": {
+        "source": "/Users/maolinml/.julia/scratchspaces/0b3b1443-0f03-428d-bdfb-f27f9c1191ea/root/pkgs/libsqlite-3.39.4-h76d750c_0",
+        "type": 1
+    },
+    "md5": "bc447b47695c18c7e018fe47f24c16a0",
+    "name": "libsqlite",
+    "package_tarball_full_path": "/Users/maolinml/.julia/scratchspaces/0b3b1443-0f03-428d-bdfb-f27f9c1191ea/root/pkgs/libsqlite-3.39.4-h76d750c_0.tar.bz2",
+    "paths_data": {
+        "paths": [
+            {
+                "_path": "include/sqlite3.h",
+                "path_type": "hardlink",
+                "sha256": "2650d56a86f18e521e649dabd6e4ec2616afe7e43f097d5668fbabdf7e7cbaba",
+                "sha256_in_prefix": "2650d56a86f18e521e649dabd6e4ec2616afe7e43f097d5668fbabdf7e7cbaba",
+                "size_in_bytes": 613416
+            },
+            {
+                "_path": "include/sqlite3ext.h",
+                "path_type": "hardlink",
+                "sha256": "7f9ae3bab94bbc62d909fbb0149861b4a0832299f12d7ccbfecc7f28a8d27aa2",
+                "sha256_in_prefix": "7f9ae3bab94bbc62d909fbb0149861b4a0832299f12d7ccbfecc7f28a8d27aa2",
+                "size_in_bytes": 37310
+            },
+            {
+                "_path": "lib/libsqlite3.0.dylib",
+                "path_type": "hardlink",
+                "sha256": "8bfb7e331a0854915e37be7582c1718f03a07fd35b9d04b3c5ee37efcbeea03c",
+                "sha256_in_prefix": "8bfb7e331a0854915e37be7582c1718f03a07fd35b9d04b3c5ee37efcbeea03c",
+                "size_in_bytes": 1467040
+            },
+            {
+                "_path": "lib/libsqlite3.dylib",
+                "path_type": "softlink",
+                "sha256_in_prefix": "8bfb7e331a0854915e37be7582c1718f03a07fd35b9d04b3c5ee37efcbeea03c",
+                "size_in_bytes": 1467040
+            },
+            {
+                "_path": "lib/pkgconfig/sqlite3.pc",
+                "path_type": "hardlink",
+                "sha256": "7885d7238d28be859f4778e823ebb22fd76c1ba184f48e123f74bbf4be4d18ba",
+                "sha256_in_prefix": "e50b37965bdfac0c3f7bed687ca9da2b35d56335381b74455aca19a39883ebb6",
+                "size_in_bytes": 512
+            }
+        ],
+        "paths_version": 1
+    },
+    "platform": "osx",
+    "requested_spec": "",
+    "sha256": "fac23992c2943210443c2128db5ca8bba979687d5dc4158ced93dfb42d956228",
+    "size": 821220,
+    "subdir": "osx-arm64",
+    "timestamp": 1664796520239,
+    "track_features": "",
+    "url": "https://conda.anaconda.org/conda-forge/osx-arm64/libsqlite-3.39.4-h76d750c_0.tar.bz2",
+    "version": "3.39.4"
+}
