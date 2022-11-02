@@ -3,5 +3,6 @@ python = ">=3.7,<3.11"
 pydantic=""
 
 [pip.deps]
+scipy = ">=1.9.3"
+numpy = ">=1.19.3"
 amazon-braket-sdk = ">=1.33.0.dev0"
-numpy = ">=1.21"

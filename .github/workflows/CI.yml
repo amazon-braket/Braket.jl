@@ -19,6 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+    # allow windows Python to fail
+    continue-on-error: ${{ matrix.os == 'windows-latest' && matrix.group == 'PyBraket-unit' }}
     strategy:
       fail-fast: true
       max-parallel: 2
@@ -43,6 +45,7 @@ jobs:
         uses: julia-actions/julia-runtest@v1
         env:
           GROUP: ${{ matrix.group }}
+          JULIA_CONDAPKG_VERBOSITY: 2
   version-test:
     runs-on: ubuntu-latest 
     # don't run on draft PRs
@@ -72,6 +75,7 @@ jobs:
       - name: "Run tests"
         uses: julia-actions/julia-runtest@v1
         env:
+          JULIA_CONDAPKG_VERBOSITY: 2
           GROUP: ${{ matrix.group }}
       - name: "Process coverage"
         uses: julia-actions/julia-processcoverage@v1
