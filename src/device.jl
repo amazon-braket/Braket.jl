@@ -102,8 +102,7 @@ function AwsDevice(device_arn::String; config::AWSConfig=global_aws_config())
             refresh_metadata!(d)
             return d
         catch e
-            e isa AWS.AWSExceptions.AWSException || throw(e)
-            #e.code == "ResourceNotFoundException" || throw(e)
+            e isa AWS.AWSExceptions.AWSException || e isa Downloads.RequestError || throw(e)
             !occursin("qpu", device_arn) && throw(ErrorException("Simulator $device_arn not found in '$current_region'"))
 
             for new_region in setdiff(REGIONS, current_region)
@@ -113,8 +112,7 @@ function AwsDevice(device_arn::String; config::AWSConfig=global_aws_config())
                     refresh_metadata!(d)
                     return d
                 catch e 
-                    e isa AWS.AWSExceptions.AWSException || throw(e)
-                    #e.code == "ResourceNotFoundException" || throw(e)
+                    e isa AWS.AWSExceptions.AWSException || e isa Downloads.RequestError || throw(e)
                 end
             end
             throw(ErrorException("QPU $device_arn not found"))

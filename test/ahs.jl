@@ -1,13 +1,25 @@
 using Braket, Test, JSON3, StructTypes, UUIDs, DecFP
 
+struct MockRydbergLocal
+    timeResolution::Dec128
+    commonDetuningResolution::Dec128
+    localDetuningResolution::Dec128
+end
+
+struct MockRydberg
+    c6coefficient::Dec128
+    rydbergGlobal::Braket.RydbergGlobal
+    rydbergLocal::MockRydbergLocal
+end
+
 struct MockAhsParadigmProperties
-    lattice
-    rydberg
+    lattice::Braket.Lattice
+    rydberg::MockRydberg
 end
 
 struct MockAhsDeviceCapabilities
-    action
-    paradigm
+    action::Dict{Union{Braket.DeviceActionType, String}, Braket.DeviceActionProperties}
+    paradigm::MockAhsParadigmProperties
 end
 
 @testset "AHS" begin
@@ -106,7 +118,7 @@ end
         sf = ShiftingField(Field(ts, pt))
         H = AnalogHamiltonianSimulation(register, [df, sf])
         prog = ir(H)
-        @test JSON3.read(JSON3.write(prog), Braket.AhsProgram) == prog
+        @test JSON3.read(JSON3.write(prog), Braket.AHSProgram) == prog
 
         @test vacant == "vacant"
         @test "filled" == filled
@@ -124,72 +136,66 @@ end
         @test task_args[:outputS3KeyPrefix] == s3_folder[2]
         @test task_args[:extra_opts] == Dict{String, Any}("deviceParameters"=>"{}", "tags"=>Dict{String, String}())
     end
-    #=
     @testset "discretize" begin
         aa = map(AtomArrangementItem, [(0.0, 0.0), (0.0, 3.0e-6), (0.0, 6.0e-6), (3.0e-6, 0.0), (3.0e-6, 3.0e-6)])
         register = AtomArrangement(aa)
-        push!(register, (3.0e-6, 3.0e-6), vacant)
-        push!(register, (3.0e-6, 6.0e-6), vacant)
+        push!(register, (Dec128("3.0e-6"), Dec128("3.0e-6")), vacant)
+        push!(register, (Dec128("3.0e-6"), Dec128("6.0e-6")), vacant)
 
         t1 = TimeSeries()
         t2 = TimeSeries()
         t3 = TimeSeries()
-        for (t, v) in [(0.0, 0.0), (3.0e-7, 2.51327e7), (2.7e-6, 2.51327e7), (3.0e-6, 0.0)]
+        for (t, v) in [(0.0, 0.0), (Dec128("3.0e-7"), Dec128("2.51327e7")), (Dec128("2.7e-6"), Dec128("2.51327e7")), (Dec128("3.0e-6"), 0.0)]
             t1[t] = v
         end
-        for (t, v) in [(0.0, 0), (3.0e-6, 0)]
+        for (t, v) in [(0.0, 0), (Dec128("3.0e-6"), 0)]
             t2[t] = v
         end
-        for (t, v) in [(0.0, -1.25664e8), (3.0e-7, -1.25664e8), (2.7e-6, 1.25664e8), (3.0e-6, 1.25664e8)]
+        for (t, v) in [(0.0, Dec128("-1.25664e8")), (Dec128("3.0e-7"), Dec128("-1.25664e8")), (Dec128("2.7e-6"), Dec128("1.25664e8")), (Dec128("3.0e-6"), Dec128("1.25664e8"))]
             t3[t] = v
         end
         df = DrivingField(t1, t2, t3)
         ts = TimeSeries()
-        for (t, v) in [(0.0, -1.25664e8), (3.0e-6, 1.25664e8)]
+        for (t, v) in [(0.0, Dec128("-1.25664e8")), (Dec128("3.0e-6"), Dec128("1.25664e8"))]
             ts[t] = v
         end
-        pt = Pattern([0.5, 1.0, 0.5, 0.5, 0.5, 0.5])
+        pt = Pattern(Dec128.(["0.5", "1.0", "0.5", "0.5", "0.5", "0.5"]))
         sf = ShiftingField(Field(ts, pt))
         ahs = AnalogHamiltonianSimulation(register, [df, sf])
-        rg = Braket.RydbergGlobal((1.0, 1e6), 400.0, 0.2, (1.0, 1e6), 0.2, 0.2, (1.0, 1e6), 5e-7, 1e-9, 1e-5, 0.0, 100.0)
-        rl = Braket.RydbergLocal((0.1, 1.0), 2000.0, 0.01, 1.0, 100, 0.001, 1e-9, 1e-8)
+        rl = MockRydbergLocal(Dec128("1e-9"), Dec128("2000.0"), Dec128("0.01"))
+        rg = Braket.RydbergGlobal((Dec128("1.0"), Dec128("1e6")), Dec128("400.0"), Dec128("0.2"), (Dec128("1.0"), Dec128("1e6")), Dec128("0.2"), Dec128("0.2"), (Dec128("1.0"), Dec128("1e6")), Dec128("5e-7"), Dec128("1e-9"), Dec128("1e-5"), Dec128("0.0"), Dec128("100.0"))
         dev = Braket.AwsDevice(_arn="arn:fake_device")
         para_props = MockAhsParadigmProperties(
-            Braket.Lattice(Braket.Area(1e-3, 1e-3), Braket.Geometry(1e-7, 1e-7, 1e-7, 200)),
-            Braket.Rydberg(1e-6, rg),
+            Braket.Lattice(Braket.Area(Dec128("1e-3"), Dec128("1e-3")), Braket.Geometry(Dec128("1e-7"), Dec128("1e-7"), Dec128("1e-7"), 200)),
+            MockRydberg(Dec128("1e-6"), rg, rl),
         )
         dev._properties = MockAhsDeviceCapabilities(Dict("braket.ir.ahs.program"=>Braket.GenericDeviceActionProperties(["1"], "braket.ir.ahs.program")), para_props)
         disc_ahs = Braket.discretize(ahs, dev)
 
         disc_ir  = ir(disc_ahs)
         read_in  = JSON3.read(JSON3.write(disc_ir), Dict)
-        @test read_in["setup"]["ahs_register"] == Dict("filling"=>[1, 1, 1, 1, 1, 0, 0], "sites"=>[
-            [0.0, 0.0],
-            [0.0, 3e-06],
-            [0.0, 6e-06],
-            [3e-06, 0.0],
-            [3e-06, 3e-06],
-            [3e-06, 3e-06],
-            [3e-06, 6e-06],
-        ])
+        @test read_in["setup"]["ahs_register"]["filling"] == [1, 1, 1, 1, 1, 0, 0]
+        for (site, expected) in zip(read_in["setup"]["ahs_register"]["sites"], [[0.0, 0.0], [0.0, 3e-06], [0.0, 6e-06], [3e-06, 0.0], [3e-06, 3e-06], [3e-06, 3e-06], [3e-06, 6e-06]])
+            @test Dec128.(site) == Dec128.(string.(expected))
+        end
+
         @test read_in["hamiltonian"]["drivingFields"][1]["amplitude"]["pattern"] == "uniform"
-        @test read_in["hamiltonian"]["drivingFields"][1]["amplitude"]["sequence"]["times"]  ≈ [0.0, 3e-07, 2.7e-06, 3e-06] atol=eps(Float64)
-        @test read_in["hamiltonian"]["drivingFields"][1]["amplitude"]["sequence"]["values"] ≈ [0, 25132800, 25132800, 0] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["drivingFields"][1]["amplitude"]["time_series"]["times"])  ≈ [0.0, 3e-07, 2.7e-06, 3e-06] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["drivingFields"][1]["amplitude"]["time_series"]["values"]) ≈ [0, 25132800, 25132800, 0] atol=eps(Float64)
 
         @test read_in["hamiltonian"]["drivingFields"][1]["phase"]["pattern"] == "uniform"
-        @test read_in["hamiltonian"]["drivingFields"][1]["phase"]["sequence"]["times"]  ≈ [0.0, 3e-06] atol=eps(Float64)
-        @test read_in["hamiltonian"]["drivingFields"][1]["phase"]["sequence"]["values"] ≈ [0.0, 0.0] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["drivingFields"][1]["phase"]["time_series"]["times"])  ≈ [0.0, 3e-06] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["drivingFields"][1]["phase"]["time_series"]["values"]) ≈ [0.0, 0.0] atol=eps(Float64)
 
         @test read_in["hamiltonian"]["drivingFields"][1]["detuning"]["pattern"] == "uniform"
-        @test read_in["hamiltonian"]["drivingFields"][1]["detuning"]["sequence"]["times"]  ≈ [0.0, 3e-07, 2.7e-06, 3e-06] atol=eps(Float64)
-        @test read_in["hamiltonian"]["drivingFields"][1]["detuning"]["sequence"]["values"] ≈ [-125664000.0, -125664000.0, 125664000.0, 125664000.0] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["drivingFields"][1]["detuning"]["time_series"]["times"])  ≈ [0.0, 3e-07, 2.7e-06, 3e-06] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["drivingFields"][1]["detuning"]["time_series"]["values"]) ≈ [-125664000.0, -125664000.0, 125664000.0, 125664000.0] atol=eps(Float64)
         
-        @test read_in["hamiltonian"]["shiftingFields"][1]["magnitude"]["pattern"] == [0.5, 1.0, 0.5, 0.5, 0.5, 0.5]
-        @test read_in["hamiltonian"]["shiftingFields"][1]["magnitude"]["sequence"]["times"]  ≈ [0.0, 3e-06] atol=eps(Float64)
-        @test read_in["hamiltonian"]["shiftingFields"][1]["magnitude"]["sequence"]["values"] ≈ [-125664000.0, 125664000.0] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["shiftingFields"][1]["magnitude"]["pattern"]) == [0.5, 1.0, 0.5, 0.5, 0.5, 0.5]
+        @test Dec128.(read_in["hamiltonian"]["shiftingFields"][1]["magnitude"]["time_series"]["times"])  ≈ [0.0, 3e-06] atol=eps(Float64)
+        @test Dec128.(read_in["hamiltonian"]["shiftingFields"][1]["magnitude"]["time_series"]["values"]) ≈ [-125664000.0, 125664000.0] atol=eps(Float64)
 
         dev._properties = MockAhsDeviceCapabilities(Dict("bad_program"=>Braket.GenericDeviceActionProperties(["1"], "braket.ir.ahs.program")), para_props)
         @test_throws ErrorException Braket.discretize(ahs, dev)
     end
-    =#
 end

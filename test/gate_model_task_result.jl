@@ -31,14 +31,14 @@ non_zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     action = Braket.Program(c)
     @testset for (shots, result) in zip([0, 100], [zero_shots_result, non_zero_shots_result])
         task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", shots, "arn1", nothing, nothing, nothing, nothing, nothing)
-        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing)
+        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
         r = result(task_metadata, additional_metadata)
         g = Braket.format_result(r)
         @test g isa Braket.GateModelQuantumTaskResult
         @test sprint(show, g) == "GateModelQuantumTaskResult\n"
     end
     task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 0, "arn1", nothing, nothing, nothing, nothing, nothing)
-    additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing)
+    additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
     result = Braket.GateModelQuantumTaskResult(task_metadata, JSON3.read(JSON3.write(additional_metadata), Braket.AdditionalMetadata), nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     @test JSON3.read("{\"task_metadata\": $(JSON3.write(task_metadata)), \"additional_metadata\": $(JSON3.write(additional_metadata))}", Braket.GateModelQuantumTaskResult) == result
 end
@@ -61,7 +61,7 @@ end
     samp = ir(Braket.Sample(ho, Int[2]))
     action = Braket.Program(Braket.header_dict[Braket.Program], [Braket.IR.CNot(0, 1, "cnot"), Braket.IR.CNot(2, 3, "cnot")], [Braket.IR.Probability([1], "probability"), Braket.IR.Expectation(["z"], nothing, "expectation"), Braket.IR.Variance(["x", "x"], [0, 2], "variance"), samp], [])
     task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
-    additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing)
+    additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
     task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
         measurements,
         nothing,
@@ -80,7 +80,7 @@ end
 
     @testset "result without measurements or measurementProbabilities" begin
         task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
-        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing)
+        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
         task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
             nothing,
             nothing,
@@ -94,7 +94,7 @@ end
     @testset "bad result type in results for shots > 0" begin
         action = Braket.Program(Braket.header_dict[Braket.Program], [Braket.IR.CNot(0, 1, "cnot"), Braket.IR.CNot(2, 3, "cnot")], [Braket.IR.DensityMatrix([1,3], "densitymatrix")], [])
         task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
-        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing)
+        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
         task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
             measurements,
             nothing,

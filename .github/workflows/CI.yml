@@ -15,20 +15,50 @@ concurrency:
   cancel-in-progress: ${{ startswith(github.ref, 'refs/pull/') }}
 
 jobs:
-  test:
+  os-test:
     runs-on: ${{ matrix.os }}
+    # don't run on draft PRs
+    if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+    # allow windows Python to fail
+    continue-on-error: ${{ matrix.os == 'windows-latest' && matrix.group == 'PyBraket-unit' }}
+    strategy:
+      fail-fast: true
+      max-parallel: 2
+      matrix:
+        group:
+          - Braket-unit
+          - PyBraket-unit
+        os: [windows-latest, macOS-latest]        
+        arch: ['x64']
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Set up Julia"
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: 1.8
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/julia-buildpkg@latest
+      - run: |
+          git config --global user.name Tester
+          git config --global user.email te@st.er
+      - name: "Run tests"
+        uses: julia-actions/julia-runtest@v1
+        env:
+          GROUP: ${{ matrix.group }}
+          JULIA_CONDAPKG_VERBOSITY: 2
+  version-test:
+    runs-on: ubuntu-latest 
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     # allow failures on nightly Julia
     continue-on-error: ${{ matrix.version == 'nightly' }}
     strategy:
       fail-fast: true
-      max-parallel: 4
+      max-parallel: 2
       matrix:
         group:
           - Braket-unit
           - PyBraket-unit
-        os: [windows-latest, ubuntu-latest, macOS-latest]        
         version: ['1.6', '1.7', '1.8', 'nightly']
         arch: ['x64']
     steps:
@@ -42,18 +72,25 @@ jobs:
       - run: |
           git config --global user.name Tester
           git config --global user.email te@st.er
-      - uses: julia-actions/julia-runtest@v1
+      - name: "Run tests"
+        uses: julia-actions/julia-runtest@v1
         env:
+          JULIA_CONDAPKG_VERBOSITY: 2
           GROUP: ${{ matrix.group }}
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v2
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: "Process coverage"
+        uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: src,PyBraket/src
+      - name: "Upload coverage"
+        uses: codecov/codecov-action@v2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+    needs: [os-test, version-test]
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1

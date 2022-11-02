@@ -16,7 +16,7 @@ function set_aws_creds(test_type)
     end
 end
 
-const GROUP = get(ENV, "GROUP", "All")
+const GROUP = get(ENV, "GROUP", "PyBraket-unit")
 
 groups = GROUP == "All" ? ["PyBraket-integ", "PyBraket-unit"] : [GROUP]
 
@@ -33,6 +33,6 @@ for group in groups
         include(joinpath(@__DIR__, "gates.jl"))
         include(joinpath(@__DIR__, "ahs.jl"))
     elseif test_type == "integ"
-        include(joinpath(@__DIR__, "/integ_tests/runtests.jl"))
+        include(joinpath(@__DIR__, "integ_tests/runtests.jl"))
     end
 end
