@@ -72,6 +72,6 @@ for group in groups
         develop_subpackage(pkg_name)
         subpkg_path = subpackage_path(pkg_name)
         # this should inherit the GROUP envvar
-        Pkg.test(PackageSpec(; name=pkg_name, path=subpkg_path))
+        Pkg.test(PackageSpec(; name=pkg_name, path=subpkg_path); coverage=get(ENV, "COVERAGE", false))
     end
 end
