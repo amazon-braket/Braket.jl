@@ -19,7 +19,7 @@ struct Kraus <: Noise
 end
 
 Kraus(mats::Vector{Vector{Vector{Vector{Float64}}}}) = Kraus(complex_matrix_from_ir.(mats))
-Base.:(==)(k1::Kraus, k2::Kraus) = k1.matrices == k2.matrices
+Base.:(==)(k1::Kraus, k2::Kraus) = all(m1 ≈ m2 for (m1, m2) in zip(k1.matrices, k2.matrices))
 function ir(g::Kraus, target::QubitSet, ::Val{:JAQCD}; kwargs...)
     mats = complex_matrix_to_ir.(g.matrices)
     t_c = collect(target[1:convert(Int, log2(size(g.matrices[1], 1)))])

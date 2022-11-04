@@ -110,7 +110,7 @@ struct Unitary <: Gate
     matrix::Matrix{ComplexF64}
 end
 Unitary(mat::Vector{Vector{Vector{Float64}}}) = Unitary(complex_matrix_from_ir(mat))
-Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix == u2.matrix
+Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix ≈ u2.matrix
 qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
 
 function ir(g::Unitary, target::QubitSet, ::Val{:JAQCD}; kwargs...)

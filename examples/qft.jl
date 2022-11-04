@@ -11,7 +11,7 @@ using Braket, PyBraket
 using Plots
 
 # ╔═╡ 5ed4321a-467d-11ed-23c2-c19a80e0d7f1
-path_to_braketjl = "/Users/hyatkath/.julia/dev/Braket"
+path_to_braketjl = joinpath(ENV["HOME"], ".julia/dev/Braket")
 
 # ╔═╡ b6659bc6-2166-4cc0-ab33-197d0cb7588c
 import Pkg; Pkg.develop(Pkg.PackageSpec(path=path_to_braketjl)); Pkg.develop(Pkg.PackageSpec(path=joinpath(path_to_braketjl, "PyBraket")))
