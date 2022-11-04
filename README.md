@@ -2,7 +2,7 @@
 
 **Braket.jl is not an officially supported AWS product.**
 
-This package is a Julia implementation of the [Amazon Braket SDK](https://github.com/aws/amazon-braket-sdk-python).
+This package is a Julia implementation of the [Amazon Braket SDK](https://github.com/aws/amazon-braket-sdk-python) allowing customers to access [Quantum Hardware and Simulators](https://aws.amazon.com/braket/quantum-computers/). 
 
 This is *experimental* software, and support may be discontinued in the future. For a fully supported SDK, please use
 the [Python SDK](https://github.com/aws/amazon-braket-sdk-python). We may change, remove, or deprecate parts of the API when making new releases.
@@ -63,6 +63,8 @@ res = result(run(dev, c, shots=0))
 
 ## TODO and development roadmap
 
+As Amazon Braket expands its featureset, we welcome contributions and development from the Julia community.  
+
 What's currently implemented in *pure* Julia:
 
 - All of the [`Amazon Braket schemas`](https://github.com/aws/amazon-braket-schemas-python).
@@ -78,7 +80,8 @@ What's currently implemented in *pure* Julia:
 - All gates and noise operations
 - Analog Hamiltonian Simulation
 
-Features which we still need to add:
+**Features to add:**
+
 - Support for pickled jobs results
 - Local jobs
 - More robust entry point verification for jobs
