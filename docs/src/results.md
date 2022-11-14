@@ -1,6 +1,9 @@
 # Results
 ```@docs
 Braket.Result
+AdjointGradient
+AdjointGradient(::Observable, ::Vector{QubitSet}, ::Vector) 
+AdjointGradient(::Circuit, ::Observable, ::Vector{QubitSet}, ::Vector{String}) 
 Expectation
 Expectation(::Any, ::Any)
 Expectation(::Circuit, ::Any, ::Any)

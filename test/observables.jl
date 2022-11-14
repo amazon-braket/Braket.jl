@@ -1,8 +1,9 @@
 using Braket, Braket.Observables, Test, JSON3, StructTypes, LinearAlgebra
-using Braket: VIRTUAL, PHYSICAL, OpenQASMSerializationProperties, pauli_eigenvalues
+using Braket: VIRTUAL, PHYSICAL, OpenQASMSerializationProperties, pauli_eigenvalues, IRObservable
 using LinearAlgebra: eigvals
 
 @testset "Observables" begin
+    Braket.IRType[] = :JAQCD
     @testset "pauli eigenvalues" begin
         z = [1.0 0.0; 0.0 -1.0]
         @test pauli_eigenvalues(1) == diag(z)
@@ -15,11 +16,12 @@ using LinearAlgebra: eigvals
         @test qubit_count(o) == 1
         rt = Expectation(o, [0])
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
+        @test ir(o) isa IRObservable
     end
     @testset "TensorProduct" begin
         tp = Observables.TensorProduct(["x", "y", "z"])
         @test ir(tp) == ["x", "y", "z"]
-        @test JSON3.write(tp) == replace("""$(Braket.ir(tp))""", " "=>"")
+        @test JSON3.write(tp) == JSON3.write(ir(tp))
         @test qubit_count(tp) == 3
         rt = Expectation(tp, [0, 1, 2])
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
@@ -33,6 +35,7 @@ using LinearAlgebra: eigvals
         @test qubit_count(tp) == 2
         rt = Expectation(tp, [0, 2])
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
+        @test ir(tp) isa IRObservable
     end
     @testset "TensorProduct mixed types" begin
         m = [1. -im; im -1.]
@@ -40,21 +43,36 @@ using LinearAlgebra: eigvals
         tp = Observables.TensorProduct([Observables.X(), o, Observables.Z()])
         @test qubit_count(tp) == 3
         rt = Expectation(tp, [0, 1, 2])
+        @test ir(tp) isa IRObservable
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
+    end
+    @testset "TensorProduct doesn't accept Sum" begin
+        s = 2.0 * Observables.X() * Observables.X() + 3.0 * Observables.Z() * Observables.Z()
+        @test_throws ArgumentError Observables.TensorProduct([Observables.X(), s])
+    end
+    @testset "Sum" begin
+        s = 2.0 * Observables.X() * Observables.X() + 3.0 * Observables.Z() * Observables.Z()
+        @test length(s) == 2
+        @test s.summands[1].coefficient == 2.0
+        @test s.summands[2].coefficient == 3.0
+        s2 = -1.0 * s
+        @test length(s2) == 2
+        @test s2.summands[1].coefficient == -2.0
+        @test s2.summands[2].coefficient == -3.0
     end
     @test_throws ErrorException StructTypes.constructfrom(Observables.Observable, ["x", 1, "z"])
     m = [1 -im; im -1]
     HO = Observables.HermitianObservable(m)
-    @test JSON3.write(HO) == replace("""$(Braket.ir(HO))""", " "=>"")
-    m_raw = first(ir(HO))
-    @test StructTypes.constructfrom(Observables.Observable, m_raw) == HO
+    HO_ir = ir(HO)
+    @test JSON3.write(HO) == JSON3.write(ir(HO)) 
+    @test StructTypes.constructfrom(Observables.Observable, convert(IRObservable, HO_ir)) == HO
     @test copy(HO) == HO
     for typ in (Observables.H, Observables.I, Observables.Z, Observables.X, Observables.Y)
         @test copy(typ()) == typ()
-        @test JSON3.write(typ()) == """$(Braket.ir(typ()))"""
+        @test JSON3.write(typ()) == JSON3.write(ir(typ()))
         @test ishermitian(typ())
     end
-
+    Braket.IRType[] = :OpenQASM
     @testset "eigenvalues" begin
         mat = [1.0 1.0 - im; 1.0 + 1im -1.0]
         h = Observables.HermitianObservable(mat)
@@ -92,6 +110,8 @@ using LinearAlgebra: eigvals
             ( Observables.H(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [3], "h(q[3])"),
             ( Observables.H(), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), [3], "h(\$3)"),
             ( Observables.H(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), nothing, "h all"),
+            ( 2.0 * Observables.H() - 5.0 * Observables.Z() * Observables.X(), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), [[2], [3, 4]], "2.0 * h(\$2) - 5.0 * z(\$3) @ x(\$4)"),
+            ( 2.0 * Observables.H() - 5.0 * Observables.Z() * Observables.X(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [[2], [3, 4]], "2.0 * h(q[2]) - 5.0 * z(q[3]) @ x(q[4])"),
             ( Observables.HermitianObservable(diagm(ones(Int64, 4))), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [1, 2], "hermitian([[1+0im, 0im, 0im, 0im], [0im, 1+0im, 0im, 0im], [0im, 0im, 1+0im, 0im], [0im, 0im, 0im, 1+0im]]) q[1], q[2]"),
             ( Observables.HermitianObservable(diagm(ones(Int64, 4))), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), [1, 2], "hermitian([[1+0im, 0im, 0im, 0im], [0im, 1+0im, 0im, 0im], [0im, 0im, 1+0im, 0im], [0im, 0im, 0im, 1+0im]]) \$1, \$2"),
             ( Observables.HermitianObservable(diagm(ones(Int64, 2))), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), nothing, "hermitian([[1+0im, 0im], [0im, 1+0im]]) all"),

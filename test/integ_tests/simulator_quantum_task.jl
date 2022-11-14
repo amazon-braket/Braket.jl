@@ -128,7 +128,7 @@ end
             device = AwsDevice(_arn=simulator_arn)
             res = result(device(task, shots=SHOTS, s3_destination_folder=s3_destination_folder))
             @test length(res.result_types) == 1
-            @test isapprox(res[Probability(qubits(circuit))], [0.5, 0.0, 0.0, 0.5], rtol=tol["rtol"], atol=tol["atol"])
+            @test isapprox(res[Probability()], [0.5, 0.0, 0.0, 0.5], rtol=tol["rtol"], atol=tol["atol"])
         end
     end
     @testset "Bell pair marginal probability" begin

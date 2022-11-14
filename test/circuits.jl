@@ -270,6 +270,31 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         c = Probability(c)
         @test c.observables_simultaneously_measureable
     end
+    @testset "Adjoint gradient" begin
+        α = FreeParameter(:alpha)
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
+        op2 = 2.0 * Braket.Observables.Y() * Braket.Observables.Y()
+        c = AdjointGradient(c, op, [QubitSet(0, 1)], [α])
+        @test length(c.result_types) == 1
+        @test c.result_types[1] isa AdjointGradient
+        @test c.result_types[1].observable == op
+        @test c.result_types[1].targets == [QubitSet(0, 1)]
+        @test c.result_types[1].parameters == ["alpha"]
+        @test_throws ArgumentError AdjointGradient(c, op2, [QubitSet(0, 1)], [α])
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
+        @test_throws DimensionMismatch AdjointGradient(c, op, [QubitSet(0)], [α])
+        op3 = op + op2
+        @test_throws DimensionMismatch AdjointGradient(c, op3, [QubitSet(0, 1)], [α])
+        # make sure qubit count is correct
+        α = FreeParameter(:alpha)
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
+        @test qubit_count(c) == 2
+        c = AdjointGradient(c, op, [QubitSet(1, 2)], [α])
+        @test qubit_count(c) == 3
+    end
     @testset "Basis rotation instructions" begin
         @testset "Basic" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
@@ -664,6 +689,8 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
     end
 
     @testset "Result types & OpenQASM" begin
+        sum_obs = 2.0 * Observables.H() - 5.0 * Observables.Z() * Observables.X()
+        herm = Observables.HermitianObservable(diagm(ones(2)))
         @testset for ir_bolus in [
             (Expectation(Braket.Observables.I(), 0), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result expectation i(q[0])",),
             (Expectation(Braket.Observables.I()), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result expectation i all",),
@@ -672,6 +699,14 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             (DensityMatrix([0, 2]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result density_matrix q[0], q[2]",),
             (DensityMatrix(0), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "#pragma braket result density_matrix \$0",),
             (Amplitude(["01", "10"]), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "#pragma braket result amplitude \"01\", \"10\"",),
+            (AdjointGradient(Observables.H(), 0, ["alpha"]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(h(q[0])) alpha",),
+            (AdjointGradient(Observables.H(), 0), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(h(q[0])) all",),
+            (AdjointGradient(Observables.X() * Observables.Y(), [0, 1], []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(x(q[0]) @ y(q[1])) all",),
+            (AdjointGradient(Observables.H(), 0, []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(h(q[0])) all",),
+            (AdjointGradient(sum_obs, [[0], [1, 2]], ["alpha"]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(2.0 * h(q[0]) - 5.0 * z(q[1]) @ x(q[2])) alpha",),
+            (AdjointGradient(sum_obs, [[0], [1, 2]]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(2.0 * h(q[0]) - 5.0 * z(q[1]) @ x(q[2])) all",),
+            (AdjointGradient(sum_obs, [[0], [1, 2]], []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(2.0 * h(q[0]) - 5.0 * z(q[1]) @ x(q[2])) all",),
+            (AdjointGradient(herm, 0, []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(hermitian([[1.0+0im, 0im], [0im, 1.0+0im]]) q[0]) all",),
             (Probability(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result probability all",),
             (Probability([0, 2]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result probability q[0], q[2]",),
             (Probability(0), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "#pragma braket result probability \$0",),

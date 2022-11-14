@@ -61,6 +61,7 @@ julia> Circuit(v);
 ```
 """
 Circuit(v::AbstractVector) = (c = Circuit(); c(v); return c)
+Base.show(io::IO, circ::Circuit) = print(io, "Circuit($(qubit_count(circ)) qubits)")
 
 function make_bound_circuit(c::Circuit, param_values::Dict{Symbol, Number})
     clamped_circ = Circuit()
@@ -179,11 +180,12 @@ julia> qubit_count(c)
 ```
 """
 qubit_count(c::Circuit) = length(qubits(c))
+qubit_count(p::Program) = length(mapreduce(ix->ix.target, union, p.instructions))
 
 (rt::Result)(c::Circuit) = add_result_type!(c, rt)
 
 Base.convert(::Type{Circuit}, p::Program) = Circuit(Moments(p.instructions), p.instructions, Result[StructTypes.constructfrom(Result, r) for r in p.results], p.basis_rotation_instructions)
-Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); return Program(braketSchemaHeader("braket.ir.jaqcd.program" ,"1"), c.instructions, ir.(c.result_types), c.basis_rotation_instructions))
+Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); return Program(braketSchemaHeader("braket.ir.jaqcd.program" ,"1"), c.instructions, ir.(c.result_types, Val(:JAQCD)), c.basis_rotation_instructions))
 Circuit(p::Program) = convert(Circuit, p)
 Program(c::Circuit) = convert(Program, c)
 
@@ -221,9 +223,9 @@ function ir(c::Circuit, ::Val{:OpenQASM}; serialization_properties::Serializatio
     end
     return OpenQasmProgram(header_dict[OpenQasmProgram], join(vcat(header, ixs, rts), "\n"), nothing)
 end
-ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = JSON3.write(convert(Program, c))
-ir(p::Program, ::Val{:JAQCD}; kwargs...) = JSON3.write(p)
-ir(p::Program; kwargs...) = ir(p, Val(IRType[]); kwargs...)
+ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = convert(Program, c)
+ir(p::Program, ::Val{:JAQCD}; kwargs...) = p
+ir(p::Program; kwargs...) = ir(p, Val(:JAQCD); kwargs...)
 
 function Base.append!(c1::Circuit, c2::Circuit)
     foreach(ix->add_instruction!(c1, ix), c2.instructions)
@@ -371,13 +373,17 @@ function add_to_qubit_observable_mapping!(c::Circuit, o::Observables.TensorProdu
 end
 add_to_qubit_observable_mapping!(c::Circuit, o::Observables.Observable, obs_targets::Vector) = add_to_qubit_observable_mapping!(c, o, QubitSet(obs_targets))
 add_to_qubit_observable_set!(c::Circuit, rt::ObservableResult) = union!(c.qubit_observable_set, Set(rt.targets))
+add_to_qubit_observable_set!(c::Circuit, rt::AdjointGradient)  = union!(c.qubit_observable_set, Set(reduce(union, rt.targets)))
 add_to_qubit_observable_set!(c::Circuit, rt::Result) = c.qubit_observable_set
 
 function add_result_type!(c::Circuit, rt::Result)
     rt_to_add = rt
     if rt_to_add ∉ c.result_types
+        if rt_to_add isa AdjointGradient && any(rt_ isa AdjointGradient for rt_ in c.result_types)
+            throw(ArgumentError("only one AdjointGradient result can be present on a circuit."))
+        end
         obs = extract_observable(rt_to_add)
-        if !isnothing(obs) && c.observables_simultaneously_measureable
+        if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa AdjointGradient)
             add_to_qubit_observable_mapping!(c, obs, rt_to_add.targets)
         end
         add_to_qubit_observable_set!(c, rt_to_add)
@@ -387,7 +393,6 @@ function add_result_type!(c::Circuit, rt::Result)
 end
 add_result_type!(c::Circuit, rt::Result, target) = add_result_type!(c, remap(rt, target))
 add_result_type!(c::Circuit, rt::Result, target_mapping::Dict{<:Integer, <:Integer}) = add_result_type!(c, remap(rt, target_mapping))
-
 
 function add_instruction!(c::Circuit, ix::Instruction)
     to_add = [ix]
@@ -709,6 +714,36 @@ julia> c = StateVector(c);
 ```
 """
 StateVector(c::Circuit) = (sv = StateVector(); sv(c))
+        
+"""
+    AdjointGradient(c::Circuit, o::Observable, targets, parameters) -> Circuit
+
+Constructs an `AdjointGradient` computation with respect to the expectation value of an observable `o`
+on qubits `targets`, computing partial derivatives of `parameters`, and adds it as a result to [`Circuit`](@ref) `c`.
+
+`o` may be any `Observable`. `targets` must be a `Vector` of `QubitSet`s (or a single `QubitSet`, if `o` is not a `Sum`),
+each of which is the same length as the qubit count of the corresponding term in `o`.
+`parameters` can have elements which are [`FreeParameter`](@ref)s or `String`s, or `["all"]`,
+in which case the gradient is computed with respect to all parameters in the circuit.
+
+# Examples
+```jldoctest
+julia> c = Circuit();
+
+julia> α = FreeParameter("alpha");
+
+julia> c = H(c, collect(0:10));
+
+julia> c = Rx(c, collect(0:10), α);
+
+julia> c = AdjointGradient(c, Braket.Observables.Z(), 0, [α]);
+```
+"""
+AdjointGradient(c::Circuit, o::Observable, target::Vector{QubitSet}, parameters) = (ag = AdjointGradient(o, target, parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::Vector{Vector{T}}, parameters) where {T} = (ag = AdjointGradient(o, target, parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::Vector{<:IntOrQubit}, parameters) = (ag = AdjointGradient(o, target, parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::QubitSet, parameters) = (ag = AdjointGradient(o, [target], parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::IntOrQubit, parameters) = (ag = AdjointGradient(o, [target], parameters); ag(c))
 
 function validate_circuit_and_shots(c::Circuit, shots::Int)
     isempty(c.instructions) && throw(ErrorException("Circuit must have instructions to run on a device."))
@@ -716,7 +751,7 @@ function validate_circuit_and_shots(c::Circuit, shots::Int)
     if shots > 0 && !isempty(c.result_types)
         !c.observables_simultaneously_measureable && throw(ErrorException("Observables cannot be measured simultaneously."))
         for rt in c.result_types
-            (rt isa StateVector || rt isa Amplitude) && throw(ErrorException("StateVector or Amplitude cannot be specified when shots>0"))
+            (rt isa StateVector || rt isa Amplitude || rt isa AdjointGradient) && throw(ErrorException("StateVector or Amplitude cannot be specified when shots>0"))
             if rt isa Probability
                 num_qubits = length(rt.targets) == 0 ? qubit_count(c) : length(rt.targets)
                 num_qubits > 40 && throw(ErrorException("Probability target must be less than or equal to 40 qubits."))
@@ -728,5 +763,5 @@ end
 
 Base.:(==)(c1::Circuit, c2::Circuit) = (c1.instructions == c2.instructions && c1.result_types == c2.result_types)
 function Base.show(io::IO, program::OpenQasmProgram)
-    println(io, "OpenQASM program")
+    print(io, "OpenQASM program")
 end

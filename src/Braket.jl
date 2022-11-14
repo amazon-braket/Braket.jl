@@ -9,7 +9,7 @@ export logs, log_metric, metrics
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
 
-export Expectation, Sample, Variance, Amplitude, Probability, StateVector, DensityMatrix, Result
+export AdjointGradient, Expectation, Sample, Variance, Amplitude, Probability, StateVector, DensityMatrix, Result
 
 using AWSS3
 using AWS
@@ -41,21 +41,21 @@ Currently, two formats are supported:
   - `:JAQCD`, the Amazon Braket IR
   - `:OpenQASM`, the OpenQASM3 representation
 
-By default, `IRType` is initialized to use `:JAQCD`, although this may change
+By default, `IRType` is initialized to use `:OpenQASM`, although this may change
 in the future. The current default value can be checked by calling `IRType[]`.
 To change the default IR format, set `IRType[]`.
 
 # Examples
 ```jldoctest
 julia> IRType[]
-:JAQCD
-
-julia> IRType[] = :OpenQASM;
-
-julia> IRType[]
 :OpenQASM
 
 julia> IRType[] = :JAQCD;
+
+julia> IRType[]
+:JAQCD
+
+julia> IRType[] = :OpenQASM;
 ```
 """
 const IRType = Ref{Symbol}()
@@ -65,7 +65,7 @@ const GlobalTrackerContext = Ref{TrackerContext}()
 
 function __init__()
     AWS.DEFAULT_BACKEND[] = AWS.DownloadsBackend()
-    IRType[] = :JAQCD
+    IRType[] = :OpenQASM
     Prices[] = Pricing([])
     GlobalTrackerContext[] = TrackerContext()
 end
@@ -82,6 +82,7 @@ qubit_count(t) = throw(MethodError(qubit_count, t))
 
 include("qubit_set.jl")
 include("raw_schema.jl")
+ir(p::Union{AHSProgram, BlackbirdProgram, OpenQasmProgram}) = p
 using .IR
 include("raw_jobs_config.jl")
 include("raw_task_result_types.jl")

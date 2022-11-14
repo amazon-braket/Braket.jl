@@ -83,6 +83,7 @@ Valid `kwargs` are:
   - `poll_timeout_seconds::Int` - maximum number of seconds to wait while polling for results. Default: $DEFAULT_RESULTS_POLL_TIMEOUT
   - `poll_interval_seconds::Int` - default number of seconds to wait between attempts while polling for results. Default: $DEFAULT_RESULTS_POLL_INTERVAL
   - `tags::Dict{String, String}` - tags for the `AwsQuantumTask`
+  - `inputs::Dict{String, Float64}` - input values for any free parameters in the `task_spec`
 """
 function AwsQuantumTask(device_arn::String,
                         task_spec::Union{AbstractProgram, Circuit, AnalogHamiltonianSimulation};
@@ -92,8 +93,9 @@ function AwsQuantumTask(device_arn::String,
                         disable_qubit_rewiring::Bool=false,
                         poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT,
                         poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL,
-                        tags::Dict{String, String}=Dict{String, String}())
-    args = prepare_task_input(task_spec, device_arn, s3_destination_folder, shots, device_params, disable_qubit_rewiring, tags=tags, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds)
+                        tags::Dict{String, String}=Dict{String, String}(),
+                        inputs::Dict{String,Float64}=Dict{String, Float64}())
+    args = prepare_task_input(task_spec, device_arn, s3_destination_folder, shots, device_params, disable_qubit_rewiring, tags=tags, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs)
     return AwsQuantumTask(args)
 end
 
@@ -139,7 +141,26 @@ function prepare_task_input(ahs::AnalogHamiltonianSimulation, device_arn::String
     return prepare_task_input(ir(ahs), device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; kwargs...)
 end
 
-function prepare_task_input(program::Union{AHSProgram, BlackbirdProgram, OpenQasmProgram}, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+    common       = _create_common_params(device_arn, s3_folder, shots; kwargs...)
+    client_token = string(uuid1())
+    tags         = get(kwargs, :tags, Dict{String,String}())
+    device_parameters = Dict{String, Any}() # not currently used
+    dev_params   = JSON3.write(device_parameters)
+    extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
+    
+    inputs = get(kwargs, :inputs, Dict{String, Float64}())
+    if !isempty(inputs)
+        inputs_merged = merge(program.inputs, inputs)
+        program_ = OpenQasmProgram(program.braketSchemaHeader, program.source, inputs_merged)
+        action   = JSON3.write(program_)
+    else
+        action   = JSON3.write(program)
+    end
+    return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
+end
+
+function prepare_task_input(program::Union{AHSProgram, BlackbirdProgram}, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     device_parameters = Dict{String, Any}() # not currently used
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
@@ -150,8 +171,40 @@ function prepare_task_input(program::Union{AHSProgram, BlackbirdProgram, OpenQas
     return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
 end
 
-function prepare_task_input(circuit::Union{Program, Circuit}, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(circuit::Circuit, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     validate_circuit_and_shots(circuit, shots)
+    common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
+    paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
+    T = GateModelSimulatorDeviceParameters # default to use simulator
+    if occursin("ionq", device_arn)
+        T = IonqDeviceParameters
+    elseif occursin("rigetti", device_arn)
+        T = RigettiDeviceParameters
+    elseif occursin("oqc", device_arn)
+        T = OqcDeviceParameters
+    end
+    qubit_reference_type = VIRTUAL
+    if disable_qubit_rewiring || Instruction(StartVerbatimBox()) in circuit.instructions
+        #|| any(instruction.operator isa PulseGate for instruction in circuit.instructions)
+        qubit_reference_type = QubitReferenceType.PHYSICAL
+    end
+    serialization_properties = OpenQASMSerializationProperties(qubit_reference_type=qubit_reference_type)
+    oq3_program = ir(circuit, Val(:OpenQASM), serialization_properties=serialization_properties)
+    inputs = get(kwargs, :inputs, Dict{String, Float64}())
+    program_inputs = isnothing(oq3_program.inputs) ? Dict{String, Float64}() : oq3_program.inputs
+    inputs_merged = !isempty(inputs) ? merge(program_inputs, inputs) : oq3_program.inputs
+    oq3_program = OpenQasmProgram(oq3_program.braketSchemaHeader, oq3_program.source, inputs_merged)
+
+    device_parameters = T(header_dict[T], paradigm_parameters)
+    client_token = string(uuid1())
+    action       = JSON3.write(oq3_program)
+    dev_params   = JSON3.write(device_parameters)
+    tags         = get(kwargs, :tags, Dict{String,String}())
+    extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
+    return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
+end
+
+function prepare_task_input(circuit::Program, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
     T = GateModelSimulatorDeviceParameters # default to use simulator
@@ -164,7 +217,7 @@ function prepare_task_input(circuit::Union{Program, Circuit}, device_arn::String
     end
     device_parameters = T(header_dict[T], paradigm_parameters)
     client_token = string(uuid1())
-    action       = ir(circuit)
+    action       = JSON3.write(circuit)
     dev_params   = JSON3.write(device_parameters)
     tags         = get(kwargs, :tags, Dict{String,String}())
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
@@ -384,7 +437,7 @@ function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{In
     !haskey(ir_obj, "results") && return result_types
     for result_type in ir_obj["results"]
         ir_obs = get(result_type, "observable", nothing)
-        rt     = StructTypes.constructfrom(AbstractProgramResult, result_type)
+        rt     = JSON3.read(JSON3.write(result_type), AbstractProgramResult)
         obs    = isnothing(ir_obs) ? nothing : StructTypes.constructfrom(Observables.Observable, rt.observable)
         targs  = rt.targets
         typ    = result_type["type"]
@@ -441,13 +494,12 @@ function from_dict(::Type{GateModelQuantumTaskResult}, r::GateModelTaskResult)
     task_mtd = r.taskMetadata
     addi_mtd = r.additionalMetadata
     rts      = r.resultTypes
-    #=vals     = map(rts) do rt
+    vals = map(rts) do rt
         !(rt.type isa IR.Amplitude) && return rt.value
-        # need to fix return dict
-        fixed_dict = Dict(string(k)=>complex(v[1], v[2]) for (k,v) in rt.value)
-        return fixed_dict
-    end=#
-    vals = [rt.value for rt in rts]
+        val_keys = string.(keys(rt.value))
+        val_vals = [complex(v...) for v in values(rt.value)]
+        return Dict{String, ComplexF64}(zip(val_keys, val_vals))
+    end
     return GateModelQuantumTaskResult(task_mtd, addi_mtd, rts, vals, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
 end
 

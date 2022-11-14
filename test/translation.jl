@@ -55,7 +55,7 @@ using Braket: operator, target
     @testset "Results translation" begin
         json_str = """[{"observable":["i"],"targets":[0],"type":"expectation"},{"observable":["z"],"targets":[0],"type":"expectation"}]"""
         parsed = JSON3.read(json_str, Vector{Braket.AbstractProgramResult})
-        raw = Braket.AbstractProgramResult[Braket.IR.Expectation(["i"], [0], "expectation"), Braket.IR.Expectation(["z"], [0], "expectation")]
+        raw = Braket.AbstractProgramResult[Braket.IR.Expectation(convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, ["i"]), [0], "expectation"), Braket.IR.Expectation(convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, ["z"]), [0], "expectation")]
         for (e_r, e_p) in zip(raw, parsed)
             @test e_r == e_p
         end
@@ -70,14 +70,14 @@ using Braket: operator, target
     @testset "Program translation" begin
         json_str = """{"braketSchemaHeader": {"name": "braket.ir.jaqcd.program", "version": "1"}, "instructions": [{"target": 0, "type": "x"}, {"target": 0, "type": "z"}], "results": [{"observable":["i"],"targets":[0],"type":"expectation"},{"observable":["z"],"targets":[0],"type":"expectation"}], "basis_rotation_instructions": []}"""
         parsed = Braket.parse_raw_schema(json_str)
-        raw    = Braket.Program(Braket.braketSchemaHeader("braket.ir.jaqcd.program", "1"), [Braket.Instruction(X(), 0), Braket.Instruction(Z(), 0)], Braket.AbstractProgramResult[Braket.IR.Expectation(["i"], [0], "expectation"), Braket.IR.Expectation(["z"], [0], "expectation")], Braket.Instruction[])
+        raw    = Braket.Program(Braket.braketSchemaHeader("braket.ir.jaqcd.program", "1"), [Braket.Instruction(X(), 0), Braket.Instruction(Z(), 0)], Braket.AbstractProgramResult[Braket.IR.Expectation(convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, ["i"]), [0], "expectation"), Braket.IR.Expectation(convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, ["z"]), [0], "expectation")], Braket.Instruction[])
         @test parsed.braketSchemaHeader == raw.braketSchemaHeader
         @test parsed.instructions       == raw.instructions
         @test parsed.results            == raw.results
         @test parsed.basis_rotation_instructions       == raw.basis_rotation_instructions
         @test Braket.parse_raw_schema(JSON3.write(raw)) == raw
         @test Braket.Program(Circuit(raw)) == raw
-        @test ir(raw) == ir(Circuit(raw))
+        @test ir(raw) == ir(Circuit(raw), Val(:JAQCD))
 
         noisy_json_str = """{"braketSchemaHeader": {"name": "braket.ir.jaqcd.program", "version": "1"}, "instructions": [{"target": 0, "type": "x"}, {"gamma": 0.1, "target": 0, "type": "amplitude_damping"}, {"target": 1, "type": "y"}, {"control": 0, "target": 2, "type": "cnot"}, {"gamma": 0.1, "target": 0, "type": "amplitude_damping"}, {"gamma": 0.1, "target": 2, "type": "amplitude_damping"}, {"target": 1, "type": "x"}, {"target": 2, "type": "z"}, {"gamma": 0.1, "target": 2, "type": "amplitude_damping"}], "results": [{"targets": null, "type": "probability"}, {"observable": ["z"], "targets": [0], "type": "expectation"}, {"targets": [0, 1], "type": "densitymatrix"}], "basis_rotation_instructions": []}"""
 
@@ -95,12 +95,11 @@ using Braket: operator, target
         for (prt, rrt) in zip(p.results, raw.results)
             @test prt == rrt
         end
-
-        @test JSON3.read(ir(raw), Dict) == JSON3.read(ir(Circuit(raw)), Dict)
+        @test JSON3.read(JSON3.write(raw), Dict) == JSON3.read(JSON3.write(ir(Circuit(raw), Val(:JAQCD))), Dict)
     end
 
     @testset "enum translation" begin
-        for e in [Braket._CopyMode, Braket.SafeUUID, Braket.PaymentCardBrand,
+        for e in [Braket.SafeUUID, Braket.PaymentCardBrand,
                 Braket.Protocol, Braket.Extra, Braket.DeviceActionType,
                 Braket.ExecutionDay, Braket.QubitDirection,
                 Braket.PostProcessingType, Braket.ResultFormat,
