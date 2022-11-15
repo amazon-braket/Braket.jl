@@ -2,7 +2,7 @@
 
 **PyBraket.jl is not an officially supported AWS product.**
 
-This package provides Julia-Python interopability between `Braket.jl` and Python features of the Amazon Braket SDK, such as the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html) and
+This package provides Julia-Python interoperability between `Braket.jl` and Python features of the Amazon Braket SDK, such as the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html) and
 [Local Jobs](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs-local-mode.html).
 
 This is *experimental* software, and support may be discontinued in the future. For a fully supported SDK, please use
