@@ -57,3 +57,39 @@ using Braket: AtomArrangement, AtomArrangementItem, TimeSeries, DrivingField, Aw
         @test length(local_result.measurements) == 1_000
     end=#
 end
+
+
+@testset "AHS_Local_simulator" begin
+    a = 5.5e-6
+
+    register = AtomArrangement()
+    push!(register, AtomArrangementItem((0, 0) .* a))
+    
+    Ω_max = 2.5e6
+    t_max = 2π/(Ω_max)
+    Ω = TimeSeries()
+    Ω[0.0] = Ω_max
+    Ω[t_max] = Ω_max
+
+    ϕ = TimeSeries()
+    ϕ[0.0] = 0.0
+    ϕ[t_max] = 0.0
+
+    Δ = TimeSeries()
+    Δ[0.0] = 0.0
+    Δ[t_max] = 0.0
+
+    drive                   = DrivingField(Ω, ϕ, Δ)
+    ahs_program             = AnalogHamiltonianSimulation(register, drive)
+
+    ahs_local    = LocalSimulator("braket_ahs")
+    local_result = result(run(ahs_local, ahs_program, shots=1_000))
+    
+    g_count = 0
+    for meas in local_result.measurements
+        g_count += meas.post_sequence[1]
+    end
+
+    @test g_count == 1_000
+
+end
