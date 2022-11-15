@@ -58,7 +58,7 @@ c = CNot(c, 0, 1)
 c = Expectation(c, Observables.X()) # measure X on all qubits
 
 dev = AwsDevice("arn:aws:braket:::device/qpu/ionq/ionQdevice")
-res = result(run(dev, c, shots=10))
+res = result(dev(c, shots=10))
 ```
 
 ## TODO and development roadmap
