@@ -8,10 +8,10 @@ This is *experimental* software, and support may be discontinued in the future. 
 the [Python SDK](https://github.com/aws/amazon-braket-sdk-python). We may change, remove, or deprecate parts of the API when making new releases.
 Please review the [CHANGELOG](CHANGELOG.md) for information about changes in each release. 
 
-[![Stable docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://awslabs.github.io/braket-jl/stable)
-[![Latest docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://awslabs.github.io/braket-jl/dev)
-[![CI](https://github.com/awslabs/braket-jl/actions/workflows/CI.yml/badge.svg)](https://github.com/awslabs/braket-jl/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/awslabs/braket-jl/branch/main/graph/badge.svg?token=QC9P7HQY4V)](https://codecov.io/gh/awslabs/braket-jl)
+[![Stable docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://awslabs.github.io/braket.jl/stable)
+[![Latest docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://awslabs.github.io/braket.jl/dev)
+[![CI](https://github.com/awslabs/braket.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/awslabs/braket.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/awslabs/braket.jl/branch/main/graph/badge.svg?token=QC9P7HQY4V)](https://codecov.io/gh/awslabs/braket.jl)
 
 ## Installation & Prerequisites
 
