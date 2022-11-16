@@ -25,7 +25,7 @@ No. `Braket.jl` is a "software development kit" (SDK) written in [Julia](https:/
 In order to use most features of Amazon Braket, you will *not* need a Python installation or to install the Python SDK or any of its dependencies.
 There are some exceptions - if you want to run a [`LocalJob`](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs-local-mode.html)
 or run a task on one of the [`Braket local simulators`](https://github.com/aws/amazon-braket-default-simulator-python) you will need to use the Python
-interoperability package `PyBraket.jl`, which comes with `Braket.jl` as a sub-packge in the same repo. Refer to the `PyBraket.jl` `README` for more information.
+interoperability package `PyBraket.jl`, which comes with `Braket.jl` as a sub-package in the same repo. Refer to the `PyBraket.jl` `README` for more information.
 
 If you want to run tasks or Amazon Braket Hybrid Jobs on AWS managed devices, you will need to have an AWS account and to [`onboard to Braket`](https://docs.aws.amazon.com/braket/latest/developerguide/braket-enable-overview.html).
 

@@ -8,21 +8,23 @@ information to effectively respond to your bug report or contribution.
 
 ## Table of Contents
 
-* [Report Bugs/Feature Requests](#report-bugsfeature-requests)
-* [Contribute via Pull Requests (PRs)](#contribute-via-pull-requests-prs)
-  * [Pull Down the Code](#pull-down-the-code)
-  * [Run the Unit Tests](#run-the-unit-tests)
-  * [Run the Integration Tests](#run-the-integration-tests)
-  * [Make and Test Your Change](#make-and-test-your-change)
-  * [Commit Your Change](#commit-your-change)
-  * [Send a Pull Request](#send-a-pull-request)
-* [Documentation Guidelines](#documentation-guidelines)
-  * [API References (docstrings)](#api-references-docstrings)
-  * [Build and Test Documentation](#build-and-test-documentation)
-* [Find Contributions to Work On](#find-contributions-to-work-on)
-* [Code of Conduct](#code-of-conduct)
-* [Security Issue Notifications](#security-issue-notifications)
-* [Licensing](#licensing)
+- [Contributing Guidelines](#contributing-guidelines)
+  - [Table of Contents](#table-of-contents)
+  - [Report Bugs/Feature Requests](#report-bugsfeature-requests)
+  - [Contribute via Pull Requests (PRs)](#contribute-via-pull-requests-prs)
+    - [Pull Down the Code](#pull-down-the-code)
+    - [Run the Unit Tests](#run-the-unit-tests)
+    - [Run the Integration Tests](#run-the-integration-tests)
+    - [Make and Test Your Change](#make-and-test-your-change)
+    - [Commit Your Change](#commit-your-change)
+    - [Send a Pull Request](#send-a-pull-request)
+  - [Documentation Guidelines](#documentation-guidelines)
+    - [API References (docstrings)](#api-references-docstrings)
+    - [Build and Test Documentation](#build-and-test-documentation)
+  - [Find Contributions to Work On](#find-contributions-to-work-on)
+  - [Code of Conduct](#code-of-conduct)
+  - [Security Issue Notifications](#security-issue-notifications)
+  - [Licensing](#licensing)
 
 ## Report Bugs/Feature Requests
 
@@ -58,7 +60,7 @@ Before sending us a pull request, please ensure that:
 
 ### Run the Unit Tests
 
-You can run the package tests using Julia's built-in unit testing sytem. To run the Braket unit tests:
+You can run the package tests using Julia's built-in unit testing system. To run the Braket unit tests:
 
 `julia -e 'using Pkg; Pkg.test("Braket")'`
 
