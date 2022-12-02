@@ -70,6 +70,14 @@ function __init__()
     GlobalTrackerContext[] = TrackerContext()
 end
 
+"""
+    Device
+
+Abstract type representing a generic device which tasks (local or managed) may be run on.
+"""
+abstract type Device end
+
+
 qubit_count(t) = throw(MethodError(qubit_count, t))
 
 include("qubit_set.jl")
@@ -104,8 +112,8 @@ include("schemas.jl")
 include("moments.jl")
 include("circuit.jl")
 include("noise_model.jl")
-include("device.jl")
 include("ahs.jl")
+include("device.jl")
 include("gate_applicators.jl")
 include("noise_applicators.jl")
 include("jobs.jl")
