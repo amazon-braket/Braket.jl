@@ -12,23 +12,24 @@ using Plots
 
 # ╔═╡ 7568667e-7592-11ed-1f75-33a9f6228b6c
 md"
-# Measuring the Rabi frequency of an analog Hamiltonian simulation.
+# Measuring the Rabi oscillation frequency of a Rydberg atom
 "
 
 # ╔═╡ 9cb745ac-8a69-4cd3-ad7a-450558e072d8
 md"
-In this notebook, we'll run an analog Hamiltonian simulation using just one atom to verify that we correctly measure the Rabi frequency we set in the simulation.
+In this notebook, we'll run an analog Hamiltonian simulation (AHS) program using just one atom to verify that we correctly measure the Rabi frequency we set in the simulation.
 "
 
-# ╔═╡ d64d82d9-1aab-4821-a102-edc8e6e10c04
-# set the atomic spacing
-a = 5.5e-6
+# ╔═╡ 91485d04-a80e-46cd-a67c-d3571c61fb4d
+md"
+We first create a register with a single atom
+"
 
 # ╔═╡ 58152bdb-1a5d-4b48-8cfa-aa6dc1ab27ad
 begin
 	# create an AtomArrangement with just one atom
 	register = AtomArrangement()
-	push!(register, AtomArrangementItem((0, 0) .* a))
+	push!(register, AtomArrangementItem((0, 0)))
 end
 
 # ╔═╡ d34c696e-54af-414b-b916-f3e73b3e116c
@@ -60,6 +61,11 @@ md"Now we set the maximum amplitude in the driving field -- this should be the R
 
 # ╔═╡ 456fa9bb-904d-4065-8e5d-c4492c381385
 Ω_max = Dec128("2.5e6")
+
+# ╔═╡ c5587822-e315-45d2-beaf-017c245af5f3
+md"
+Here we create an AHS program that drives the atom with constant Rabi frequency. The resultant oscillation will have period $2\pi/\Omega_{max}$, hence by measuring the probability of the Rydberg state as a function of time, we can infer the magnitude of the driving field.
+"
 
 # ╔═╡ ef8051a1-69ec-4719-9f51-54d07d0e71fa
 # set the time range for the fields
@@ -138,9 +144,9 @@ PyBraket = "~0.1.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.3"
+julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "9057820524fd7afbb2b58dbd7256f0c756a4b081"
+project_hash = "ac7dca929cd60db1dda885b8c2ba99e143ab5e29"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -1329,11 +1335,12 @@ version = "1.4.1+0"
 # ╟─7568667e-7592-11ed-1f75-33a9f6228b6c
 # ╟─9cb745ac-8a69-4cd3-ad7a-450558e072d8
 # ╠═c37cf3fd-ba64-4b66-9da1-c67ca4752803
-# ╠═d64d82d9-1aab-4821-a102-edc8e6e10c04
+# ╟─91485d04-a80e-46cd-a67c-d3571c61fb4d
 # ╠═58152bdb-1a5d-4b48-8cfa-aa6dc1ab27ad
 # ╠═d34c696e-54af-414b-b916-f3e73b3e116c
 # ╟─9c150de3-2076-4895-803c-891d077e21cc
 # ╠═456fa9bb-904d-4065-8e5d-c4492c381385
+# ╟─c5587822-e315-45d2-beaf-017c245af5f3
 # ╠═ef8051a1-69ec-4719-9f51-54d07d0e71fa
 # ╠═b974749f-54e8-4bb4-b1f9-48baa778a0d9
 # ╠═313b80ed-7549-4992-a791-bc47ed3a042f

@@ -10,15 +10,28 @@ using Braket, PyBraket
 # ╔═╡ dd486f0e-cc45-41b7-b7db-42ad83121194
 using Braket: AtomArrangement, AtomArrangementItem, TimeSeries, DrivingField, AwsDevice, AnalogHamiltonianSimulation, discretize, AnalogHamiltonianSimulationQuantumTaskResult
 
-# ╔═╡ 281a092d-7240-4528-a166-0b3250448a1b
+# ╔═╡ c8e43644-4faf-4ea2-96f4-796451f04db0
 using DataStructures, Statistics, Plots
 
 # ╔═╡ 1a35d23d-2eb0-45a5-b7a6-bbd73e3e7552
 md"
+# Hello AHS: Run your first Analog Hamiltonian Simulation
+
+Analog Hamiltonian simulation (AHS) is a paradigm of quantum computing different from quantum circuits: instead of a sequence of gates, each acting only on a couple of qubits at a time, an AHS program is defined by the time- and space-dependent parameters of the Hamiltonian in question. 
+
+As an example, in this notebook, we will consider a ring of eight spins, each of which can be in the “up” and “down” state. We will show how to prepare a so-called anti-ferromagnetic order, where consecutive spins point in opposite directions.
+
 Note: to run this notebook you'll need the `Braket.jl` package installed (it comes along with a sub-package, `PyBraket.jl`, for interfacing with Python where necessary).
 "
 
-# ╔═╡ 93a4afe7-e33f-4acd-9c90-4875d882189b
+# ╔═╡ 9e2fcfb3-8d7d-4757-8bfe-8db98c36e409
+md"
+## Register
+
+The first component of an AHS program is the register. In this example, we will use one neutral atom to stand for each spin, and the “up” and “down” spin states will be encoded in excited Rydberg state and ground state of the atoms, respectively. Let us first create a ring consists of eight atoms.
+"
+
+# ╔═╡ 388585cc-4417-11ed-3e99-af78d6112c38
 begin
 	a = 5.5e-6
 	
@@ -33,31 +46,37 @@ begin
 	push!(register, AtomArrangementItem((-0.5, 0.5 + 1/√2) .* a))
 end
 
-# ╔═╡ bcff2464-0f38-45f2-8f01-66e2ebbef869
-aquila_qpu   = AwsDevice("arn:aws:braket:us-east-1::device/qpu/quera/Aquila")
+# ╔═╡ 062c38f4-07d9-4a3c-ab88-590afb00ae74
+md"
+## Hamiltonian
 
-# ╔═╡ 1519684c-84ed-4f04-bdc8-7c38fd9fd35d
-begin
-	C6           = aquila_qpu._properties.paradigm.rydberg.c6Coefficient
-	aquila_rg    = aquila_qpu._properties.paradigm.rydberg.rydbergGlobal
-	Ω_min, Ω_max = aquila_rg.rabiFrequencyRange
-	Ω_slope_max  = aquila_rg.rabiFrequencySlewRateMax
-	Δ_min, Δ_max = aquila_rg.detuningRange
-	time_max     = Float64(aquila_rg.timeMax)
-end
+The second component of an AHS program is the Hamiltonian. At the beginning of the AHS program, all spins (by default) start in their “down” state, they are in a so-called ferromagnetic phase. Our goal is to specify a time-dependent Hamiltonian that smoothly transitions the spins from this state to a many-body state where the “up” states are preferred. 
 
-# ╔═╡ 2b1d582b-8de5-499c-badd-da97056eda8e
+We will work with the following Hamiltonian
+```math
+\begin{align}
+H(t) = \sum_{k=1}^NH_\text{drive, k}(t) + \sum_{j=1}^N\sum_{k=j+1}^NH_\text{vdW, j, k}
+\end{align}
+```
+where $N$ is the number of atoms in the register. Here the first term is the driving field for the atoms
+```math
+\begin{align}
+H_\text{drive, k}(t) = \frac{\Omega(t)}{2}[e^{i\phi(t)}|g_k\rangle\langle r_k|+h.c.]-\Delta(t)|r_k\rangle\langle r_k|
+\end{align}
+```
+and the second term is the van de Waals interaction between all pairs of atoms. An AHS program consists of the time series for the time-dependent coefficients $\Omega(t)$, $\phi(t)$ and $\Delta(t)$, which are specificied below.
+
+
+"
+
+# ╔═╡ dbd73541-e918-48e2-b590-c07f44e3e711
 begin
-	Δ_start      = -5 * Float64(Ω_max)
-	Δ_end        = 5 * Float64(Ω_max)
-	@assert all(Δ_min <= Δ <= Δ_max for Δ in (Δ_start, Δ_end))
+	time_max                = 4e-6  # seconds
+	time_ramp               = 1e-7  # seconds
+	Ω_max                   = 6300000.0  # rad / sec
+	Δ_start                 = -5 * Ω_max
+	Δ_end                   = 5 * Ω_max
 	
-	time_ramp = 1e-7  # seconds
-	@assert Float64(Ω_max) / time_ramp < Ω_slope_max
-end
-
-# ╔═╡ 388585cc-4417-11ed-3e99-af78d6112c38
-begin
 	Ω                       = TimeSeries()
 	Ω[0.0]                  = 0.0
 	Ω[time_ramp]            = Ω_max
@@ -75,20 +94,40 @@ begin
 	ϕ[time_max] = 0.0
 end
 
-# ╔═╡ 9f607ec4-6337-4946-ae6d-842f1b02259c
+# ╔═╡ 3b6c8e8c-7114-4754-bf64-4949ce62b8b8
+md"
+## AHS program
+
+We can assemble the defined register and Hamiltonian to an AHS program, as shown below. 
+"
+
+# ╔═╡ c63adffa-2d10-4e0a-8702-ea85cfc4b7ea
 begin
 	drive                   = DrivingField(Ω, ϕ, Δ)
 	ahs_program             = AnalogHamiltonianSimulation(register, drive)
-	discretized_ahs_program = discretize(ahs_program, aquila_qpu)
 end
 
-# ╔═╡ a27acb82-5690-4a7b-bc6d-7104ccf54fbf
-ahs_local    = LocalSimulator("braket_ahs")
+# ╔═╡ de36f5be-e8fe-4e6a-9cec-a0cae8ff0148
+md"
+## Running AHS program on the local simulator
 
-# ╔═╡ e097f2f3-e2a6-4fc5-83e9-c0a0de70e9f6
-local_result = result(run(ahs_local, discretized_ahs_program, shots=1_000_000))
+Before submitting the AHS program to an AHS-compatible QPU, we can run it on the local AHS simulator which comes along with `PyBraket.jl`. 
+"
 
-# ╔═╡ 583c8ff8-ea3c-465b-a368-c6b33abadd33
+# ╔═╡ ba9eb8dc-31ea-473f-aa44-870e4161924d
+begin
+	local_sim    = LocalSimulator("braket_ahs")
+	local_result = result(run(local_sim, ahs_program, shots=1_000_000))
+end
+
+# ╔═╡ 4e1a8a8d-ef9a-4bea-8dac-00c1e39f26b4
+md"
+## Analysizing simulator results
+
+We can aggregate the shot results with the following function that infers the state of each spin (which may be “d” for “down”, “u” for “up”, or “e” for empty site), and counts how many times each configuration occurred across the shots. 
+"
+
+# ╔═╡ 98eb475f-07a7-453c-8df4-4f3f3b0ffee2
 """
     get_counts(result)
 
@@ -114,8 +153,14 @@ function get_counts(result::AnalogHamiltonianSimulationQuantumTaskResult)
     return state_counts
 end
 
-# ╔═╡ 7695a2a0-a82e-4389-abd1-7180420272d6
+# ╔═╡ 921cb466-6049-4897-ac35-f9a669596004
 counts = get_counts(local_result)
+
+# ╔═╡ 4b8fff35-40b4-4670-8df6-92a496c66676
+md"
+Here `counts` is a dictionary that counts the number of times each state configuration is observed across the shots. We can also visualize them with the following code.
+"
+
 
 # ╔═╡ 25e25003-873f-4d09-8df2-c723871a3c00
 function has_neighboring_rydberg_states(state::String)
@@ -124,20 +169,23 @@ function has_neighboring_rydberg_states(state::String)
     return false
 end
 
-# ╔═╡ cf84bdcc-729d-4cd9-bcc7-a3818cfb93e4
-number_of_rydberg_states(state::String) = counter(state)['r']
-
-# ╔═╡ 835d9653-db06-4997-8efb-c1b3729cd2d3
-non_blockaded = []
-
-# ╔═╡ 7fecba19-3dbb-48ed-b856-92ab5a22db8a
-blockaded     = []
-
-# ╔═╡ 3b9133e0-46a6-488a-8250-556b20bd0474
-for (state, count) in counts
-    collection = has_neighboring_rydberg_states(state) ? blockaded : non_blockaded
-    push!(collection, (state, count, number_of_rydberg_states(state)))
+# ╔═╡ 6018b50e-ff73-435c-bf7c-fc1cf8eaaa3a
+begin
+	number_of_rydberg_states(state::String) = counter(state)['r']
+	non_blockaded                           = []
+	blockaded                               = []
+	
+	for (state, count) in counts
+	    collection = has_neighboring_rydberg_states(state) ? blockaded : non_blockaded
+	    push!(collection, (state, count, number_of_rydberg_states(state)))
+	end
 end
+
+# ╔═╡ 9b89d73d-e257-40d6-bc11-f6ffc0ec9dcc
+md"
+We can print out the number of occurrence for the states that respect and violate the Rydberg blockade. Upon comparing the results below, we indeed see that the latter has much less chance to appear.
+"
+
 
 # ╔═╡ c72408bc-901d-47a9-9fdf-3be2aac424a0
 begin
@@ -157,6 +205,16 @@ begin
 	    println(join([string(number_of_rydberg_states(state)), string(state), string(count)], '\t'))
 	end
 end
+
+# ╔═╡ 8d9cbc4d-7bad-444a-8b06-744620ef119a
+md"
+We can further calculate other observables which quantify the state arrived. Below, we calculate
+1. The marginal probabilities of each atom being in the Rydberg state, which are expected to be uniform because of the $D_8$ symmetry of the atom arrangement.
+2. The Matthews correlation coefficient, which are expected to alternate between negative and positive values and tend to zero with increasing distance
+
+The results below indeed confirm our expectations for the simulation results. 
+"
+
 
 # ╔═╡ 175d2e0f-582a-4dc2-95c1-25bf7e233b23
 function marginals(counts)
@@ -229,6 +287,34 @@ distance, ϕ_1d = correlation_function(ϕs)
 # ╔═╡ fbee7ea7-398c-4344-adb6-ecf9bf04d967
 bar(distance, ϕ_1d, ylim=[-1.05, 1.05], xlabel="separation\n(in units of nearest neighbor distance)", ylabel="Matthews\ncorrelation coefficient")
 
+# ╔═╡ 98b60cdb-639f-4e26-a9d4-ec3e009b810c
+md"
+## Running AHS program on QuEra's Aquila QPU
+
+After we confirm that the AHS program produces the expected result, one could run the AHS program with larger registers (up to 256 atoms) on QuEra's Aquila QPU. Here, we choose to run the same AHS program with eight atoms for illustration purpose. 
+"
+
+# ╔═╡ 4b14e404-2ec9-4b34-b96d-31d5c1b9fb51
+aquila_qpu   = AwsDevice("arn:aws:braket:us-east-1::device/qpu/quera/Aquila")
+
+# ╔═╡ 41d51f88-2044-412f-ac49-d7c0f5639fe4
+md"
+Before submitting the program, we need to discretize the program so that it is suitable to run on Aquia. This is basically rounding all values to comply with the levels of precision allowed by the QPU.
+"
+
+# ╔═╡ 8ac55598-1c18-43aa-a439-208c7f1767f2
+discretized_ahs_program = discretize(ahs_program, aquila_qpu)
+
+# ╔═╡ f44b23d4-3f28-4fba-a050-fcf829e6ead3
+md"
+We are ready to submit the first AHS program to Aquila. After the result is returned from the QPU, one could analyze the result with the same method as shown above. 
+
+Note: running the following cell will incur a cost of $0.01 per shot and $0.30 per task. Only uncomment the following cell if you are comfortable with the cost.
+"
+
+# ╔═╡ b27fad62-1062-482a-8e79-69ab84f4fbf9
+# qpu_result = result(run(aquila_qpu, discretized_ahs_program, shots=100))
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -249,7 +335,7 @@ PyBraket = "~0.1.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.3"
+julia_version = "1.8.2"
 manifest_format = "2.0"
 project_hash = "c837e636395cc458569faad3958f7fc171e4d04f"
 
@@ -1440,24 +1526,25 @@ version = "1.4.1+0"
 # ╟─1a35d23d-2eb0-45a5-b7a6-bbd73e3e7552
 # ╠═b7719166-12c4-47a6-b501-7bacd7662dd0
 # ╠═dd486f0e-cc45-41b7-b7db-42ad83121194
+# ╠═c8e43644-4faf-4ea2-96f4-796451f04db0
+# ╟─9e2fcfb3-8d7d-4757-8bfe-8db98c36e409
 # ╠═388585cc-4417-11ed-3e99-af78d6112c38
-# ╠═93a4afe7-e33f-4acd-9c90-4875d882189b
-# ╠═bcff2464-0f38-45f2-8f01-66e2ebbef869
-# ╠═1519684c-84ed-4f04-bdc8-7c38fd9fd35d
-# ╠═2b1d582b-8de5-499c-badd-da97056eda8e
-# ╠═9f607ec4-6337-4946-ae6d-842f1b02259c
-# ╠═a27acb82-5690-4a7b-bc6d-7104ccf54fbf
-# ╠═e097f2f3-e2a6-4fc5-83e9-c0a0de70e9f6
-# ╠═281a092d-7240-4528-a166-0b3250448a1b
-# ╠═583c8ff8-ea3c-465b-a368-c6b33abadd33
-# ╠═7695a2a0-a82e-4389-abd1-7180420272d6
+# ╟─062c38f4-07d9-4a3c-ab88-590afb00ae74
+# ╠═dbd73541-e918-48e2-b590-c07f44e3e711
+# ╟─3b6c8e8c-7114-4754-bf64-4949ce62b8b8
+# ╠═c63adffa-2d10-4e0a-8702-ea85cfc4b7ea
+# ╟─de36f5be-e8fe-4e6a-9cec-a0cae8ff0148
+# ╠═ba9eb8dc-31ea-473f-aa44-870e4161924d
+# ╟─4e1a8a8d-ef9a-4bea-8dac-00c1e39f26b4
+# ╠═98eb475f-07a7-453c-8df4-4f3f3b0ffee2
+# ╠═921cb466-6049-4897-ac35-f9a669596004
+# ╟─4b8fff35-40b4-4670-8df6-92a496c66676
 # ╠═25e25003-873f-4d09-8df2-c723871a3c00
-# ╠═cf84bdcc-729d-4cd9-bcc7-a3818cfb93e4
-# ╠═835d9653-db06-4997-8efb-c1b3729cd2d3
-# ╠═7fecba19-3dbb-48ed-b856-92ab5a22db8a
-# ╠═3b9133e0-46a6-488a-8250-556b20bd0474
+# ╠═6018b50e-ff73-435c-bf7c-fc1cf8eaaa3a
+# ╟─9b89d73d-e257-40d6-bc11-f6ffc0ec9dcc
 # ╠═c72408bc-901d-47a9-9fdf-3be2aac424a0
 # ╠═60304f9b-0821-4ba6-a80a-dd5d35fecc71
+# ╟─8d9cbc4d-7bad-444a-8b06-744620ef119a
 # ╠═175d2e0f-582a-4dc2-95c1-25bf7e233b23
 # ╠═c6e7bd83-1b88-454c-9684-1ae893a6684f
 # ╠═490eb0e1-4d8e-47c1-9ce6-6c8aa43e72d6
@@ -1465,5 +1552,11 @@ version = "1.4.1+0"
 # ╠═3d6d9440-2068-4c23-bd2e-3027473648fe
 # ╠═b0d3f31c-52f6-4a24-9ebc-f9af151a23a9
 # ╠═fbee7ea7-398c-4344-adb6-ecf9bf04d967
+# ╟─98b60cdb-639f-4e26-a9d4-ec3e009b810c
+# ╠═4b14e404-2ec9-4b34-b96d-31d5c1b9fb51
+# ╠═41d51f88-2044-412f-ac49-d7c0f5639fe4
+# ╠═8ac55598-1c18-43aa-a439-208c7f1767f2
+# ╟─f44b23d4-3f28-4fba-a050-fcf829e6ead3
+# ╠═b27fad62-1062-482a-8e79-69ab84f4fbf9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
