@@ -4,206 +4,132 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ d928ee56-0f14-426c-b669-356627382f8f
-using Braket, PyBraket
+# ╔═╡ c37cf3fd-ba64-4b66-9da1-c67ca4752803
+using Braket, PyBraket, DataStructures, Braket.DecFP
 
-# ╔═╡ ab9771de-a268-4df8-811d-9310a12a7d79
+# ╔═╡ c84d1362-a92f-4688-97d9-03e5f197e242
 using Plots
 
-# ╔═╡ eefcfdb6-dc0f-4ec4-85a3-73bafc9e0177
+# ╔═╡ 7568667e-7592-11ed-1f75-33a9f6228b6c
 md"
-# Quantum Fourier Transform with Amazon Braket
+# Measuring the Rabi frequency of an analog Hamiltonian simulation.
 "
 
-# ╔═╡ 608cf437-7493-494b-a4d7-1e852bcae8d9
-"""
-	qft_no_swap(qubits) -> Circuit
+# ╔═╡ 9cb745ac-8a69-4cd3-ad7a-450558e072d8
+md"
+In this notebook, we'll run an analog Hamiltonian simulation using just one atom to verify that we correctly measure the Rabi frequency we set in the simulation.
+"
 
-Subroutine of the QFT excluding the final SWAP gates, applied to the `qubits` argument.
+# ╔═╡ d64d82d9-1aab-4821-a102-edc8e6e10c04
+# set the atomic spacing
+a = 5.5e-6
 
-"""
-function qft_no_swap(qubits)
-    # On a single qubit, the QFT is just a Hadamard.
-    length(qubits) == 1 && return Circuit([(H, qubits)])
-    
-    # For more than one qubit, we define the QFT recursively
-    qftcirc = Circuit()
-	# First add a Hadamard gate
-	qftcirc(H, first(qubits))
-	# Then apply the controlled rotations, with weights (angles) defined by the distance to the control qubit.
-	for (k, qubit) in enumerate(qubits[2:end])
-		qftcirc(CPhaseShift, qubit, first(qubits), 2π/2^(k+1))
-	end
-	# Now apply the above gates recursively to the rest of the qubits
-	qftcirc(qft_no_swap(qubits[2:end]))
-    return qftcirc
+# ╔═╡ 58152bdb-1a5d-4b48-8cfa-aa6dc1ab27ad
+begin
+	# create an AtomArrangement with just one atom
+	register = AtomArrangement()
+	push!(register, AtomArrangementItem((0, 0) .* a))
 end
 
-# ╔═╡ 2c612fa4-1a8d-404a-8b3e-5e1907e20d84
+# ╔═╡ d34c696e-54af-414b-b916-f3e73b3e116c
 """
-	qft_recursive(qubits)
-
-Construct a circuit object corresponding to the Quantum Fourier Transform (QFT)
-algorithm, applied to the argument `qubits`.
+Aggregates state counts from AHS shot results.
+Strings of length = # of atoms are returned, where
+each character denotes the state of an atom (site):
+   - `'e'`: empty site
+   - `'g'`: ground state atom
+   - `'r'`: Rydberg state atom
+    
+Returns an `Accumulator` containing the number of times each state configuration is measured.
 """
-function qft_recursive(qubits)
-    qftcirc = Circuit()
-    
-    # First add the QFT subroutine above
-    qftcirc(qft_no_swap(qubits))
-    
-    # Then add SWAP gates to reverse the order of the qubits:
-    for i in 1:div(length(qubits), 2)
-        qftcirc(Swap, qubits[i], qubits[end-i-1])
-	end
-    return qftcirc
+function get_counts(result)
+    state_counts = Accumulator{String, Int}()
+    states = ["e", "r", "g"]
+    for shot in result.measurements
+        pre       = convert(Vector{Int}, shot.pre_sequence)
+        post      = convert(Vector{Int}, shot.post_sequence)
+        state_idx = (pre .* (1 .+ post)) .+ 1
+        state     = prod([states[s_idx] for s_idx in state_idx])
+        inc!(state_counts, state)
+    end
+    return state_counts
 end
 
-# ╔═╡ 3ccc5bb1-16ec-4fd5-b82f-31da2734223e
-"""
-	qft(qubits)
+# ╔═╡ 9c150de3-2076-4895-803c-891d077e21cc
+md"Now we set the maximum amplitude in the driving field -- this should be the Rabi frequency we measure from the atom's oscillation."
 
-Construct a circuit object corresponding to the Quantum Fourier Transform (QFT)
-algorithm, applied to the argument `qubits`.  Does not use recursion to generate the QFT.
-"""
-function qft(qubits)   
+# ╔═╡ 456fa9bb-904d-4065-8e5d-c4492c381385
+Ω_max = Dec128("2.5e6")
 
-    qftcirc = Circuit()
+# ╔═╡ ef8051a1-69ec-4719-9f51-54d07d0e71fa
+# set the time range for the fields
+trange = range(0, 4π/(Ω_max), 21)[2:end]
+
+# ╔═╡ b974749f-54e8-4bb4-b1f9-48baa778a0d9
+"""
+Generate the AHS program to be run. This program turns on a constant driving field consisting only of the "amplitude" component.
+"""
+function get_program(register, t_max)
+    Ω = TimeSeries()
+    Ω[0.0] = Ω_max
+    Ω[t_max] = Ω_max
+
+    ϕ = TimeSeries()
+    ϕ[0.0] = 0.0
+    ϕ[t_max] = 0.0
+
+    Δ = TimeSeries()
+    Δ[0.0] = 0.0 
+    Δ[t_max] = 0.0 
     
-    # get number of qubits
-    num_qubits = length(qubits)
-    
-    for k in 1:num_qubits
-        # First add a Hadamard gate
-        qftcirc(H, qubits[k])
-        # Then apply the controlled rotations, with weights (angles) defined by the distance to the control qubit.
-        # Start on the qubit after qubit k, and iterate until the end.  When num_qubits==1, this loop does not run.
-        for j in 1:(num_qubits - k - 1)
-            angle = 2π/2^(j+1)
-            qftcirc(CPhaseShift, qubits[k+j], qubits[k], angle)
-		end
-	end
-            
-    # Then add SWAP gates to reverse the order of the qubits:
-    for i in 1:div(num_qubits, 2)
-        qftcirc(Swap, qubits[i], qubits[end-i])
-	end
+    drive = DrivingField(Ω, ϕ, Δ)
         
-    return qftcirc
+    return AnalogHamiltonianSimulation(register, drive)
 end
 
-# ╔═╡ 55a3b85b-6d3c-43b9-9c89-5af3f5c57629
-"""
-	inverse_qft(qubits)
+# ╔═╡ 313b80ed-7549-4992-a791-bc47ed3a042f
+programs = [get_program(register, t) for t in trange]
 
-Construct a circuit object corresponding to the inverse Quantum Fourier Transform (QFT)
-algorithm, applied to the argument `qubits`.  Does not use recursion to generate the circuit.
-"""
-function inverse_qft(qubits)
+# ╔═╡ 412e20a7-0fbc-46de-94f0-0a852a589277
+md"Now we'll run each program on the AHS local simulator with 1000 shots."
 
-    # instantiate circuit object
-    qftcirc = Circuit()
-    
-    # get number of qubits
-    num_qubits = length(qubits)
-    
-    # First add SWAP gates to reverse the order of the qubits:
-    for i in 1:div(num_qubits, 2)
-        qftcirc(Swap, qubits[i], qubits[end-i+1])
-	end
-        
-    # Start on the last qubit and work to the first.
-    for k in reverse(1:num_qubits)
-        # Apply the controlled rotations, with weights (angles) defined by the distance to the control qubit.
-        # These angles are the negative of the angle used in the QFT.
-        # Start on the last qubit and iterate until the qubit after k.  
-        # When num_qubits==1, this loop does not run.
-        for j in reverse(1:num_qubits - k)
-            angle = -2π/2^(j+1)
-            qftcirc(CPhaseShift, qubits[k+j], qubits[k], angle)
-		end
-        # Then add a Hadamard gate
-        qftcirc(H, qubits[k])
-	end
-    return qftcirc
-end
+# ╔═╡ 52a96f4d-2621-4fda-bfcf-22449ee51f95
+device = LocalSimulator("braket_ahs")
 
-# ╔═╡ b3a750d1-7a2b-4de6-9e6c-166336ba6cec
-device = LocalSimulator()
+# ╔═╡ 14a896f6-f218-43e4-9278-3de94c88cd32
+local_results = [result(run(device, program, shots=1000)) for program in programs]
 
-# ╔═╡ 7127d624-fb0d-41b9-a8cd-6cae7d34d55f
-function prettify_state_vector(state_vector)
-	state_vec_pretty = complex.(trunc.(real.(state_vector), digits=3), trunc.(imag.(state_vector), digits=3))
+# ╔═╡ 229b0550-6bd0-4f81-b37a-5a0b8e33a9b1
+state_counts = local_results .|> get_counts
 
-	state_vec_pretty = map(ampl->abs(ampl)>1e-5 ? ampl : zero(ampl), state_vec_pretty)
-	return state_vec_pretty
-end
+# ╔═╡ f5764bba-bb57-42d7-a68e-52913eb32b18
+md"Finally we plot the number of shots resulting in the atom being in its groundstate compared with the total program length. We should be able to see the Rabi oscillation at the correct frequency in this plot."
 
-# ╔═╡ 83b78b1a-3935-4ca7-88f6-7a15cc523591
-function run_and_plot_qft(c::Circuit)
-	num_qubits = qubit_count(c)
-	bitstring_keys = [prod(string.(digits(ii, base=2, pad=num_qubits))) for ii in 0:(2^num_qubits)-1]
-	# specify desired result types
-	c(StateVector)
-	c(Probability)
-
-	# Run the task
-	task = run(device, c, shots=0)
-	res  = result(task)
-	state_vector = res.values[1]
-	probs_values = res.values[2]
-	p = bar(bitstring_keys, probs_values, xlabel="bitstrings", ylabel="probability", legend=false)
-	return p
-end
-
-# ╔═╡ 256bb268-e2fc-4483-a6f7-4a76028fcf80
-# check output for input |0,0,0> -> expect uniform distribution
-run_and_plot_qft(qft(collect(0:2)))
-
-# ╔═╡ 20cfa5e8-d4ad-4720-9d27-f7c161ea09e3
+# ╔═╡ b4270f21-7a9f-45d6-9255-5606b62247ff
 begin
-	nqs1 = 3
-	qbs1 = collect(0:nqs1-1)
-	circ2 = Circuit([(H, qbs1)])
-	for ii in 1:nqs1 - 1
-	    circ2(Rz, ii, π/2^(ii-1))
-	end
-	# add iQFT circuit
-	circ2(inverse_qft(qbs1))
-	run_and_plot_qft(circ2)
+	p = plot(trange,
+	     	[state_count["g"] for state_count in state_counts],
+	     	marker=:circle,
+	     	ylabel="No. of shots with atom in the groundstate",
+	     	xlabel="Time (s)",
+	     	label="Groundstate density")
+	vline!([2π/Ω_max], label="Inverse Rabi frequency")
 end
 
-# ╔═╡ 0508acef-1de0-42e4-9bbc-9127c2a162b5
-begin
-	# test that the iQFT circuit works for larger qubit counts
-	nqs2 = 4
-	qbs2 = collect(0:nqs2-1)
-	circ3 = Circuit(vcat((H, qbs2), [(Rz, ii, π/2^(ii-1)) for ii in 1:nqs2-1]))
-	# add iQFT circuit   
-	circ3(inverse_qft(qbs2))
-	run_and_plot_qft(circ3)
-end
-
-# ╔═╡ ae77c39f-9f7e-4c45-8823-a16a38c33e0d
-begin
-	#test that the QFT and iQFT circuits cancel each other
-	nqs3 = 3
-	qbs3 = collect(0:nqs3-1)
-	circ4 = qft(qbs3)
-	circ4(inverse_qft(qbs3))
-	
-	run_and_plot_qft(circ4)
-end
+# ╔═╡ 75b92907-eeb8-44c4-b0e8-10c9403e19a9
+md"Indeed, the oscillation period is exactly at $2\pi/\Omega_{max}$, as we expected."
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PyBraket = "e85266a6-1825-490b-a80e-9b9469c53660"
 
 [compat]
 Braket = "~0.1.0"
+DataStructures = "~0.18.13"
 Plots = "~1.37.0"
 PyBraket = "~0.1.0"
 """
@@ -214,7 +140,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.3"
 manifest_format = "2.0"
-project_hash = "aeb747ab5656cc755389f2a00cc7e08ea3f4ea4e"
+project_hash = "9057820524fd7afbb2b58dbd7256f0c756a4b081"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -1400,19 +1326,24 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─eefcfdb6-dc0f-4ec4-85a3-73bafc9e0177
-# ╠═d928ee56-0f14-426c-b669-356627382f8f
-# ╠═608cf437-7493-494b-a4d7-1e852bcae8d9
-# ╠═2c612fa4-1a8d-404a-8b3e-5e1907e20d84
-# ╠═3ccc5bb1-16ec-4fd5-b82f-31da2734223e
-# ╠═55a3b85b-6d3c-43b9-9c89-5af3f5c57629
-# ╠═b3a750d1-7a2b-4de6-9e6c-166336ba6cec
-# ╠═7127d624-fb0d-41b9-a8cd-6cae7d34d55f
-# ╠═ab9771de-a268-4df8-811d-9310a12a7d79
-# ╠═83b78b1a-3935-4ca7-88f6-7a15cc523591
-# ╠═256bb268-e2fc-4483-a6f7-4a76028fcf80
-# ╠═20cfa5e8-d4ad-4720-9d27-f7c161ea09e3
-# ╠═0508acef-1de0-42e4-9bbc-9127c2a162b5
-# ╠═ae77c39f-9f7e-4c45-8823-a16a38c33e0d
+# ╟─7568667e-7592-11ed-1f75-33a9f6228b6c
+# ╟─9cb745ac-8a69-4cd3-ad7a-450558e072d8
+# ╠═c37cf3fd-ba64-4b66-9da1-c67ca4752803
+# ╠═d64d82d9-1aab-4821-a102-edc8e6e10c04
+# ╠═58152bdb-1a5d-4b48-8cfa-aa6dc1ab27ad
+# ╠═d34c696e-54af-414b-b916-f3e73b3e116c
+# ╟─9c150de3-2076-4895-803c-891d077e21cc
+# ╠═456fa9bb-904d-4065-8e5d-c4492c381385
+# ╠═ef8051a1-69ec-4719-9f51-54d07d0e71fa
+# ╠═b974749f-54e8-4bb4-b1f9-48baa778a0d9
+# ╠═313b80ed-7549-4992-a791-bc47ed3a042f
+# ╟─412e20a7-0fbc-46de-94f0-0a852a589277
+# ╠═52a96f4d-2621-4fda-bfcf-22449ee51f95
+# ╠═14a896f6-f218-43e4-9278-3de94c88cd32
+# ╠═229b0550-6bd0-4f81-b37a-5a0b8e33a9b1
+# ╟─f5764bba-bb57-42d7-a68e-52913eb32b18
+# ╠═c84d1362-a92f-4688-97d9-03e5f197e242
+# ╠═b4270f21-7a9f-45d6-9255-5606b62247ff
+# ╟─75b92907-eeb8-44c4-b0e8-10c9403e19a9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
