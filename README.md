@@ -82,11 +82,11 @@ What's currently implemented in *pure* Julia:
 
 **Features to add:**
 
-- Support for pickled jobs results
-- Local jobs
+- [Support for pickled jobs results](https://github.com/awslabs/Braket.jl/issues/18)
+- [Local jobs](https://github.com/awslabs/Braket.jl/issues/17)
 - More robust entry point verification for jobs
-- Pretty printing of circuits
-- Pulse control
+- [Pretty printing of `Circuit`s](https://github.com/awslabs/Braket.jl/issues/14)
+- [Pulse control](https://github.com/awslabs/Braket.jl/issues/15)
 
 ## Security
 
