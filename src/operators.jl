@@ -14,8 +14,8 @@ Abstract type representing *quantum* operations that can be applied to a [`Circu
 Subtypes include [`Gate`](@ref) and [`Noise`](@ref).
 """
 abstract type QuantumOperator <: Operator end
-ir(o::Operator, t::Vector{T}, ::Val{V}; kwargs...) where {T, V} = ir(o, QubitSet(t), Val(V); kwargs...)
-ir(o::Operator, t::Vector{T}; kwargs...) where {T} = ir(o, QubitSet(t), Val(IRType[]); kwargs...)
+ir(o::Operator, t::Vector{T}, ::Val{V}; kwargs...) where {T<:IntOrQubit, V} = ir(o, QubitSet(t), Val(V); kwargs...)
+ir(o::Operator, t::Vector{T}; kwargs...) where {T<:IntOrQubit} = ir(o, QubitSet(t), Val(IRType[]); kwargs...)
 ir(o::Operator, t::QubitSet; kwargs...)  = ir(o, t, Val(IRType[]); kwargs...)
 ir(o::Operator, t::IntOrQubit; kwargs...)          = ir(o, QubitSet(t), Val(IRType[]); kwargs...)
 ir(o::Operator, t::IntOrQubit, args...; kwargs...) = ir(o, QubitSet(t), args...; kwargs...)

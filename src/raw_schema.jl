@@ -114,12 +114,18 @@ module IR
 import ..Braket: AbstractProgram, braketSchemaHeader, BraketSchemaBase
 using DecFP, StructTypes
 
-export Program, AHSProgram, AbstractIR, AbstractProgramResult, CompilerDirective
+export Program, AHSProgram, AbstractIR, AbstractProgramResult, CompilerDirective, IRObservable
 
 abstract type AbstractIR end
 StructTypes.StructType(::Type{AbstractIR}) = StructTypes.AbstractType()
 StructTypes.subtypekey(::Type{AbstractIR}) = :type
-StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, compilerdirective=CompilerDirective, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, setup=Setup, hamiltonian=Hamiltonian, shiftingfield=ShiftingField, atomarrangement=AtomArrangement, timeseries=TimeSeries, physicalfield=PhysicalField, ahsprogram=AHSProgram, drivingfield=DrivingField, abstractprogramresult=AbstractProgramResult)
+StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, compilerdirective=CompilerDirective, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, setup=Setup, hamiltonian=Hamiltonian, shiftingfield=ShiftingField, atomarrangement=AtomArrangement, timeseries=TimeSeries, physicalfield=PhysicalField, ahsprogram=AHSProgram, drivingfield=DrivingField, abstractprogramresult=AbstractProgramResult)
+
+const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, String}
+Base.convert(::Type{IRObservable}, v::Vector{String}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
+Base.convert(::Type{IRObservable}, s::String)         = s
+Base.convert(::Type{IRObservable}, v::Vector{Vector{Vector{Vector{Float64}}}}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
+
 
 abstract type CompilerDirective <: AbstractIR end
 
@@ -130,7 +136,7 @@ abstract type AbstractProgramResult <: AbstractIR end
 
 StructTypes.StructType(::Type{AbstractProgramResult}) = StructTypes.AbstractType()
  
-StructTypes.subtypes(::Type{AbstractProgramResult}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, sample=Sample, statevector=StateVector, densitymatrix=DensityMatrix, variance=Variance)
+StructTypes.subtypes(::Type{AbstractProgramResult}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, sample=Sample, statevector=StateVector, densitymatrix=DensityMatrix, variance=Variance, adjoint_gradient=AdjointGradient)
 struct AtomArrangement <: AbstractIR
     sites::Vector{Vector{Dec128}}
     filling::Vector{Int}
@@ -182,7 +188,7 @@ StructTypes.StructType(::Type{Z}) = StructTypes.UnorderedStruct()
 
 StructTypes.defaults(::Type{Z}) = Dict{Symbol, Any}(:type => "z")
 struct Sample <: AbstractProgramResult
-    observable::Vector{Union{String, Vector{Vector{Vector{Float64}}}}}
+    observable::IRObservable
     targets::Union{Nothing, Vector{Int}}
     type::String
 end
@@ -263,7 +269,7 @@ StructTypes.StructType(::Type{Depolarizing}) = StructTypes.UnorderedStruct()
 
 StructTypes.defaults(::Type{Depolarizing}) = Dict{Symbol, Any}(:type => "depolarizing")
 struct Variance <: AbstractProgramResult
-    observable::Vector{Union{String, Vector{Vector{Vector{Float64}}}}}
+    observable::IRObservable
     targets::Union{Nothing, Vector{Int}}
     type::String
 end
@@ -371,6 +377,15 @@ end
 StructTypes.StructType(::Type{CNot}) = StructTypes.UnorderedStruct()
 
 StructTypes.defaults(::Type{CNot}) = Dict{Symbol, Any}(:type => "cnot")
+struct AdjointGradient <: AbstractProgramResult
+    parameters::Union{Nothing, Vector{String}}
+    observable::IRObservable
+    targets::Union{Nothing, Vector{Vector{Int}}}
+    type::String
+end
+StructTypes.StructType(::Type{AdjointGradient}) = StructTypes.UnorderedStruct()
+
+StructTypes.defaults(::Type{AdjointGradient}) = Dict{Symbol, Any}(:type => "adjoint_gradient")
 struct CSwap <: AbstractIR
     control::Int
     targets::Vector{Int}
@@ -508,7 +523,7 @@ StructTypes.StructType(::Type{PSwap}) = StructTypes.UnorderedStruct()
 
 StructTypes.defaults(::Type{PSwap}) = Dict{Symbol, Any}(:type => "pswap")
 struct Expectation <: AbstractProgramResult
-    observable::Vector{Union{String, Vector{Vector{Vector{Float64}}}}}
+    observable::IRObservable
     targets::Union{Nothing, Vector{Int}}
     type::String
 end
@@ -637,6 +652,12 @@ for g in [:Expectation, :Sample, :Variance, :DensityMatrix, :Probability]
         Target(::Type{$g}) = OptionalMultiTarget()
     end
 end
+struct OptionalNestedMultiTarget <: Target end
+for g in [:AdjointGradient]
+    @eval begin
+        Target(::Type{$g}) = OptionalNestedMultiTarget()
+    end
+end
 struct DoubleTarget <: Target end
 for g in [:Swap, :CSwap, :ISwap, :PSwap, :XY, :ECR, :XX, :YY, :ZZ, :TwoQubitDepolarizing, :TwoQubitDephasing]
     @eval begin
@@ -691,10 +712,6 @@ end # module
 
 using .IR
 
-@enum _CopyMode always if_needed never
-_CopyModeDict = Dict(string(inst)=>inst for inst in instances(_CopyMode))
-Base.:(==)(x::_CopyMode, y::String) = string(x) == y
-Base.:(==)(x::String, y::_CopyMode) = string(y) == x
 @enum SafeUUID safe unsafe unknown
 SafeUUIDDict = Dict(string(inst)=>inst for inst in instances(SafeUUID))
 Base.:(==)(x::SafeUUID, y::String) = string(x) == y
@@ -1027,6 +1044,7 @@ struct DeviceServiceProperties <: BraketSchemaBase
     deviceDocumentation::Union{Nothing, DeviceDocumentation}
     deviceLocation::Union{Nothing, String}
     updatedAt::Union{Nothing, String}
+    getTaskPollIntervalMillis::Union{Nothing, Int}
 end
 StructTypes.StructType(::Type{DeviceServiceProperties}) = StructTypes.UnorderedStruct()
 

@@ -2,7 +2,7 @@ module PySchema
 
 using PythonCall, Braket, Braket.IR
 import Braket: DwaveTiming, GateModelQpuParadigmProperties, ResultTypeValue, OqcDeviceCapabilities, GateFidelity2Q, OneQubitProperties, AdditionalMetadata, DwaveAdvantageDeviceLevelParameters, IonqDeviceCapabilities, TwoQubitProperties, IonqDeviceParameters, NativeQuilMetadata, QueraDeviceCapabilities, ExecutionDay, StandardizedGateModelQpuDeviceProperties, XanaduDeviceCapabilities, DeviceExecutionWindow, DwaveDeviceParameters, CoherenceTime, DwaveMetadata, Frame, DeviceCost, Dwave2000QDeviceLevelParameters, FidelityType, QueraMetadata, OqcProviderProperties, DeviceServiceProperties, XanaduDeviceParameters, BlackbirdProgram, Geometry, Fidelity1Q, AnnealingTaskResult, AnalogHamiltonianSimulationShotResult, RigettiDeviceCapabilities, DwaveProviderProperties, DeviceActionProperties, DwaveProviderLevelParameters, JaqcdDeviceActionProperties, Direction, PulseDeviceActionProperties, BlackbirdDeviceActionProperties, PerformanceLattice, PerformanceRydberg, DeviceActionType, IonqProviderProperties, PersistedJobDataFormat, PhotonicModelTaskResult, DeviceDocumentation, XanaduProviderProperties, QubitDirection, ContinuousVariableQpuParadigmProperties, PulseFunctionArgument, DwaveAdvantageDeviceParameters, RigettiDeviceParameters, AnalogHamiltonianSimulationTaskResult, TaskMetadata, GateModelSimulatorParadigmProperties, GateModelTaskResult, RigettiProviderProperties, OqcDeviceParameters, DeviceConnectivity, PulseFunction, Rydberg, PerformanceRydbergGlobal, RydbergGlobal, GateModelSimulatorDeviceCapabilities, XanaduMetadata, GateModelParameters, Performance, GateModelSimulatorDeviceParameters, AnalogHamiltonianSimulationShotMeasurement, OqcMetadata, QueraAhsParadigmProperties, Lattice, PersistedJobData, DwaveDeviceCapabilities, ProblemType, RigettiMetadata, SimulatorMetadata, Area, Problem, ResultType, PostProcessingType, ResultFormat, Dwave2000QDeviceParameters, AnalogHamiltonianSimulationShotMetadata, braketSchemaHeader, OpenQasmProgram, Port, OpenQASMDeviceActionProperties, AbstractProgram
-import Braket.IR: Z, Sample, CPhaseShift01, PhaseDamping, Rz, GeneralizedAmplitudeDamping, XX, ZZ, PhaseFlip, Vi, Depolarizing, Variance, TwoQubitDepolarizing, DensityMatrix, CPhaseShift00, ECR, CompilerDirective, CCNot, Unitary, BitFlip, Y, Swap, CZ, EndVerbatimBox, Program, CNot, CSwap, Ry, I, Si, AmplitudeDamping, StateVector, ISwap, H, XY, YY, T, TwoQubitDephasing, X, Ti, CV, StartVerbatimBox, PauliChannel, PSwap, Expectation, Probability, PhaseShift, V, CPhaseShift, S, Rx, Kraus, Amplitude, CPhaseShift10, MultiQubitPauliChannel, CY, Setup, Hamiltonian, ShiftingField, AtomArrangement, TimeSeries, PhysicalField, AHSProgram, DrivingField, AbstractProgramResult
+import Braket.IR: Z, Sample, CPhaseShift01, PhaseDamping, Rz, GeneralizedAmplitudeDamping, XX, ZZ, PhaseFlip, Vi, Depolarizing, Variance, TwoQubitDepolarizing, DensityMatrix, CPhaseShift00, ECR, CompilerDirective, CCNot, Unitary, BitFlip, Y, Swap, CZ, EndVerbatimBox, Program, CNot, AdjointGradient, CSwap, Ry, I, Si, AmplitudeDamping, StateVector, ISwap, H, XY, YY, T, TwoQubitDephasing, X, Ti, CV, StartVerbatimBox, PauliChannel, PSwap, Expectation, Probability, PhaseShift, V, CPhaseShift, S, Rx, Kraus, Amplitude, CPhaseShift10, MultiQubitPauliChannel, CY, Setup, Hamiltonian, ShiftingField, AtomArrangement, TimeSeries, PhysicalField, AHSProgram, DrivingField, AbstractProgramResult, IRObservable
 
 const instructions = PythonCall.pynew()
 const dwave_metadata_v1 = PythonCall.pynew()
@@ -71,6 +71,12 @@ const shared_models = PythonCall.pynew()
 const schema_header = PythonCall.pynew()
 const openqasm_device_action_properties = PythonCall.pynew()
 
+function union_convert(::Type{IRObservable}, x)
+    PythonCall.pyisinstance(x, PythonCall.pybuiltins.str) && return pyconvert(String, x)
+    x_vec = Union{String, Vector{Vector{Vector{Float64}}}}[PythonCall.pyisinstance(x_, PythonCall.pybuiltins.str) ? pyconvert(String, x_) : pyconvert(Vector{Vector{Vector{Float64}}}, x_) for x_ in x] 
+    return x_vec
+end
+
 function union_convert(union_type, x)
     union_ts = union_type isa Union ? Type[] : [union_type]
     union_t = union_type
@@ -117,11 +123,8 @@ function jl_convert_attr(n, t, attr)
             return pyconvert(t, attr)
         end
     else
-        if !PythonCall.pyisnone(attr)
-            return union_convert(t, attr)
-        else
-            return nothing
-        end
+        PythonCall.pyisnone(attr) && return nothing
+        return union_convert(t, attr)
     end
 end
 
@@ -148,16 +151,28 @@ function jl_convert(::Type{T}, x::Py) where {T<:AbstractIR}
     end
     PythonCall.pyconvert_return(T(args..., pyconvert(String, pygetattr(x, "type"))))
 end
-
 function jl_convert(::Type{AbstractProgram}, x::Py)
     T = Braket.lookup_type(pyconvert(braketSchemaHeader, pygetattr(x, "braketSchemaHeader")))
     return PythonCall.pyconvert_return(pyconvert(T, x))
 end
 function jl_convert(::Type{AbstractProgramResult}, x::Py)
     T_ = pyconvert(String, x.type)
-    T = Dict("expectation"=>Expectation, "variance"=>Variance, "statevector"=>StateVector, "densitymatrix"=>DensityMatrix, "sample"=>Sample, "amplitude"=>Amplitude, "probability"=>Probability)
+    T = Dict("adjoint_gradient"=>AdjointGradient, "expectation"=>Expectation, "variance"=>Variance, "statevector"=>StateVector, "densitymatrix"=>DensityMatrix, "sample"=>Sample, "amplitude"=>Amplitude, "probability"=>Probability)
     return PythonCall.pyconvert_return(pyconvert(T[T_], x))
 end
+#=for (irT, pyT) in ((:(Braket.IR.Expectation), :(pyjaqcd.Expectation)),
+                   (:(Braket.IR.Variance), :(pyjaqcd.Variance)),
+                   (:(Braket.IR.Sample), :(pyjaqcd.Sample)),
+                   (:(Braket.IR.Amplitude), :(pyjaqcd.Amplitude)),
+                   (:(Braket.IR.StateVector), :(pyjaqcd.StateVector)),
+                   (:(Braket.IR.Probability), :(pyjaqcd.Probability)),
+                   (:(Braket.IR.DensityMatrix), :(pyjaqcd.DensityMatrix)),
+                   (:(Braket.IR.AdjointGradient), :(pyjaqcd.AdjointGradient)))
+    @eval begin
+        Py(o::$irT) = $pyT(;arg_gen(o, fieldnames($irT))...) 
+    end
+end
+=#
 
 function __init__()
     PythonCall.pycopy!(instructions, pyimport("braket.ir.jaqcd.instructions"))
@@ -363,6 +378,7 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.annealing.problem_v1:ProblemType", ProblemType, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:ECR", ECR, jl_convert)
     PythonCall.pyconvert_add_rule("braket.task_result.rigetti_metadata_v1:RigettiMetadata", RigettiMetadata, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", AdjointGradient, jl_convert)
     PythonCall.pyconvert_add_rule("braket.task_result.simulator_metadata_v1:SimulatorMetadata", SimulatorMetadata, jl_convert)
     PythonCall.pyconvert_add_rule("braket.device_schema.quera.quera_ahs_paradigm_properties_v1:Area", Area, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.annealing.problem_v1:Problem", Problem, jl_convert)
@@ -386,11 +402,12 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.device_schema.openqasm_device_action_properties:OpenQASMDeviceActionProperties", OpenQASMDeviceActionProperties, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", Program, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", AbstractProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", AbstractProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:OpenQasmProgram", AbstractProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", AbstractProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.blackbird.program_v1:Program", BlackbirdProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.blackbird.program_v1:BlackbirdProgram", AbstractProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.blackbird.program_v1:Program", AbstractProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.ahs.program_v1:Program", AHSProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.ahs.program_v1:AHSProgram", AbstractProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.ahs.program_v1:Program", AbstractProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Amplitude", AbstractProgramResult, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Expectation", AbstractProgramResult, jl_convert)
@@ -399,6 +416,7 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:StateVector", AbstractProgramResult, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:DensityMatrix", AbstractProgramResult, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", AbstractProgramResult, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", AbstractProgramResult, jl_convert)
 
 end
 

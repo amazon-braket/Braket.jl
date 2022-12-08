@@ -1,4 +1,4 @@
-using Braket, JSON3, PyBraket, PythonCall, Test
+using Braket, Braket.JSON3, PyBraket, PythonCall, Test
 
 using PythonCall: pybuiltins
 

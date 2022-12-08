@@ -5,4 +5,4 @@ scipy = ""
 numpy = ""
 
 [pip.deps]
-amazon-braket-sdk = ">=1.33.0.dev0"
+amazon-braket-sdk = ">=1.35.0"

@@ -10,7 +10,7 @@ isn't answered here, it may be at one of those two locations.
 
 This is *experimental* software, and support may be discontinued in the future. For a fully supported SDK, please use
 the [Python SDK](https://github.com/aws/amazon-braket-sdk-python). We may change, remove, or deprecate parts of the API when making new releases.
-Please review the [CHANGELOG](CHANGELOG.md) for information about changes in each release. 
+Please review the [CHANGELOG](https://github.com/awslabs/Braket.jl/blob/main/CHANGELOG.md) for information about changes in each release. 
 
 ## What is Amazon Braket?
 

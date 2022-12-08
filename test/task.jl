@@ -119,7 +119,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")
         task_args = Braket.prepare_task_input(program(), arn, s3_folder, shots, device_params)
-        @test task_args[:action] == ir(program())
+        @test task_args[:action] == JSON3.write(ir(program()))
         @test task_args[:device_arn] == arn
         @test UUID(task_args[:client_token]) isa UUID
         @test task_args[:shots] == shots
@@ -132,7 +132,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")
         task_args = Braket.prepare_task_input(program(), arn, s3_folder, shots, device_params)
-        @test task_args[:action] == JSON3.write(program())
+        @test task_args[:action] == JSON3.write(ir(program()))
         @test task_args[:device_arn] == arn
         @test UUID(task_args[:client_token]) isa UUID
         @test task_args[:shots] == shots

@@ -29,18 +29,20 @@ end
 PyCircuit(c::Circuit) = convert(PyCircuit, c)
 
 Py(o::Braket.Observables.HermitianObservable) = braketobs.Hermitian(Py(o.matrix))
-Py(o::Braket.Observables.TensorProduct) = braketobs.TensorProduct(pylist(map(Py, o.factors)))
-Py(o::Expectation)   = circuit.result_types.Expectation(Py(o.observable), pylist(o.targets))
-Py(o::Variance)      = circuit.result_types.Variance(Py(o.observable), pylist(o.targets))
-Py(o::Sample)        = circuit.result_types.Sample(Py(o.observable), pylist(o.targets))
-Py(o::Probability)   = circuit.result_types.Probability(pylist(o.targets))
-Py(o::DensityMatrix) = circuit.result_types.DensityMatrix(pylist(o.targets))
-Py(o::Amplitude)     = circuit.result_types.Amplitude(pylist(map(s->Py(s), o.states)))
-Py(o::StateVector)   = circuit.result_types.StateVector()
+Py(o::Braket.Observables.TensorProduct) = o.coefficient * braketobs.TensorProduct(pylist(map(Py, o.factors)))
+Py(o::Braket.Observables.Sum) = braketobs.Sum(pylist(map(Py, o.summands)))
+Py(o::AdjointGradient) = circuit.result_types.AdjointGradient(Py(o.observable), pylist(o.target), pylist(o.parameters))
+Py(o::Expectation)     = circuit.result_types.Expectation(Py(o.observable), pylist(o.targets))
+Py(o::Variance)        = circuit.result_types.Variance(Py(o.observable), pylist(o.targets))
+Py(o::Sample)          = circuit.result_types.Sample(Py(o.observable), pylist(o.targets))
+Py(o::Probability)     = circuit.result_types.Probability(pylist(o.targets))
+Py(o::DensityMatrix)   = circuit.result_types.DensityMatrix(pylist(o.targets))
+Py(o::Amplitude)       = circuit.result_types.Amplitude(pylist(map(s->Py(s), o.states)))
+Py(o::StateVector)     = circuit.result_types.StateVector()
 
 for (typ, py_typ, label) in ((:(Braket.Observables.H), :H, "h"), (:(Braket.Observables.X), :X, "x"), (:(Braket.Observables.Y), :Y, "y"), (:(Braket.Observables.Z), :Z, "z"), (:(Braket.Observables.I), :I, "i"))
     @eval begin
-        Py(o::$typ) = braketobs.$py_typ()
+        Py(o::$typ) = o.coefficient * braketobs.$py_typ()
     end
 end
 

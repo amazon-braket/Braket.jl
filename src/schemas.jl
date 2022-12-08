@@ -72,3 +72,4 @@ function StructTypes.constructfrom(::Type{Program}, obj)
     new_obj[:instructions] = StructTypes.constructfrom(Vector{Instruction}, new_obj[:instructions])
     return StructTypes.constructfrom(StructTypes.StructType(Program), Program, new_obj)
 end
+

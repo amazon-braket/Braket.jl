@@ -31,9 +31,9 @@ mutable struct AwsQuantumTaskBatch
       - `poll_timeout_seconds::Int` - maximum number of seconds to wait while polling for results. Default: $DEFAULT_RESULTS_POLL_TIMEOUT
       - `poll_interval_seconds::Int` - default number of seconds to wait between attempts while polling for results. Default: $DEFAULT_RESULTS_POLL_INTERVAL
     """
-    function AwsQuantumTaskBatch(device_arn::String, task_specs::Vector{<:Union{AbstractProgram, Circuit}}; s3_destination_folder::Tuple{String, String}=default_task_bucket(), shots::Int=DEFAULT_SHOTS, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds=DEFAULT_RESULTS_POLL_INTERVAL)
-        tasks = launch_batch(device_arn, task_specs; s3_destination_folder=s3_destination_folder, shots=shots, poll_interval_seconds=poll_interval_seconds)
-        new(tasks, nothing, Set(), device_arn, task_specs, s3_destination_folder, shots, poll_timeout_seconds, poll_interval_seconds) 
+    function AwsQuantumTaskBatch(device_arn::String, task_specs::Vector{<:Union{AbstractProgram, Circuit}}; s3_destination_folder::Tuple{String, String}=default_task_bucket(), shots::Int=DEFAULT_SHOTS, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds=DEFAULT_RESULTS_POLL_INTERVAL, inputs=Dict{String, Float64}())
+        tasks = launch_batch(device_arn, task_specs; s3_destination_folder=s3_destination_folder, shots=shots, poll_interval_seconds=poll_interval_seconds, inputs=inputs)
+        new(tasks, nothing, Set(), device_arn, task_specs, s3_destination_folder, shots, poll_timeout_seconds, poll_interval_seconds)
     end
 end
 
@@ -42,7 +42,20 @@ function launch_batch(device_arn::String, task_specs::Vector{<:Union{AbstractPro
     s3_folder  = haskey(kwargs, :s3_destination_folder) ? kwargs[:s3_destination_folder] : default_task_bucket()
     shots      = get(kwargs, :shots, DEFAULT_SHOTS)
     device_params = get(kwargs, :device_params, Dict{String, Any}())
-    input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; kwargs...) for ts in task_specs]
+    input_dicts = get(kwargs, :inputs, Dict{String, Float64}())
+    if !isempty(input_dicts)
+        if input_dicts isa Dict
+            input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; inputs=input_dicts, kwargs...) for ts in task_specs]
+        elseif input_dicts isa Vector
+            length(input_dicts) == length(task_specs) || throw(DimensionMismatch("number of input dictionaries $(length(input_dicts)) must equal number of task specifications $(length(task_specs))."))
+
+            input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; inputs=ts_input, kwargs...) for (ts, ts_input) in zip(task_specs, input_dicts)]
+        else
+            throw(ArgumentError("invalid inputs $input_dicts."))
+        end
+    else
+        input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; kwargs...) for ts in task_specs]
+    end
     to_launch = Threads.Atomic{Int}(length(task_specs))
     tasks = Vector{AwsQuantumTask}(undef, length(task_specs))
     Threads.@threads for ii in 1:length(task_specs)
