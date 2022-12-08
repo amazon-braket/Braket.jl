@@ -12,6 +12,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 AWS = "=1.78.0"
 Aqua = "0.5"
-Braket = "=0.1.0"
+Braket = "=0.2.0"
 CondaPkg = "=0.2.14"
 PythonCall = "=0.9.7"
