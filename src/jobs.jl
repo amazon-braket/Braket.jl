@@ -185,6 +185,7 @@ end
 function _parse_query_results(results::Vector, metric_type::String=TIMESTAMP, statistic::String="MAX")
     parsed = filter(x->!isempty(x.message), map(_parse_result, results))
     metrics_dict = Dict{String, Vector}()
+    sortby = metric_type
     for p in parsed
         parsed_metrics = Dict{String, Any}()
         for m in eachmatch(METRIC_DEFINITIONS, p.message)
@@ -192,16 +193,21 @@ function _parse_query_results(results::Vector, metric_type::String=TIMESTAMP, st
             ITERATION_NUMBER ∈ m.captures && (parsed_metrics[ITERATION_NUMBER] = [String(m.captures[end])])
             node_match = match(NODE_TAG, p.message)
             !isnothing(node_match) && (parsed_metrics[NODE_ID] = [String(node_match.captures)])
-            parsed_metrics[String(m[1])] = [String(m[2])]
+            sorter = get(parsed_metrics, sortby, [getfield(p, Symbol(string(sortby)))])[1]
+            parsed_metrics[String(m[1])] = [(sorter, String(m[2]))]
         end
         mergewith!(vcat, metrics_dict, parsed_metrics)
     end
-    sortby = metric_type
     p = sortperm(metrics_dict[sortby])
-    for k in keys(metrics_dict)
-        metrics_dict[k] = metrics_dict[k][p]
+    expanded_metrics_dict = Dict{String, Vector}(sortby=>metrics_dict[sortby][p])
+    for k in filter(k->k!=sortby, keys(metrics_dict))
+        expanded_metrics_dict[k] = []
+        for ind in expanded_metrics_dict[sortby]
+            ix = findfirst(local_ind -> local_ind == ind, first.(metrics_dict[k]))
+            push!(expanded_metrics_dict[k], isnothing(ix) ? missing : last(metrics_dict[k][ix]))
+        end
     end
-    return metrics_dict
+    return expanded_metrics_dict
 end
 
 function _get_metrics_results_sync(query_id::String)
