@@ -26,7 +26,7 @@ end
 function price_search(p::Pricing; kwargs...)
     isempty(p._price_list) && get_prices!(p)
     return filter(p._price_list) do entry
-        all(haskey(entry, string(k)) && entry[string(k)] == v for (k, v) in kwargs)
+        all([haskey(entry, string(k)) && !ismissing(entry[string(k)]) && entry[string(k)] == v for (k, v) in kwargs])
     end
 end
 price_search(; kwargs...) = price_search(Prices[]; kwargs...)
@@ -128,14 +128,17 @@ function _get_qpu_task_cost(arn::String, details::Dict{String})
     occursin("2000Q", device_name) && (device_name = "2000Q")
     occursin("Advantage_system", device_name) && (device_name = "Advantage_system")
     
-    search_dict[Symbol("Device name")] = device_name
     if details["job_task"]
+        search_dict[Symbol("Device Name")] = device_name
         shot_product_family = "Braket Managed Jobs QPU Task Shot"
         task_product_family = "Braket Managed Jobs QPU Task"
     else
+        search_dict[Symbol("DeviceName")] = device_name
         shot_product_family = "Quantum Task-Shot"
         task_product_family = "Quantum Task"
     end
+    shot_prices = price_search(; namedtuple(search_dict)...)
+
     search_dict[Symbol("Product Family")] = shot_product_family
     shot_prices = price_search(; namedtuple(search_dict)...)
     search_dict[Symbol("Product Family")] = task_product_family
@@ -162,7 +165,7 @@ function _get_simulator_task_cost(arn::String, details::Dict{String})
 
     device_name = uppercase(String(split(details["device"], '/')[end]))
     
-    search_dict= Dict(Symbol("Device name")=>device_name)
+    search_dict = Dict(Symbol("Device name")=>device_name)
     if details["job_task"]
         product_family = "Braket Managed Jobs Simulator Task"
         operation = "Managed-Jobs"

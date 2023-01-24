@@ -16,6 +16,7 @@ mutable struct AwsQuantumTask
     poll_timeout_seconds::Int
     poll_interval_seconds::Int
     _future::Union{Future, Nothing}
+    _config::AbstractAWSConfig
     _metadata::Dict{String, Any}
     _logger::AbstractLogger
     _result::Union{Nothing, AbstractQuantumTaskResult}
@@ -23,8 +24,9 @@ mutable struct AwsQuantumTask
                    client_token::String=string(uuid1()),
                    poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT,
                    poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL,
-                   logger=global_logger())
-        new(arn, client_token, poll_timeout_seconds, poll_interval_seconds, nothing, Dict(), logger, nothing)
+                   logger=global_logger(),
+                   config::AWSConfig=global_aws_config())
+        new(arn, client_token, poll_timeout_seconds, poll_interval_seconds, nothing, config, Dict(), logger, nothing)
     end
 end
 Base.show(io::IO, t::AwsQuantumTask) = println(io, "AwsQuantumTask(\"id/taskArn\":\"$(arn(t))\")")
@@ -45,15 +47,16 @@ function AwsQuantumTask(args::NamedTuple)
     s3_key_prefix = args[:outputS3KeyPrefix]
     shots        = args[:shots]
     extra_opts   = args[:extra_opts]
+    config       = args[:config]
     job_token    = get(ENV, "AMZN_BRAKET_JOB_TOKEN", nothing)
     !isnothing(job_token) && merge!(extra_opts, Dict("jobToken"=>job_token))
     timeout_seconds  = get(args, :poll_timeout_seconds, DEFAULT_RESULTS_POLL_TIMEOUT)
     interval_seconds = get(args, :poll_interval_seconds, DEFAULT_RESULTS_POLL_INTERVAL)
     merge!(AWS.AWSServices.braket.service_specific_headers, AWS.LittleDict("Braket-Trackers"=>string(length(GlobalTrackerContext[]))))
-    response         = BRAKET.create_quantum_task(action, client_token, device_arn, s3_bucket, s3_key_prefix, shots, extra_opts)
+    response         = BRAKET.create_quantum_task(action, client_token, device_arn, s3_bucket, s3_key_prefix, shots, extra_opts, aws_config=config)
     pop!(AWS.AWSServices.braket.service_specific_headers, "Braket-Trackers")
     broadcast_event!(TaskCreationEvent(response["quantumTaskArn"], shots, !isnothing(job_token), device_arn))
-    return AwsQuantumTask(response["quantumTaskArn"]; client_token=client_token, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds)
+    return AwsQuantumTask(response["quantumTaskArn"]; client_token=client_token, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds, config=config)
 end
 
 function default_task_bucket()
@@ -94,8 +97,9 @@ function AwsQuantumTask(device_arn::String,
                         poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT,
                         poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL,
                         tags::Dict{String, String}=Dict{String, String}(),
-                        inputs::Dict{String,Float64}=Dict{String, Float64}())
-    args = prepare_task_input(task_spec, device_arn, s3_destination_folder, shots, device_params, disable_qubit_rewiring, tags=tags, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs)
+                        inputs::Dict{String,Float64}=Dict{String, Float64}(),
+                        config::AbstractAWSConfig=global_aws_config())
+    args = prepare_task_input(task_spec, device_arn, s3_destination_folder, shots, device_params, disable_qubit_rewiring, tags=tags, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs, config=config)
     return AwsQuantumTask(args)
 end
 
@@ -123,7 +127,8 @@ _create_annealing_device_params(device_params, device_arn) = _create_annealing_d
 function _create_common_params(device_arn::String, s3_destination_folder::Tuple{String, String}, shots::Int; kwargs...)
     timeout_seconds  = get(kwargs, :poll_timeout_seconds, DEFAULT_RESULTS_POLL_TIMEOUT)
     interval_seconds = get(kwargs, :poll_interval_seconds, DEFAULT_RESULTS_POLL_INTERVAL)
-    return (device_arn=device_arn, outputS3Bucket=s3_destination_folder[1],  outputS3KeyPrefix=s3_destination_folder[2], shots=shots, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds)
+    config           = get(kwargs, :config, global_aws_config())
+    return (device_arn=device_arn, outputS3Bucket=s3_destination_folder[1],  outputS3KeyPrefix=s3_destination_folder[2], shots=shots, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds, config=config)
 end
 
 function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Union{Dict{String, Any}, DwaveDeviceParameters, DwaveAdvantageDeviceParameters, Dwave2000QDeviceParameters}, disable_qubit_rewiring::Bool=false; kwargs...)
@@ -231,7 +236,7 @@ Cancels the task `t`.
 """
 function cancel(t::AwsQuantumTask)
     #!isnothing(t._future) && cancel(t.future)
-    resp = BRAKET.cancel_quantum_task(t.client_token, t.arn)
+    resp = BRAKET.cancel_quantum_task(t.client_token, HTTP.escapeuri(t.arn), aws_config=t._config)
     broadcast_event!(TaskStatusEvent(t.arn, resp["cancellationStatus"]))
     return
 end

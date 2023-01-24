@@ -35,13 +35,13 @@ Base.convert(::Type{String}, d::AwsDevice) = d._arn
 Base.show(io::IO, d::AwsDevice) = print(io, "AwsDevice(arn="*d._arn*")")
 function (d::AwsDevice)(task_spec::Union{Circuit, AnalogHamiltonianSimulation, AbstractProgram}; s3_destination_folder=default_task_bucket(), shots=nothing, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL, inputs=Dict{String, Float64}(), kwargs...)
     shots_ = isnothing(shots) ? d._default_shots : shots
-    return AwsQuantumTask(d._arn, task_spec, s3_destination_folder=s3_destination_folder, shots=shots_, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs, kwargs...)
+    return AwsQuantumTask(d._arn, task_spec, s3_destination_folder=s3_destination_folder, shots=shots_, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs, config=d._config, kwargs...)
 end
 
 # currently no batch support for AHS
-function (d::AwsDevice)(task_specs::Vector{<:Union{Circuit, AbstractProgram}}; s3_destination_folder=default_task_bucket(), shots=nothing, max_parallel=nothing, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL, inputs=Dict{String, Float64}(), kwargs...)
+function (d::AwsDevice)(task_specs::Vector{<:Union{Circuit, AbstractProgram}}; s3_destination_folder=default_task_bucket(), shots=nothing, max_parallel=nothing, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL, inputs=Dict{String, Float64}(), config=d._config, kwargs...)
     shots_ = isnothing(shots) ? d._default_shots : shots
-    return AwsQuantumTaskBatch(d._arn, task_specs; s3_destination_folder=s3_destination_folder, shots=shots_, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs, kwargs...)
+    return AwsQuantumTaskBatch(d._arn, task_specs; s3_destination_folder=s3_destination_folder, shots=shots_, poll_timeout_seconds=poll_timeout_seconds, poll_interval_seconds=poll_interval_seconds, inputs=inputs, config=config, kwargs...)
 end
 
 function _construct_topology_graph(d::AwsDevice)
@@ -222,6 +222,7 @@ function get_devices(; arns::Vector{String}=String[], names::Vector{String}=Stri
         config_for_region = region == current_region ? global_config : AWSConfig(global_config.credentials, region, global_config.output)
         # Simulators are only instantiated in the same region as the AWS session
         types_for_region = string.(sort(region == current_region ? types : setdiff(types, "SIMULATOR")))
+        types_for_region = isnothing(types_for_region) ? Vector[] : types_for_region
         region_devices = search_devices(arns=arns, names=names,
                                         types=types_for_region,
                                         statuses=statuses,

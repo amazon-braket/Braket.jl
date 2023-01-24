@@ -16,9 +16,10 @@ mutable struct AwsQuantumTaskBatch
     _shots::Int
     _poll_timeout_seconds::Int
     _poll_interval_seconds::Int
-    function AwsQuantumTaskBatch(tasks, results, unsuccessful, device_arn, task_specs, s3_dest, shots, timeout, interval)
+    _config::AbstractAWSConfig
+    function AwsQuantumTaskBatch(tasks, results, unsuccessful, device_arn, task_specs, s3_dest, shots, timeout, interval, config=global_aws_config())
         length(tasks) != length(task_specs) && throw(ArgumentError("number of quantum tasks ($(length(tasks))) and task specifications ($(length(task_specs))) must be equal!"))
-        new(tasks, results, unsuccessful, device_arn, task_specs, s3_dest, shots, timeout, interval)
+        new(tasks, results, unsuccessful, device_arn, task_specs, s3_dest, shots, timeout, interval, config)
     end
     @doc """
         AwsQuantumTaskBatch(device_arn::String, task_specs::Vector{<:Union{AbstractProgram, Circuit}}; kwargs...) -> AwsQuantumTaskBatch
@@ -31,9 +32,9 @@ mutable struct AwsQuantumTaskBatch
       - `poll_timeout_seconds::Int` - maximum number of seconds to wait while polling for results. Default: $DEFAULT_RESULTS_POLL_TIMEOUT
       - `poll_interval_seconds::Int` - default number of seconds to wait between attempts while polling for results. Default: $DEFAULT_RESULTS_POLL_INTERVAL
     """
-    function AwsQuantumTaskBatch(device_arn::String, task_specs::Vector{<:Union{AbstractProgram, Circuit}}; s3_destination_folder::Tuple{String, String}=default_task_bucket(), shots::Int=DEFAULT_SHOTS, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds=DEFAULT_RESULTS_POLL_INTERVAL, inputs=Dict{String, Float64}())
-        tasks = launch_batch(device_arn, task_specs; s3_destination_folder=s3_destination_folder, shots=shots, poll_interval_seconds=poll_interval_seconds, inputs=inputs)
-        new(tasks, nothing, Set(), device_arn, task_specs, s3_destination_folder, shots, poll_timeout_seconds, poll_interval_seconds)
+    function AwsQuantumTaskBatch(device_arn::String, task_specs::Vector{<:Union{AbstractProgram, Circuit}}; s3_destination_folder::Tuple{String, String}=default_task_bucket(), shots::Int=DEFAULT_SHOTS, poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT, poll_interval_seconds=DEFAULT_RESULTS_POLL_INTERVAL, inputs=Dict{String, Float64}(), config::AbstractAWSConfig=global_aws_config())
+        tasks = launch_batch(device_arn, task_specs; s3_destination_folder=s3_destination_folder, shots=shots, poll_interval_seconds=poll_interval_seconds, inputs=inputs, config=config)
+        new(tasks, nothing, Set(), device_arn, task_specs, s3_destination_folder, shots, poll_timeout_seconds, poll_interval_seconds, config)
     end
 end
 

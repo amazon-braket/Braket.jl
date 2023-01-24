@@ -1,18 +1,10 @@
 using Pkg, Test, Aqua, Braket
 
-Aqua.test_all(Braket, ambiguities=false, unbound_args=false)
+in_ci = tryparse(Bool, get(ENV, "BRAKET_CI", "false"))
+Aqua.test_all(Braket, ambiguities=false, unbound_args=false, stale_deps=!in_ci, deps_compat=!in_ci)
 Aqua.test_ambiguities(Braket)
 
 const GROUP = get(ENV, "GROUP", "Braket-unit")
-
-subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
-develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
-function activate_subpackage_env(subpackage::String)
-    path = subpackage_path(subpackage)
-    Pkg.activate(path)
-    Pkg.develop(PackageSpec(; path=path))
-    return Pkg.instantiate()
-end
 
 function set_aws_creds(test_type)
     if test_type == "unit"
@@ -69,6 +61,8 @@ for group in groups
             include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))
         end
     else
+        subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
+        develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
         develop_subpackage(pkg_name)
         subpkg_path = subpackage_path(pkg_name)
         # this should inherit the GROUP envvar
