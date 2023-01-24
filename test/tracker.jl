@@ -71,7 +71,7 @@ COMPLETE_EVENTS = [
     end
     @testset "qpu task cost" begin
         function Braket.price_search(; kwargs...)
-            occursin("Shot", kwargs[Symbol("Product Family")]) && return [Dict("PricePerUnit"=>"0.001", "Currency"=>"USD")]
+            haskey(kwargs, Symbol("Product Family")) && occursin("Shot", kwargs[Symbol("Product Family")]) && return [Dict("PricePerUnit"=>"0.001", "Currency"=>"USD")]
             return [Dict("PricePerUnit"=>"1.0", "Currency"=>"USD")]
         end
         @test qpu_tasks_cost(tracker) == Dec128("3.3")

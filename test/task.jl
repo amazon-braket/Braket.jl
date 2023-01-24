@@ -36,8 +36,8 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         resp_dict = Dict("quantumTaskArn"=>"arn/fake")
         req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
         apply(req_patch) do
-            args = (action="", client_token="", device_arn="", outputS3Bucket="", outputS3KeyPrefix="", shots=0, extra_opts=Dict{String, Any}())
-            @test AwsQuantumTask(args) == AwsQuantumTask("arn/fake", client_token="")
+            args = (action="", client_token="", device_arn="", outputS3Bucket="", outputS3KeyPrefix="", shots=0, extra_opts=Dict{String, Any}(), config=Braket.AWS.global_aws_config())
+            @test AwsQuantumTask(args) == AwsQuantumTask("arn/fake", client_token="", config=Braket.AWS.global_aws_config())
             c = CNot(Circuit(), 0, 1)
             @test AwsQuantumTask("arn/fake_dev", c, s3_destination_folder=("", "")) == AwsQuantumTask("arn/fake")
         end
@@ -89,7 +89,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         resp_dict = Dict("cancellationStatus"=>"CANCELLED", "quantumTaskArn"=>"arn:fake")
         req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
         apply(req_patch) do
-            t = AwsQuantumTask("arn:fake", client_token="")
+            t = AwsQuantumTask("arn:fake", client_token="", config=Braket.AWS.global_aws_config())
             @test isnothing(Braket.cancel(t))
         end
     end

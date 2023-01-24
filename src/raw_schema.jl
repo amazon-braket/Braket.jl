@@ -996,7 +996,7 @@ StructTypes.StructType(::Type{BlackbirdDeviceActionProperties}) = StructTypes.Un
 struct JaqcdDeviceActionProperties <: DeviceActionProperties
     version::Vector{String}
     actionType::String
-    supportedOperations::Vector{String}
+    supportedOperations::Union{Nothing, Vector{String}}
     supportedResultTypes::Union{Nothing, Vector{ResultType}}
     disabledQubitRewiringSupported::Union{Nothing, Bool}
 end
@@ -1005,7 +1005,7 @@ StructTypes.StructType(::Type{JaqcdDeviceActionProperties}) = StructTypes.Unorde
 struct OpenQASMDeviceActionProperties <: DeviceActionProperties
     version::Vector{String}
     actionType::String
-    supportedOperations::Vector{String}
+    supportedOperations::Union{Nothing, Vector{String}}
     supportedPragmas::Vector{String}
     forbiddenPragmas::Vector{String}
     maximumQubitArrays::Union{Nothing, Int}
