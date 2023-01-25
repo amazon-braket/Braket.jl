@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.16
+# v0.19.20
 
 using Markdown
 using InteractiveUtils
@@ -15,11 +15,63 @@ md"
 # Quantum Fourier Transform with Amazon Braket
 "
 
+# ╔═╡ e00258a8-e04e-4806-85ad-1ef5c4476dad
+md"""
+In this example, we show an implementation of the Quantum Fourier Transform (QFT) and its inverse. QFT is an important subroutine in many quantum algorithms, like Shor's algorithm and Quantum Phase Estimation. The QFT can be performed efficiently on a quantum computer, using only $\mathcal{O}(n^2)$ single-qubit Hadamard gates and two-qubit controlled phase shift gates, where $n$ is the number of qubits. First, we review the basics of the QFT circuit and how it relates to classical Fourier transforms. Then, we implement QFT in both recursive and non-recursive form, as well as its inverse.
+"""
+
+# ╔═╡ b5530b38-f3e1-4bd7-bf6e-b2052a44850b
+md"""
+## Background of QFT
+
+The Quantum Fourier Transform is a quantum algorithm for applying a discrete Fourier transform to the amplitudes of a quantum state. It's the quantum analogue of the [classical discrete Fourier transform](https://en.wikipedia.org/wiki/Discrete_Fourier_transform). As a refresher, if we have a length $N$ vector $(x_0, x_1, \ldots, x_{N-1}) \in \mathbb{C}^N$, then the discrete Fourier transform of this vector is a length $N$ vector $(y_0, y_1, \ldots, y_{N-1}) \in \mathbb{C}^N$:
+
+```math
+y_j = \frac{1}{\sqrt{N}}\sum_{k=0}^{N-1} x_k \exp{\left\{\frac{2\pi i}{N} j k \right\}}
+```
+
+To develop the *quantum* analogue to this, we can consider an arbitrary state $|\mathtt{input}\rangle = \sum_{j=0}^{N-1} x_j |j\rangle$, and map it to an output state $|\mathtt{output}\rangle = \sum_{k=0}^{N-1} y_k |k\rangle$ such that:
+
+```math
+y_k = \frac{1}{\sqrt{N}} \sum_{\ell = 0}^{N-1} x_\ell \exp{\left\{ \frac{2\pi i}{N} \ell k \right\}}
+```
+
+As an example, let's examine the QFT of state $|0\rangle$ on 3 qubits, which we could also write as $|000\rangle$. We can calculate from the above formula for the coefficients $y_k$ that the output will be an equal superposition over all states:
+
+```math
+\begin{align*}
+y_0 &= \frac{1}{\sqrt{2^3}} \\
+y_1 &= \frac{1}{\sqrt{2^3}} \\
+\ldots & \\
+y_{N-1} &= \frac{1}{\sqrt{2^3}} \\
+|\mathtt{output}\rangle &= \frac{1}{\sqrt{2^3}}\sum_{m=0}^{N-1} |m\rangle \\
+\end{align*}
+```
+
+This state can be factored (you can multiply it out to check):
+```math
+\begin{align*}
+|\mathtt{output}\rangle &= \frac{1}{\sqrt{2^3}} \left(|0\rangle + |1\rangle\right) \otimes \left(|0\rangle + |1\rangle\right) \otimes \left(|0\rangle + |1\rangle\right) \\
+&= \otimes_{q=0}^{N-1} \left| + \right\rangle \\
+\left| + \right\rangle &= \frac{1}{\sqrt{2}} \left(|0\rangle + |1\rangle\right) \\
+\end{align*}
+```
+
+We can also implement the *inverse* QFT, which restores the original $|\mathtt{input}\rangle$ state. We will show the code for this below.
+"""
+
+# ╔═╡ d18db1cb-58b8-4949-b80a-67f36768e59c
+md"""
+### Implementing recursive QFT
+
+In this section, we will implement the QFT algorithm using a recursive approach. The function `qft_no_swap` will apply all gates up to the final `SWAP`s, and `qft_recursive` will call it recursively then apply the `SWAP` gates.
+"""
+
 # ╔═╡ 608cf437-7493-494b-a4d7-1e852bcae8d9
 """
 	qft_no_swap(qubits) -> Circuit
 
-Subroutine of the QFT excluding the final SWAP gates, applied to the `qubits` argument.
+Subroutine of the QFT excluding the final `SWAP` gates, applied to the `qubits` argument.
 
 """
 function qft_no_swap(qubits)
@@ -59,6 +111,13 @@ function qft_recursive(qubits)
     return qftcirc
 end
 
+# ╔═╡ ac3b8437-7f21-4e36-97bd-5af10d0eaf40
+md"""
+### Implementing non-recursive QFT
+
+In this section, we write a function `qft` which implements the QFT algorithm non-recursively.
+"""
+
 # ╔═╡ 3ccc5bb1-16ec-4fd5-b82f-31da2734223e
 """
 	qft(qubits)
@@ -91,6 +150,13 @@ function qft(qubits)
         
     return qftcirc
 end
+
+# ╔═╡ 25274ab6-b0a2-485f-baee-3a8a23c23834
+md"""
+### Inverse QFT
+
+Finally, we can implement the inverse QFT algorithm.
+"""
 
 # ╔═╡ 55a3b85b-6d3c-43b9-9c89-5af3f5c57629
 """
@@ -128,10 +194,22 @@ function inverse_qft(qubits)
     return qftcirc
 end
 
+# ╔═╡ 52bf519d-806c-4d4c-915a-fa28be9b2fc2
+md"""
+## Running QFT on a simulator
+
+With these routines defined, we can run QFT and its inverse on a simulator to develop more intuition. We'll use the Braket local simulator, which runs on hardware you control and is free to use.
+"""
+
 # ╔═╡ b3a750d1-7a2b-4de6-9e6c-166336ba6cec
 device = LocalSimulator()
 
 # ╔═╡ 7127d624-fb0d-41b9-a8cd-6cae7d34d55f
+"""
+	prettify_state_vector(state_vector)
+
+Rounds down small amplitudes in a given `state_vector` make it easier to analyse.
+"""
 function prettify_state_vector(state_vector)
 	state_vec_pretty = complex.(trunc.(real.(state_vector), digits=3), trunc.(imag.(state_vector), digits=3))
 
@@ -140,6 +218,11 @@ function prettify_state_vector(state_vector)
 end
 
 # ╔═╡ 83b78b1a-3935-4ca7-88f6-7a15cc523591
+"""
+	run_and_plot_qft(c::Circuit)
+
+Runs a given `Circuit` `c` and plots the resulting state vector probabilities.
+"""
 function run_and_plot_qft(c::Circuit)
 	num_qubits = qubit_count(c)
 	bitstring_keys = [prod(string.(digits(ii, base=2, pad=num_qubits))) for ii in 0:(2^num_qubits)-1]
@@ -156,9 +239,21 @@ function run_and_plot_qft(c::Circuit)
 	return p
 end
 
+# ╔═╡ 335e537b-c6f8-4c1b-a9b0-5e14c4f7323b
+md"""
+### Examining the effect of QFT on various states
+
+Let's first run the QFT on the $|0\rangle$ state, which, as we showed above, should be mapped to an equal superposition over all states by the QFT:
+"""
+
 # ╔═╡ 256bb268-e2fc-4483-a6f7-4a76028fcf80
 # check output for input |0,0,0> -> expect uniform distribution
 run_and_plot_qft(qft(collect(0:2)))
+
+# ╔═╡ 9bfd35b5-82cf-4c5e-8006-a3b2de15598a
+md"""
+We can also prepare by hand (using the formula above) the result of QFT on a particular state, say $|2\rangle = |010\rangle$, and apply the inverse QFT to recover the input state:
+"""
 
 # ╔═╡ 20cfa5e8-d4ad-4720-9d27-f7c161ea09e3
 begin
@@ -173,6 +268,9 @@ begin
 	run_and_plot_qft(circ2)
 end
 
+# ╔═╡ ac34f36b-9ede-4bf0-9120-a5e0253d6f64
+md"And we can verify that our code works on qubit counts larger than 3:"
+
 # ╔═╡ 0508acef-1de0-42e4-9bbc-9127c2a162b5
 begin
 	# test that the iQFT circuit works for larger qubit counts
@@ -184,6 +282,11 @@ begin
 	run_and_plot_qft(circ3)
 end
 
+# ╔═╡ f584f456-c803-4fa8-99f5-cb9f87b13097
+md"""
+If we apply QFT and then its inverse, we should recover the input state. Let's verify this:
+"""
+
 # ╔═╡ ae77c39f-9f7e-4c45-8823-a16a38c33e0d
 begin
 	#test that the QFT and iQFT circuits cancel each other
@@ -194,6 +297,13 @@ begin
 	
 	run_and_plot_qft(circ4)
 end
+
+# ╔═╡ cc46be99-41e5-4b30-a158-bd5c8c961247
+md"""
+## Conclusion
+
+In this example, we gave a brief introduction to the quantum Fourier transform, which is the quantum analogue of the classical discrete Fourier transform. This algorithm is an essential building block of many higher level quantum algorithms. We verified that QFT and iQFT are inverses of each other and that we see the expected output when running on simple test cases.
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -212,9 +322,9 @@ PyBraket = "~0.1.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.3"
+julia_version = "1.9.0-beta3"
 manifest_format = "2.0"
-project_hash = "aeb747ab5656cc755389f2a00cc7e08ea3f4ea4e"
+project_hash = "b388d13767d41625e15c8cccb513c918b35968c2"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -280,16 +390,16 @@ uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 version = "0.10.4"
 
 [[deps.Cairo_jll]]
-deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
+deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.16.1+1"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "e7ff6cadf743c098e08fca25c91103ee4303c9bb"
+git-tree-sha1 = "c6d890a52d2c4d55d326439580c3b8d0875a77d9"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.15.6"
+version = "1.15.7"
 
 [[deps.ChangesOfVariables]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -299,9 +409,9 @@ version = "0.1.4"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
-git-tree-sha1 = "ded953804d019afa9a3f98981d99b33e3db7b6da"
+git-tree-sha1 = "9c209fb7536406834aa938fb149964b985de6c83"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
-version = "0.7.0"
+version = "0.7.1"
 
 [[deps.ColorSchemes]]
 deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "Random", "SnoopPrecompile"]
@@ -317,15 +427,15 @@ version = "0.11.4"
 
 [[deps.ColorVectorSpace]]
 deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "SpecialFunctions", "Statistics", "TensorCore"]
-git-tree-sha1 = "d08c20eef1f2cbc6e60fd3612ac4340b89fea322"
+git-tree-sha1 = "600cc5508d66b78aae350f7accdb58763ac18589"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
-version = "0.9.9"
+version = "0.9.10"
 
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
-git-tree-sha1 = "417b0ed7b8b838aa6ca0a87aadf1bb9eb111ce40"
+git-tree-sha1 = "fc08e5930ee9a4e03f84bfb5211cb54e7769758a"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.12.8"
+version = "0.12.10"
 
 [[deps.Compat]]
 deps = ["Dates", "LinearAlgebra", "UUIDs"]
@@ -336,7 +446,7 @@ version = "4.3.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "0.5.2+0"
+version = "1.0.2+0"
 
 [[deps.CondaPkg]]
 deps = ["JSON3", "Markdown", "MicroMamba", "Pidfile", "Pkg", "TOML"]
@@ -350,9 +460,9 @@ uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.2"
 
 [[deps.DataAPI]]
-git-tree-sha1 = "e08915633fcb3ea83bf9d6126292e5bc5c739922"
+git-tree-sha1 = "e8119c1a33d267e16108be441a287a6981ba1630"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
-version = "1.13.0"
+version = "1.14.0"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -383,7 +493,9 @@ version = "2.0.3+1"
 
 [[deps.DelimitedFiles]]
 deps = ["Mmap"]
+git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+version = "1.9.1"
 
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -391,9 +503,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[deps.DocStringExtensions]]
 deps = ["LibGit2"]
-git-tree-sha1 = "c36550cb29cbe373e95b3f40486b9a4148f89ffd"
+git-tree-sha1 = "2fb1e02f2b635d0845df5d7c167fec4dd739b00d"
 uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-version = "0.9.2"
+version = "0.9.3"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
@@ -480,15 +592,15 @@ version = "3.3.8+0"
 
 [[deps.GR]]
 deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Preferences", "Printf", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "UUIDs", "p7zip_jll"]
-git-tree-sha1 = "051072ff2accc6e0e87b708ddee39b18aa04a0bc"
+git-tree-sha1 = "9e23bd6bb3eb4300cb567bdf63e2c14e5d2ffdbc"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.71.1"
+version = "0.71.5"
 
 [[deps.GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "501a4bf76fd679e7fcd678725d5072177392e756"
+git-tree-sha1 = "aa23c9f9b7c0ba6baeabe966ea1c7d2c7487ef90"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
-version = "0.71.1+0"
+version = "0.71.5+0"
 
 [[deps.Gettext_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
@@ -498,15 +610,15 @@ version = "0.21.0+0"
 
 [[deps.GitHub]]
 deps = ["Base64", "Dates", "HTTP", "JSON", "MbedTLS", "Sockets", "SodiumSeal", "URIs"]
-git-tree-sha1 = "08ee34cdc529bd4e631f661595c2eb695515bdbc"
+git-tree-sha1 = "5688002de970b9eee14b7af7bbbd1fdac10c9bbe"
 uuid = "bc5e4493-9b4d-5f90-b8aa-2b2bcaad7a26"
-version = "5.8.1"
+version = "5.8.2"
 
 [[deps.Glib_jll]]
 deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Pkg", "Zlib_jll"]
-git-tree-sha1 = "fb83fbe02fe57f2c068013aa94bcdf6760d3a7a7"
+git-tree-sha1 = "d3b3624125c1474292d0d8ed0f65554ac37ddb23"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
-version = "2.74.0+1"
+version = "2.74.0+2"
 
 [[deps.Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -639,9 +751,9 @@ version = "1.3.0"
 
 [[deps.Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Printf", "Requires"]
-git-tree-sha1 = "ab9aa169d2160129beb241cb2750ca499b4e90e9"
+git-tree-sha1 = "2422f47b34d4b127720a18f86fa7b1aa2e141f29"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.15.17"
+version = "0.15.18"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -691,9 +803,9 @@ version = "1.42.0+0"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "42b62845d70a619f063a7da093d995ec8e15e778"
+git-tree-sha1 = "c7cb1f5d892775ba13767a87c7ada0b980ea0a71"
 uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.16.1+1"
+version = "1.16.1+2"
 
 [[deps.Libmount_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -714,7 +826,7 @@ uuid = "38a345b3-de98-5d2b-a5d3-14cd9215e700"
 version = "2.36.0+0"
 
 [[deps.LinearAlgebra]]
-deps = ["Libdl", "libblastrampoline_jll"]
+deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[deps.LogExpFunctions]]
@@ -766,9 +878,9 @@ version = "0.1.9"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
-git-tree-sha1 = "bf210ce90b6c9eed32d25dbcae1ebc565df2687f"
+git-tree-sha1 = "f66bdc5de519e8f8ae43bdc598782d35a25b1272"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "1.0.2"
+version = "1.1.0"
 
 [[deps.Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -781,7 +893,7 @@ version = "0.7.2"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.2.1"
+version = "2022.10.11"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -807,7 +919,7 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.20+0"
+version = "0.3.21+0"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -816,9 +928,9 @@ version = "0.8.1+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "df6830e37943c7aaa10023471ca47fb3065cc3c4"
+git-tree-sha1 = "6503b77492fd7fcb9379bf73cd31035670e3c509"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.3.2"
+version = "1.3.3"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -846,13 +958,13 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.40.0+0"
+version = "10.42.0+0"
 
 [[deps.Parsers]]
 deps = ["Dates", "SnoopPrecompile"]
-git-tree-sha1 = "b64719e8b4504983c7fca6cc9db3ebc8acc2a4d6"
+git-tree-sha1 = "8175fc2b118a3755113c8e68084dc1a9e63c61ee"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.5.1"
+version = "2.5.3"
 
 [[deps.Pidfile]]
 deps = ["FileWatching", "Test"]
@@ -872,9 +984,9 @@ uuid = "30392449-352a-5448-841d-b1acce4e97dc"
 version = "0.40.1+0"
 
 [[deps.Pkg]]
-deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
+deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.8.0"
+version = "1.9.0"
 
 [[deps.PlotThemes]]
 deps = ["PlotUtils", "Statistics"]
@@ -890,9 +1002,9 @@ version = "1.3.2"
 
 [[deps.Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Preferences", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SnoopPrecompile", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
-git-tree-sha1 = "7c5d624a2cb080c2bf41dc5da8fbb837c427048a"
+git-tree-sha1 = "dadd6e31706ec493192a70a7090d369771a9a22a"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.37.0"
+version = "1.37.2"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
@@ -943,9 +1055,9 @@ version = "0.3.2"
 
 [[deps.RecipesBase]]
 deps = ["SnoopPrecompile"]
-git-tree-sha1 = "18c35ed630d7229c5584b945641a73ca83fb5213"
+git-tree-sha1 = "261dddd3b862bd2c940cf6ca4d1c8fe593e457c8"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
-version = "1.3.2"
+version = "1.3.3"
 
 [[deps.RecipesPipeline]]
 deps = ["Dates", "NaNMath", "PlotUtils", "RecipesBase", "SnoopPrecompile"]
@@ -987,9 +1099,9 @@ version = "1.1.1"
 
 [[deps.SentinelArrays]]
 deps = ["Dates", "Random"]
-git-tree-sha1 = "efd23b378ea5f2db53a55ae53d3133de4e080aa9"
+git-tree-sha1 = "c02bd3c9c3fc8463d3591a62a378f90d2d8ab0f3"
 uuid = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
-version = "1.3.16"
+version = "1.3.17"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -1016,9 +1128,10 @@ uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.4"
 
 [[deps.SnoopPrecompile]]
-git-tree-sha1 = "f604441450a3c0569830946e5b33b78c928e1a85"
+deps = ["Preferences"]
+git-tree-sha1 = "e760a70afdcd461cf01a575947738d359234665c"
 uuid = "66db9d55-30c0-4569-8b51-7e840670fc0c"
-version = "1.0.1"
+version = "1.0.3"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -1036,7 +1149,7 @@ uuid = "a2af1166-a08f-5f64-846c-94a0d3cef48c"
 version = "1.1.0"
 
 [[deps.SparseArrays]]
-deps = ["LinearAlgebra", "Random"]
+deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[deps.SpecialFunctions]]
@@ -1047,9 +1160,9 @@ version = "2.1.7"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "StaticArraysCore", "Statistics"]
-git-tree-sha1 = "ffc098086f35909741f71ce21d03dadf0d2bfa76"
+git-tree-sha1 = "6954a456979f23d05085727adb17c4551c19ecd1"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.5.11"
+version = "1.5.12"
 
 [[deps.StaticArraysCore]]
 git-tree-sha1 = "6b7ba252635a5eff6a0b0664a41ee140a1c9e72a"
@@ -1059,6 +1172,7 @@ version = "1.4.0"
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+version = "1.9.0"
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
@@ -1078,6 +1192,11 @@ git-tree-sha1 = "ca4bccb03acf9faaf4137a9abc1881ed1841aa70"
 uuid = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 version = "1.10.0"
 
+[[deps.SuiteSparse_jll]]
+deps = ["Artifacts", "Libdl", "Pkg", "libblastrampoline_jll"]
+uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
+version = "5.10.1+0"
+
 [[deps.SymDict]]
 deps = ["Test"]
 git-tree-sha1 = "0108ccdaea3ef69d9680eeafc8d5ad198b896ec8"
@@ -1087,7 +1206,7 @@ version = "0.3.0"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-version = "1.0.0"
+version = "1.0.3"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1104,7 +1223,7 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
-version = "1.10.1"
+version = "1.10.0"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -1118,9 +1237,9 @@ uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
-git-tree-sha1 = "e4bdc63f5c6d62e80eb1c0043fcc0360d5950ff7"
+git-tree-sha1 = "94f38103c984f89cf77c402f2a68dbd870f8165f"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.9.10"
+version = "0.9.11"
 
 [[deps.URIs]]
 git-tree-sha1 = "ac00576f90d8a259f2c9d823e91d1de3fd44d348"
@@ -1152,9 +1271,9 @@ version = "0.2.0"
 
 [[deps.Wayland_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
-git-tree-sha1 = "3e61f0b86f90dacb0bc0e73a0c5a83f6a8636e23"
+git-tree-sha1 = "ed8d92d9774b077c53e1da50fd81a36af3744c1c"
 uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
-version = "1.19.0+0"
+version = "1.21.0+0"
 
 [[deps.Wayland_protocols_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1170,9 +1289,9 @@ version = "1.4.2"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]
-git-tree-sha1 = "58443b63fb7e465a8a7210828c91c08b92132dff"
+git-tree-sha1 = "93c41695bc1c08c46c5899f4fe06d6ead504bb73"
 uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
-version = "2.9.14+0"
+version = "2.10.3+0"
 
 [[deps.XMLDict]]
 deps = ["EzXML", "IterTools", "OrderedCollections"]
@@ -1315,7 +1434,7 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.12+3"
+version = "1.2.13+0"
 
 [[deps.Zstd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1342,9 +1461,9 @@ uuid = "0ac62f75-1d6f-5e53-bd7c-93b484bb37c0"
 version = "0.15.1+0"
 
 [[deps.libblastrampoline_jll]]
-deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
+deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.1.1+0"
+version = "5.2.0+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1402,17 +1521,28 @@ version = "1.4.1+0"
 # ╔═╡ Cell order:
 # ╟─eefcfdb6-dc0f-4ec4-85a3-73bafc9e0177
 # ╠═d928ee56-0f14-426c-b669-356627382f8f
+# ╟─e00258a8-e04e-4806-85ad-1ef5c4476dad
+# ╟─b5530b38-f3e1-4bd7-bf6e-b2052a44850b
+# ╟─d18db1cb-58b8-4949-b80a-67f36768e59c
 # ╠═608cf437-7493-494b-a4d7-1e852bcae8d9
 # ╠═2c612fa4-1a8d-404a-8b3e-5e1907e20d84
+# ╟─ac3b8437-7f21-4e36-97bd-5af10d0eaf40
 # ╠═3ccc5bb1-16ec-4fd5-b82f-31da2734223e
+# ╟─25274ab6-b0a2-485f-baee-3a8a23c23834
 # ╠═55a3b85b-6d3c-43b9-9c89-5af3f5c57629
+# ╟─52bf519d-806c-4d4c-915a-fa28be9b2fc2
 # ╠═b3a750d1-7a2b-4de6-9e6c-166336ba6cec
 # ╠═7127d624-fb0d-41b9-a8cd-6cae7d34d55f
 # ╠═ab9771de-a268-4df8-811d-9310a12a7d79
 # ╠═83b78b1a-3935-4ca7-88f6-7a15cc523591
+# ╟─335e537b-c6f8-4c1b-a9b0-5e14c4f7323b
 # ╠═256bb268-e2fc-4483-a6f7-4a76028fcf80
+# ╟─9bfd35b5-82cf-4c5e-8006-a3b2de15598a
 # ╠═20cfa5e8-d4ad-4720-9d27-f7c161ea09e3
+# ╟─ac34f36b-9ede-4bf0-9120-a5e0253d6f64
 # ╠═0508acef-1de0-42e4-9bbc-9127c2a162b5
+# ╟─f584f456-c803-4fa8-99f5-cb9f87b13097
 # ╠═ae77c39f-9f7e-4c45-8823-a16a38c33e0d
+# ╟─cc46be99-41e5-4b30-a158-bd5c8c961247
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
