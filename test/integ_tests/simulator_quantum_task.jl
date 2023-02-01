@@ -53,6 +53,15 @@ end
 end
 
 @testset "Simulator Quantum Task" begin
+    @testset "Creating and cancelling a task" begin
+        @testset for simulator_arn in SIMULATOR_ARNS
+            device = AwsDevice(simulator_arn)
+            bell = bell_circ()
+            task = device(bell, shots=SHOTS, s3_destination_folder=s3_destination_folder)
+            cancel(task)
+            @test state(task) ∈ ["CANCELLING", "CANCELLED"]
+        end
+    end
     @testset "No result types Bell pair" begin
         @testset for simulator_arn in SIMULATOR_ARNS
             device = AwsDevice(simulator_arn)

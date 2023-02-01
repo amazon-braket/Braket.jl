@@ -4,7 +4,7 @@ export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTa
 export metadata, status, Observable, Result, FreeParameter, AwsQuantumJob, Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
-export apply_gate_noise!
+export apply_gate_noise!, apply
 export logs, log_metric, metrics
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
@@ -13,10 +13,11 @@ export AdjointGradient, Expectation, Sample, Variance, Amplitude, Probability, S
 
 using AWSS3
 using AWS
-using AWS: @service, AWSConfig, global_aws_config
-@service BRAKET use_response_type=false
-@service IAM 
-@service CLOUDWATCH_LOGS
+using AWS: @service, AWSConfig, global_aws_config, apply
+import AWS.Mocking: apply
+@service BRAKET use_response_type=true
+@service IAM use_response_type=true
+@service CLOUDWATCH_LOGS use_response_type=true
 
 using Compat
 using CSV

@@ -1,16 +1,24 @@
 using Braket, Braket.AWS, Dates, Test
 using AWS: @service, AWSConfig, global_aws_config
-@service BRAKET use_response_type=false
+@service BRAKET use_response_type=true
 
 @testset "Cost tracking" begin
     @testset "QPU tracking" begin
         circuit = Circuit([(H, 0)])
         t = Braket.Tracker()
+        n_available = 0
         for arn = ("arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy", "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-2", "arn:aws:braket:::device/qpu/ionq/ionQdevice")
             d = AwsDevice(arn)
-            Braket.isavailable(d) && d(circuit, shots=10)
+            if Braket.isavailable(d)
+                d(circuit, shots=10)
+                n_available += 1
+            end
         end
-        @test qpu_tasks_cost(t) > 0
+        if n_available > 0
+            @test qpu_tasks_cost(t) > 0.0
+        else
+            @test qpu_tasks_cost(t) == 0.0
+        end
     end
     @testset "Simulator tracking" begin
         circuit = Circuit([(H, 0), (CNot, 0, 1)])
