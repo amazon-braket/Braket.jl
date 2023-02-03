@@ -1,6 +1,6 @@
 using Braket, Braket.Observables, Test, JSON3
 
-using Braket: apply, NoiseModel, add_noise!, insert_noise!, remove_noise!, from_filter, GateCriteria, QubitInitializationCriteria, UnitaryGateCriteria, ObservableCriteria
+using Braket: NoiseModel, add_noise!, insert_noise!, remove_noise!, from_filter, GateCriteria, QubitInitializationCriteria, UnitaryGateCriteria, ObservableCriteria
 import Braket: I as I
 
 h_unitary() = (1/√2).*[1.0 1.0; 1.0 -1.0]

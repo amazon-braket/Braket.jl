@@ -145,7 +145,6 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
                     py_obs = Py(2.0*tp + ho)
                     @test pyisinstance(py_obs, PyBraket.braketobs.Sum)
                     @test pyisinstance(py_obs.summands[0], PyBraket.braketobs.TensorProduct)
-                    @show py_obs.summands[0].coefficient
                     @test pyconvert(Float64, py_obs.summands[0].coefficient) == 2.0
                     @test pyisinstance(py_obs.summands[1], PyBraket.braketobs.Hermitian)
                 end

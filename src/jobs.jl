@@ -276,7 +276,7 @@ use previously cached metadata, if available, otherwise fetch it from
 the Braket service. If the second argument is `::Val{false}` (default),
 do not use previously cached metadata, and fetch fresh metadata from the Braket service.
 """
-metadata(j::AwsQuantumJob, ::Val{false}) = (payload = get_job(j); return convert(Dict, payload))
+metadata(j::AwsQuantumJob, ::Val{false}) = parse(get_job(j))
 metadata(j::AwsQuantumJob, ::Val{true})  = !isempty(j._metadata) ? j._metadata : metadata(j, Val(false))
 metadata(j::AwsQuantumJob) = metadata(j, Val(false)) 
 

@@ -70,7 +70,7 @@ whether the device is currently online.
 """
 function refresh_metadata!(d::AwsDevice)
     dev_name  = d._arn
-    metadata  = convert(Dict, BRAKET.get_device(HTTP.escapeuri(dev_name), aws_config=d._config))
+    metadata  = parse(BRAKET.get_device(HTTP.escapeuri(dev_name), aws_config=d._config))
     d._name   = metadata["deviceName"]
     d._status = metadata["deviceStatus"]
     d._type   = metadata["deviceType"]

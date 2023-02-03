@@ -252,10 +252,10 @@ If the second argument is `::Val{false}`, do not use previously cached
 metadata, and fetch fresh metadata from the Braket service.
 """
 function metadata(t::AwsQuantumTask, ::Val{false})
-    payload = BRAKET.get_quantum_task(HTTP.escapeuri(t.arn))
-    resp = Dict(zip(keys(payload), values(payload)))
-    broadcast_event!(TaskStatusEvent(t.arn, resp["status"]))
-    return resp
+    resp = BRAKET.get_quantum_task(HTTP.escapeuri(t.arn))
+    payload = parse(resp)
+    broadcast_event!(TaskStatusEvent(t.arn, payload["status"]))
+    return payload
 end
 metadata(t::AwsQuantumTask, ::Val{true})  = !isempty(t._metadata) ? t._metadata : metadata(t, Val(false))
 
