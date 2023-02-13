@@ -103,7 +103,10 @@ fixed value later by supplying a mapping to a [`Circuit`](@ref).
 """
 struct FreeParameter
     name::Symbol
+    FreeParameter(name::Symbol) = new(name)
+    FreeParameter(name::String) = new(Symbol(name))
 end
+Base.copy(fp::FreeParameter) = fp
 Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
 
 include("compiler_directive.jl")
