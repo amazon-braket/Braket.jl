@@ -302,10 +302,10 @@ md"""
 """
 
 # ╔═╡ b53c4d8c-2b10-4cd2-8379-42738029f0a9
-# ╠═╡ disabled = true
-#=╠═╡
-res = result(dev(c, shots=0, inputs=init_params))
-  ╠═╡ =#
+t = dev(c, shots=0, inputs=init_params)
+
+# ╔═╡ ea21ca72-6d59-4aab-9882-353ee7fbdd3c
+res = result(t)
 
 # ╔═╡ 00f94b37-7aa0-4ac7-b842-009ef21e56c3
 md"""
@@ -334,7 +334,6 @@ function reconstruct_gradients(raw_gradients, parameter_mapper::Dict)
 end
 
 # ╔═╡ 105feeed-146f-43df-8019-2841fe9b9238
-#=╠═╡
 function filter_and_order_excitations(task_result::Braket.GateModelQuantumTaskResult, cutoff::Float64=1e-8)
     raw_grads     = first(res.values)[:gradient]
     rebuilt_grads = reconstruct_gradients(raw_grads, mapper)
@@ -345,20 +344,15 @@ function filter_and_order_excitations(task_result::Braket.GateModelQuantumTaskRe
 	# return the corresponding excitations in sorted order
     return [excitations_dict[string(k)] for k in filtered_keys]
 end
-  ╠═╡ =#
 
 # ╔═╡ 0c91bbff-31d9-4813-80e8-17cbff3656d0
 cutoff = 1e-8
 
 # ╔═╡ 336e4732-20ee-43e7-a49d-1351f9d266a9
-#=╠═╡
 ordered_excitations = filter_and_order_excitations(res, cutoff)
-  ╠═╡ =#
 
 # ╔═╡ 0b8ffdea-aeae-4060-a08f-7393086c389d
-#=╠═╡
 "Number of filtered excitations: $(length(ordered_excitations))"
-  ╠═╡ =#
 
 # ╔═╡ 5e678047-aeb0-4084-a793-8955b1465868
 md"""
@@ -384,7 +378,6 @@ function build_excitation_circ(ex::Vector{Int}, double_ix::Int, single_ix::Int)
 end
 
 # ╔═╡ c58eb369-14e1-4d76-88c4-c6b9e96070af
-#=╠═╡
 begin
 	n_doubles = count(ex->length(ex)==4, ordered_excitations)
     n_singles = count(ex->length(ex)==2, ordered_excitations)
@@ -396,7 +389,6 @@ begin
 	mapped_singles = Dict(p=>map_param(p) for p in single_ps)
     mapped_ps = merge(mapped_doubles, mapped_singles)
 end
-  ╠═╡ =#
 
 # ╔═╡ f9b9df66-3a25-4e69-97c0-3c178d5a0602
 """
@@ -423,13 +415,8 @@ function tetris_circuit(hf_state, ordered_excitations, mol_H, H_targets)
     d_ix = 1
     s_ix = 1
     while length(ordered_excitations) > 0
-        # go moment by moment...
-        best_excitation = popfirst!(ordered_excitations)
-		ex_c, d_ix, s_ix = build_excitation_circ(best_excitation, d_ix, s_ix)
-        append!(c, ex_c, best_excitation)
-		
-		touched_this_round = copy(best_excitation)
-        
+		next_excitation_ind = 1
+		touched_this_round = Set{Int}()
 		# find the excitation with the next largest contribution which
 		# will not increase the parallel gate depth
         next_excitation_ind = findfirst(ex->isdisjoint(ex, touched_this_round), ordered_excitations)
@@ -450,24 +437,16 @@ function tetris_circuit(hf_state, ordered_excitations, mol_H, H_targets)
 end
 
 # ╔═╡ d6b31724-8862-4c58-b6a5-b82814efb677
-#=╠═╡
 adapt_c = adapt_circuit(hf_state, ordered_excitations, jl_mol_H, targets)
-  ╠═╡ =#
 
 # ╔═╡ 28762af7-1426-4ac5-acfe-d2628d68bfab
-#=╠═╡
 "Total parallel gate depth for naive ADAPT-VQE ansatz: $(depth(adapt_c))"
-  ╠═╡ =#
 
 # ╔═╡ 9db4967c-46a6-4950-99f6-82b382d3530a
-#=╠═╡
 tetris_c = tetris_circuit(hf_state, copy(ordered_excitations), jl_mol_H, targets)
-  ╠═╡ =#
 
 # ╔═╡ 0a8943ce-fb98-4838-b04c-55b5548c0184
-#=╠═╡
 "Total parallel gate depth for TETRIS-ADAPT-VQE ansatz: $(depth(tetris_c))"
-  ╠═╡ =#
 
 # ╔═╡ dcf89cc2-e9b2-4cc2-8d2c-3c2f4b5c58f1
 md"""
@@ -1179,6 +1158,7 @@ version = "17.4.0+0"
 # ╠═1aa3a21e-e968-41ec-a000-9424eb2634ba
 # ╟─661c6780-e3f6-482f-9a03-e38863ee88f7
 # ╠═b53c4d8c-2b10-4cd2-8379-42738029f0a9
+# ╠═ea21ca72-6d59-4aab-9882-353ee7fbdd3c
 # ╟─00f94b37-7aa0-4ac7-b842-009ef21e56c3
 # ╠═69facee7-063e-443c-9e1f-a848b494fe0a
 # ╠═105feeed-146f-43df-8019-2841fe9b9238
