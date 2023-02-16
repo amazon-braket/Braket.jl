@@ -69,7 +69,7 @@ Here we create an AHS program that drives the atom with constant Rabi frequency.
 
 # ╔═╡ ef8051a1-69ec-4719-9f51-54d07d0e71fa
 # set the time range for the fields
-trange = range(0, 4π/(Ω_max), 21)[2:end]
+trange = range(0, 4π/Ω_max, length=21)[2:end]
 
 # ╔═╡ b974749f-54e8-4bb4-b1f9-48baa778a0d9
 """

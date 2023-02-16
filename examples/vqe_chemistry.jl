@@ -1,11 +1,11 @@
 ### A Pluto.jl notebook ###
-# v0.19.20
+# v0.19.22
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ 23aaba4e-3342-4581-a6bf-b039c390062e
-using OrderedCollections, Braket, PyBraket, PyBraket.PythonCall
+using OrderedCollections, Braket, PyBraket, PyBraket.PythonCall, CondaPkg
 
 # ╔═╡ ff4fad96-1970-4fb9-a43a-df02cd5dc643
 using Plots
@@ -19,13 +19,8 @@ md"""
 md"""
 In this example, we show how to implement the variational quantum eigensolver using `Braket.jl` and use it to find the groundstate of a simple molecular Hamiltonian with the assistance of the Braket local simulator.
 
-**Note**: This notebook uses the Python software [`pyscf`](https://pyscf.org/) to generate the molecular Hamiltonian and apply a Jordan-Wigner transformation to it. You may need to independently install `pyscf`, `openfermion`, and `openfermionpyscf` using `pip` and point `PythonCall.jl` to them by using 
-
-```bash
-export JULIA_PYTHONCALL_EXE = "/path/to/python"
-```
-
-**before** you run this notebook (i.e. quit Pluto, export that variable, and relaunch Pluto). For more information, see the [`PythonCall.jl` docs](https://cjdoris.github.io/PythonCall.jl/stable/pythoncall/#pythoncall-config).
+**Note**: This notebook uses the Python software [`pyscf`](https://pyscf.org/) to generate the molecular Hamiltonian and apply a Jordan-Wigner transformation to it.
+If you are using OSX, you may need to set the environment variable `KMP_DUPLICATE_LIB_OK=true` in order to avoid `pyscf` segfaulting. See [this GitHub issue](https://github.com/dmlc/xgboost/issues/1715) for more information. You can set this environment variable in this script by adding a new cell with `ENV["KMP_DUPLICATE_LIB_OK"] = true`.
 """
 
 # ╔═╡ 6ada7712-6f03-4f56-8254-085d878d61fc
@@ -270,6 +265,15 @@ md"""
 Now we can install and load the necessary Python packages:
 """
 
+# ╔═╡ 6626ac70-8fb2-4513-9443-5f90818f7ad4
+#install Python packages
+begin
+	CondaPkg.add_pip("pennylane", version="==0.28.0")
+	CondaPkg.add_pip("pyscf", version="==2.1.1")
+	CondaPkg.add_pip("openfermion", version="==1.5.1")
+	CondaPkg.add_pip("openfermionpyscf", version="==0.5")
+end
+
 # ╔═╡ 67b067f4-6375-42fe-aa9d-8b46f9483ed1
 #import Python packages
 begin
@@ -321,11 +325,10 @@ for rr in bond_lengths
 	rounded_rr = round(rr, digits=2)
 	@info "Computing molecular data for bond-length $rounded_rr Angstroms"
 	geom = pylist([pytuple((pystr("H"), pytuple((0., 0., -rounded_rr/2.)))), pytuple((pystr("H"), pytuple((0., 0., rounded_rr/2.))))])
-	flush(stdout)
 	desc = pystr("bondlength_"*string(rounded_rr)*"A")
     mol = of.MolecularData(geometry=geom, basis=basis_set, multiplicity=spin_mult,
         description=desc, filename=pystr(""),
-        data_directory=pystr(joinpath(pwd(), "data")))
+        data_directory=pystr(pwd()))
 	mol_data[rounded_rr] = mol 
 end
 
@@ -442,12 +445,14 @@ We can see that the energy is minimized around ~0.74 A. This is in fact the [exp
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PyBraket = "e85266a6-1825-490b-a80e-9b9469c53660"
 
 [compat]
 Braket = "~0.3.0"
+CondaPkg = "~0.2.15"
 OrderedCollections = "~1.4.1"
 Plots = "~1.38.2"
 PyBraket = "~0.3.0"
@@ -459,7 +464,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0-beta3"
 manifest_format = "2.0"
-project_hash = "c304104e9341eb18f4e11d09993dfaf545002a11"
+project_hash = "12fb0f992528b965e21985138650b6f99d6004fe"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "SHA", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -1676,6 +1681,7 @@ version = "1.4.1+0"
 # ╠═af4a74c8-fa8d-4c9a-a29d-27476c80b5e5
 # ╟─3c46d71a-7d49-4d91-b536-817333b8f284
 # ╠═23aaba4e-3342-4581-a6bf-b039c390062e
+# ╠═6626ac70-8fb2-4513-9443-5f90818f7ad4
 # ╠═67b067f4-6375-42fe-aa9d-8b46f9483ed1
 # ╠═738480aa-90d3-46e1-9796-340c30290a23
 # ╠═824ff10a-8bdc-4206-865a-facaa4b18824

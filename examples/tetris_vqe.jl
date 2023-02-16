@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ 2feb54cc-abd3-11ed-08d0-89d3036b2224
-using Braket, PyBraket, PyBraket.PythonCall
+using Braket, PyBraket, PyBraket.PythonCall, CondaPkg
 
 # ╔═╡ 9cd02259-e77a-40d3-89fb-5aceb6c88855
 using Braket.Observables: TensorProduct, Observable
@@ -17,8 +17,22 @@ md"""
 
 # ╔═╡ 5a283f0e-76ec-4975-90f1-b824eae4350b
 md"""
-In this notebook, we demonstrate how to use PennyLane's `qchem` molecule in tandem with [`Braket.jl`](https://github.com/awslabs/Braket.jl), the experimental Julia SDK for Amazon Braket, to implement the [TETRIS-ADAPT-VQE](https://arxiv.org/abs/2209.10562) algorithm for quantum chemistry. First, we import the necessary packages. Since we'll be calling PennyLane, which is written in Python, we'll need `PythonCall.jl` which is provided as a dependency of `PyBraket.jl`.
+In this notebook, we demonstrate how to use PennyLane's `qchem` molecule in tandem with [`Braket.jl`](https://github.com/awslabs/Braket.jl), the experimental Julia SDK for Amazon Braket, to implement the [TETRIS-ADAPT-VQE](https://arxiv.org/abs/2209.10562) algorithm for quantum chemistry. First, we install and import the necessary packages. Since we'll be calling PennyLane, which is written in Python, we'll need `PythonCall.jl` which is provided as a dependency of `PyBraket.jl`.
+
+**Note:** if you are using OSX, you may need to set the environment variable `KMP_DUPLICATE_LIB_OK=true` in order to avoid `pyscf` segfaulting. See [this GitHub issue](https://github.com/dmlc/xgboost/issues/1715) for more information. You can set this environment variable in this script by adding a new cell with `ENV["KMP_DUPLICATE_LIB_OK"] = true`.
 """
+
+# ╔═╡ be0d2559-b555-4026-934a-ca4922edb9af
+CondaPkg.add_pip("pennylane", version="==0.28.0")
+
+# ╔═╡ d0e4e6bc-92e9-49a6-924d-999db1de14e3
+CondaPkg.add_pip("pyscf", version="==2.1.1")
+
+# ╔═╡ bd980a06-718f-4896-9b21-fcad0ec715e5
+CondaPkg.add_pip("openfermion", version="==1.5.1")
+
+# ╔═╡ fa7fafac-4529-4c22-9cbe-fc0dfdc15032
+CondaPkg.add_pip("openfermionpyscf", version="==0.5")
 
 # ╔═╡ 94712ed6-5489-4973-bc45-5d18017facd7
 md"""
@@ -457,11 +471,13 @@ We can see that the TETRIS-ADAPT-VQE circuit is more shallow, rendering it more 
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 PyBraket = "e85266a6-1825-490b-a80e-9b9469c53660"
 
 [compat]
-Braket = "~0.4.0"
-PyBraket = "~0.4.0"
+Braket = "~0.4.1"
+CondaPkg = "~0.2.17"
+PyBraket = "~0.4.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -470,7 +486,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.0-beta3"
 manifest_format = "2.0"
-project_hash = "d2c3cc344186c4e83894bc43cdf03f99ab859887"
+project_hash = "82b1b87d69a608f890b56fda571de2de0ee7a079"
 
 [[deps.AWS]]
 deps = ["Base64", "Compat", "Dates", "Downloads", "GitHub", "HTTP", "IniFile", "JSON", "MbedTLS", "Mocking", "OrderedCollections", "Random", "SHA", "Sockets", "URIs", "UUIDs", "XMLDict"]
@@ -851,9 +867,9 @@ version = "1.4.1"
 
 [[deps.Parsers]]
 deps = ["Dates", "SnoopPrecompile"]
-git-tree-sha1 = "946b56b2135c6c10bbb93efad8a78b699b6383ab"
+git-tree-sha1 = "6f4fbcd1ad45905a5dee3f4256fabb49aa2110c6"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.5.6"
+version = "2.5.7"
 
 [[deps.Pidfile]]
 deps = ["FileWatching", "Test"]
@@ -979,9 +995,9 @@ version = "2.1.7"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "StaticArraysCore", "Statistics"]
-git-tree-sha1 = "cee507162ecbb677450f20058ca83bd559b6b752"
+git-tree-sha1 = "67d3e75e8af8089ea34ce96974d5468d4a008ca6"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.5.14"
+version = "1.5.15"
 
 [[deps.StaticArraysCore]]
 git-tree-sha1 = "6b7ba252635a5eff6a0b0664a41ee140a1c9e72a"
@@ -1043,9 +1059,9 @@ uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.9.11"
 
 [[deps.URIs]]
-git-tree-sha1 = "ac00576f90d8a259f2c9d823e91d1de3fd44d348"
+git-tree-sha1 = "074f993b0ca030848b897beff716d93aca60f06a"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.4.1"
+version = "1.4.2"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
@@ -1099,10 +1115,10 @@ uuid = "a9144af2-ca23-56d9-984f-0d03f7b5ccf8"
 version = "1.0.20+0"
 
 [[deps.micromamba_jll]]
-deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
-git-tree-sha1 = "80ddb5f510c650de288ecd548ebc3de557ffb3e2"
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
+git-tree-sha1 = "f272e9232759cc692f9f4edb70440bcf832a3fe1"
 uuid = "f8abcde7-e9b7-5caa-b8af-a437887ae8e4"
-version = "1.2.0+0"
+version = "1.3.1+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1119,6 +1135,10 @@ version = "17.4.0+0"
 # ╟─7fe2bb2d-4c6a-441d-9743-1471aec6f0b1
 # ╟─5a283f0e-76ec-4975-90f1-b824eae4350b
 # ╠═2feb54cc-abd3-11ed-08d0-89d3036b2224
+# ╠═be0d2559-b555-4026-934a-ca4922edb9af
+# ╠═d0e4e6bc-92e9-49a6-924d-999db1de14e3
+# ╠═bd980a06-718f-4896-9b21-fcad0ec715e5
+# ╠═fa7fafac-4529-4c22-9cbe-fc0dfdc15032
 # ╟─94712ed6-5489-4973-bc45-5d18017facd7
 # ╠═9cd02259-e77a-40d3-89fb-5aceb6c88855
 # ╟─cc9358b3-f5f3-44e5-8ffb-078768c79c59

@@ -322,7 +322,7 @@ adj_mat = adjacency_matrix(G)
 
 # ╔═╡ 5dfb5219-8e52-474a-9cad-08759092ecd2
 begin
-	iis, jjs, V = findnz(triu(adj_mat))
+	iis, jjs, vs = findnz(triu(adj_mat))
 	for (i,j) in zip(iis, jjs)
 	    for color in 1:k
 	        J[k*(i-1) + color, k*(j-1) + color] = P2/2
