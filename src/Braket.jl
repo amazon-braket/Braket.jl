@@ -65,7 +65,10 @@ const Prices = Ref{Pricing}()
 const GlobalTrackerContext = Ref{TrackerContext}()
 
 function __init__()
+    downloader = Downloads.Downloader()
+    downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, 60)
     AWS.DEFAULT_BACKEND[] = AWS.DownloadsBackend()
+    AWS.AWS_DOWNLOADER[] = downloader
     IRType[] = :OpenQASM
     Prices[] = Pricing([])
     GlobalTrackerContext[] = TrackerContext()
