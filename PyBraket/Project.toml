@@ -1,7 +1,7 @@
 name = "PyBraket"
 uuid = "e85266a6-1825-490b-a80e-9b9469c53660"
 authors = ["Katharine Hyatt <hyatkath@amazon.com>"]
-version = "0.4.1"
+version = "0.5.0"
 
 [deps]
 Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
@@ -14,7 +14,7 @@ StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [compat]
 Aqua = "=0.6"
-Braket = "=0.4.1"
+Braket = "=0.5.0"
 CondaPkg = "=0.2.17"
 DataStructures = "=0.18.13"
 PythonCall = "=0.9.11"
