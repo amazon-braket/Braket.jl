@@ -63,6 +63,108 @@ julia> Circuit(v);
 Circuit(v::AbstractVector) = (c = Circuit(); c(v); return c)
 Base.show(io::IO, circ::Circuit) = print(io, "Circuit($(qubit_count(circ)) qubits)")
 
+function build_blob!(lines::Vector{String}, strs, targets, hit_this_round::Set{Int}, qubit_lines, non_qubit_lines) 
+    bar_qubits = collect(minimum(targets)+1:maximum(targets)-1)
+    is_dis     = isdisjoint(hit_this_round, union(targets, bar_qubits))
+    ix_lines   = [3 + targ * 2 for targ in targets]
+    bar_lines  = [4 + q * 2 for q in minimum(targets):maximum(targets)-1]
+    if !isdisjoint(hit_this_round, union(targets, bar_qubits))
+        lines[ix_lines]        .*= "-"
+        pad_width               = maximum(length, lines)
+        lines[non_qubit_lines] .= (rpad(line, pad_width, " ") for line in lines[non_qubit_lines])
+        lines[qubit_lines]     .= (rpad(line, pad_width, "-") for line in lines[qubit_lines])
+    end
+    lines[ix_lines] .*= strs
+    # add | for multi qubit objects
+    lines[bar_lines] .*= "|"
+    union!(hit_this_round, targets)
+    union!(hit_this_round, bar_qubits)
+    return lines, hit_this_round
+end
+
+function update_border!(lines, header_str, border_lines)
+    pad_width     = maximum(length, lines)
+    border_length = length(lines[border_lines[1]])
+    pad_diff = pad_width - border_length 
+    half_pad = border_length + div(pad_width - border_length - length(header_str), 2)
+    lines[border_lines] .= (rpad(line, half_pad) for line in lines[border_lines])
+    lines[border_lines] .*= (header_str, header_str)
+    lines[border_lines] .= (rpad(line, pad_width) for line in lines[border_lines])
+    return lines
+end
+
+
+function build_slice!(lines::Vector{String}, strings_and_targets, line_groups, header::String, fallback)
+    hit_this_round = Set{Int}()
+    qubit_lines, non_qubit_lines, border_lines = line_groups
+    for (op_strings, op_targets) in strings_and_targets
+        targets = isempty(op_targets) ? fallback : op_targets
+        lines, hit_this_round = build_blob!(lines, op_strings, targets, hit_this_round, qubit_lines, non_qubit_lines)
+    end
+    lines = update_border!(lines, header, border_lines)
+    pad_width = maximum(length, lines)
+    lines[non_qubit_lines] .= [rpad(line, pad_width) for line in lines[non_qubit_lines]]
+    lines[qubit_lines]     .= [rpad(line, pad_width, "-") for line in lines[qubit_lines]]
+    lines[border_lines]    .*= "|"
+    lines[non_qubit_lines] .*= " "
+    lines[qubit_lines]     .*= "-"
+    return lines
+end
+
+function build_result_lines!(rts::Vector{Result}, lines::Vector{String}, line_groups, qc::Int)
+    strings_and_targets = zip([chars(rt)[1] for rt in rts], [rt.targets for rt in rts])
+    return build_slice!(lines, strings_and_targets, line_groups, "Result Types", collect(0:qc-1))
+end
+
+function build_left_column(qubit_count::Int)
+    qlines = vcat("T", ["q$q" for q in 0:qubit_count-1], "T")
+    nlines = ["" for line in qlines[1:end-1]]
+    lines  = Vector{String}(undef, 2*length(qlines)-1)
+    lines[1:2:end] = qlines[:]
+    lines[2:2:end] = nlines[:]
+    
+    non_qubit_lines = 2:2:length(lines)
+    qubit_lines     = 3:2:length(lines)-1
+    border_lines    = [1, length(lines)]
+    line_groups     = (qubit_lines, non_qubit_lines, border_lines)
+    
+    pad_width = maximum(length, lines)
+    lines[:] .= (rpad(line, pad_width) for line in lines[:])
+    lines[border_lines] .*= " : "
+    lines[qubit_lines]  .*= " : "
+    pad_width = maximum(length, lines)
+    lines[:] .= (rpad(line, pad_width) for line in lines[:])
+
+    lines[border_lines]    .*= "|"
+    lines[non_qubit_lines] .*= " "
+    lines[qubit_lines]     .*= "-"
+    return lines, line_groups
+end
+
+function Base.show(io::IO, ::MIME"text/plain", circ::Circuit)
+    lines, line_groups = build_left_column(qubit_count(circ))
+    targeted_rts = filter(r->hasproperty(r, :targets), circ.result_types)
+    non_targ_rts = filter(r->!hasproperty(r, :targets), circ.result_types)
+    for (t, ixs) in time_slices(circ.moments)
+        strings_and_targets = zip((chars(ix.operator) for ix in ixs), (ix.target for ix in ixs))
+        lines = build_slice!(lines, strings_and_targets, line_groups, string(t), (0, qubit_count(circ)-1))
+    end
+    lines = build_result_lines!(targeted_rts, lines, line_groups, qubit_count(circ))
+
+    circ_str = mapreduce(li->li*"\n", *, lines)
+    if !isempty(non_targ_rts)
+        circ_str *= "\nAdditional result types: "
+        circ_str *= join((chars(rt)[1] for rt in non_targ_rts), ", ")
+        circ_str *= "\n"
+    end
+    if !isempty(circ.parameters)
+        circ_str *= "\nUnassigned parameters: "
+        circ_str *= join((string(p) for p in circ.parameters), ", ") 
+        circ_str *= "\n"
+    end
+    return print(io, circ_str)
+end
+
 function make_bound_circuit(c::Circuit, param_values::Dict{Symbol, Number})
     clamped_circ = Circuit()
     foreach(ix->add_instruction!(clamped_circ, bind_value!(ix, param_values)), c.instructions)

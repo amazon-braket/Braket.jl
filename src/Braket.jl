@@ -83,6 +83,7 @@ abstract type Device end
 
 
 qubit_count(t) = throw(MethodError(qubit_count, t))
+chars(t) = (string(t),) 
 
 include("qubit_set.jl")
 include("raw_schema.jl")

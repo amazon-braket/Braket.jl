@@ -154,3 +154,39 @@ function bind_value!(::Parametrized, g::G, params::Dict{Symbol, Number}) where {
 end
 ir(g::Gate, target::Int, args...) = ir(g, QubitSet(target), args...)
 Base.copy(g::G) where {G<:Gate} = G((copy(getproperty(g, fn)) for fn in fieldnames(G))...)
+
+for (G, c) in zip((:H, :I, :X, :Y, :Z, :S, :Si, :T, :Ti, :V, :Vi), ("H", "I", "X", "Y", "Z", "S", "Si", "T", "Ti", "V", "Vi"))
+    @eval begin
+        chars(g::$G) = ($c,)
+    end
+end
+
+for (G, c) in zip((:PhaseShift, :Rx, :Ry, :Rz), ("Phase", "Rx", "Ry", "Rz"))
+    @eval begin
+        chars(g::$G) = ($c * "(" * string(g.angle) * ")",)
+    end
+end
+
+for (G, cs) in zip((:CNot, :Swap, :ECR, :ISwap, :CV, :CY, :CZ), (("C", "X"), ("SWAP", "SWAP"), ("ECR", "ECR"), ("iSWAP", "iSWAP"), ("C", "V"), ("C", "Y"), ("C", "Z")))
+    @eval begin
+        chars(g::$G) = $cs
+    end
+end
+
+for (G, cs) in zip((:CCNot, :CSwap), (("C", "C", "X"), ("C", "SWAP", "SWAP")))
+    @eval begin
+        chars(g::$G) = $cs
+    end
+end
+
+for (G, c) in zip((:CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10), ("Phase", "Phase00", "Phase01", "Phase10"))
+    @eval begin
+        chars(g::$G) = ("C", $c * "(" * string(g.angle) * ")",)
+    end
+end
+
+for (G, c) in zip((:XX, :YY, :ZZ, :PSwap), ("X", "Y", "Z", "PSwap"))
+    @eval begin
+        chars(g::$G) = ($c * "(" * string(g.angle) * ")",$c * "(" * string(g.angle) * ")")
+    end
+end

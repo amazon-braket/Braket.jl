@@ -1,6 +1,6 @@
 
-@enum MomentType_enum mtGate mtCompilerDirective mtInitializationNoise mtGateNoise mtReadoutNoise
-const MomentType_tostr = LittleDict{MomentType_enum, String}(mtCompilerDirective=>"compiler_directive", mtGate=>"gate", mtInitializationNoise=>"initialization_noise", mtGateNoise=>"gate_noise", mtReadoutNoise=>"readout_noise")
+@enum MomentType_enum mtGate mtCompilerDirective mtInitializationNoise mtGateNoise mtNoise mtReadoutNoise
+const MomentType_tostr = LittleDict{MomentType_enum, String}(mtCompilerDirective=>"compiler_directive", mtGate=>"gate", mtNoise=>"noise", mtInitializationNoise=>"initialization_noise", mtGateNoise=>"gate_noise", mtReadoutNoise=>"readout_noise")
 const MomentType_toenum = LittleDict(zip(values(MomentType_tostr), keys(MomentType_tostr)))
 
 struct MomentKey
@@ -46,7 +46,7 @@ function Base.push!(m::Moments, ix::Instruction, mt::MomentType_enum=mtGateNoise
         m._depth = max(m._depth, time+1)
         m._time_all_qubits = time
     elseif op isa Noise
-        add_noise!(m, ix, MomentType_tostr[mt], noise_index)
+        add_noise!(m, ix, "noise", noise_index)
     else # it's a Gate
         qubits = QubitSet(ix.target)
         time   = _update_qubit_time!(m, qubits)
@@ -59,14 +59,16 @@ function Base.push!(m::Moments, ix::Instruction, mt::MomentType_enum=mtGateNoise
 end
 Base.push!(m::Moments, ixs::Vector{Instruction}, mt::MomentType_enum=mtGateNoise, noise_index::Int=0) = (foreach(ix->push!(m, ix, mt, noise_index), ixs); return m)
 
-function add_noise!(m::Moments, ix::Instruction, input_type::String="gate_noise", noise_index::Int=0)
+function add_noise!(m::Moments, ix::Instruction, input_type::String="noise", noise_index::Int=0)
     qubits = QubitSet(ix.target)
     time = max(0, prod(get(m._max_times, q, -1) for q in qubits))
-    if MomentType_toenum[input_type] == mtInitializationNoise 
+    if MomentType_toenum[input_type] == mtInitializationNoise
         time = 0
     end
-    while haskey(m._moments, MomentKey(time, qubits, MomentType_toenum[input_type], noise_index))
+    search_key = MomentKey(time, qubits, MomentType_toenum[input_type], noise_index)
+    while any(k == search_key for k in keys(m._moments)) # cannot use haskey because of hashing! 
         noise_index += 1
+        search_key = MomentKey(time, qubits, MomentType_toenum[input_type], noise_index)
     end
     key = MomentKey(time, qubits, MomentType_toenum[input_type], noise_index)
     m._moments[key] = ix
@@ -84,12 +86,22 @@ function _update_qubit_time!(m::Moments, qubits::QubitSet)
 end
 
 function sort_moments!(m::Moments)
-    moment_copy    = copy(m._moments) 
+    moment_copy    = OrderedDict{MomentKey, Instruction}()
     sorted_moments = OrderedDict{MomentKey, Instruction}()
-    readout_keys   = filter(k->k.moment_type == mtReadoutNoise, keys(m))
-    init_keys      = filter(k->k.moment_type == mtInitializationNoise, keys(m))
-    noise_keys     = filter(k->(k.moment_type ∉ (mtInitializationNoise, mtReadoutNoise)), keys(m))
-
+    readout_keys   = MomentKey[]
+    init_keys      = MomentKey[]
+    # GATE, NOISE, GATE_NOISE
+    noise_keys     = MomentKey[]
+    for (key, ix) in m._moments
+        if key.moment_type == mtInitializationNoise
+            push!(init_keys, key)
+        elseif key.moment_type == mtReadoutNoise
+            push!(readout_keys, key)
+        else
+            push!(noise_keys, key)
+        end
+        moment_copy[key] = ix
+    end
     for key in init_keys
         sorted_moments[key] = moment_copy[key]
     end
@@ -107,7 +119,7 @@ end
 
 function time_slices(m::Moments)
     m = sort_moments!(m)
-    time_slices = Dict{Int, Vector{Instruction}}()
+    time_slices = OrderedDict{Int, Vector{Instruction}}()
     for (k, ix) in m._moments
         ixs = get!(time_slices, k.time, [])
         push!(ixs, ix)

@@ -2,7 +2,7 @@ module Observables
 
 using JSON3, StructTypes, LinearAlgebra
 
-import ..Braket: ir, qubit_count, pauli_eigenvalues, complex_matrix_from_ir, complex_matrix_to_ir, Operator, SerializationProperties, format_qubits, format, format_matrix, OpenQASMSerializationProperties, IRType, QubitSet, Qubit, IntOrQubit, IRObservable
+import ..Braket: ir, qubit_count, pauli_eigenvalues, complex_matrix_from_ir, complex_matrix_to_ir, Operator, SerializationProperties, format_qubits, format, format_matrix, OpenQASMSerializationProperties, IRType, QubitSet, Qubit, IntOrQubit, IRObservable, chars
 export Observable, TensorProduct, HermitianObservable, Sum
 
 """
@@ -46,6 +46,7 @@ for (typ, label) in ((:H, "h"), (:X, "x"), (:Y, "y"), (:Z, "z"), (:I, "i"))
         Base.:(*)(o::$typ, n::Real) = $typ(Float64(n*o.coefficient))
         Base.:(==)(o1::$typ, o2::$typ) = (o1.coefficient ≈ o2.coefficient)
         Base.show(io::IO, o::$typ) = print(io, (isone(o.coefficient) ? "" : string(o.coefficient) * " * ") * uppercase($label))
+        chars(o::$typ) = (uppercase($label),)
     end
 end
 const StandardObservable = Union{H, X, Y, Z}
@@ -132,6 +133,7 @@ function Base.show(io::IO, o::TensorProduct)
     print(io, o.factors[end])
     return
 end
+chars(o::TensorProduct) = (sprint(show, o),)
 
 """
     HermitianObservable <: Observable
@@ -175,6 +177,7 @@ function ir(ho::HermitianObservable, target::QubitSet, ::Val{:OpenQASM}; seriali
 end
 Base.:(*)(o::HermitianObservable, n::Real) = HermitianObservable(Float64(n) .* o.matrix, 1.0)
 ir(ho::HermitianObservable, target::Nothing, ::Val{:OpenQASM}; kwargs...) = ir(ho, QubitSet(), Val(:OpenQASM); kwargs...)
+chars(o::HermitianObservable) = ("Hermitian",)
 
 """
     Sum <: Observable
@@ -245,6 +248,8 @@ function ir(s::Sum, target::Vector{QubitSet}, ::Val{:OpenQASM}; kwargs...)
     return sum_str
 end
 ir(s::Sum, target::Vector{Vector{T}}, ::Val{:OpenQASM}; kwargs...) where {T} = ir(s, [QubitSet(t) for t in target], Val(:OpenQASM); kwargs...)
+chars(s::Sum) = ("Sum",)
+
 
 StructTypes.StructType(::Type{Observable}) = StructTypes.AbstractType()
 StructTypes.subtypes(::Type{Observable}) = (i=I, h=H, x=X, y=Y, z=Z)
