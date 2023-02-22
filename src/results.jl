@@ -53,6 +53,7 @@ for (typ, ir_typ, label) in ((:Expectation, :(Braket.IR.Expectation), "expectati
             return "#pragma braket result " * $label * " $obs_ir"
         end
         $typ(x::union_obs_typ) = $typ(StructTypes.constructfrom(Observables.Observable, x.observable), x.targets)
+        chars(x::$typ) = (uppercasefirst($label) * "(" * chars(x.observable)[1] * ")",) 
     end
 end
 
@@ -87,6 +88,7 @@ for (typ, ir_typ, label) in ((:Probability, :(Braket.IR.Probability), "probabili
         StructTypes.lower(x::$typ) = $ir_typ(isempty(x.targets) ? nothing : Int.(x.targets), $label)
         StructTypes.lowertype(::Type{$typ}) = @NamedTuple{targets::Union{Nothing, Vector{Int}}, type::String}
         $typ(x::@NamedTuple{targets::Union{Nothing, Vector{Int}}, type::String}) = $typ(x.targets)
+        chars(x::$typ) = (uppercasefirst($label),) 
     end
 end
 
@@ -196,6 +198,7 @@ function AdjointGradient(x::@NamedTuple{parameters::Union{Nothing, Vector{String
     targets = isnothing(x.targets) || isempty(x.targets) ? QubitSet[] : [QubitSet(t) for t in x.targets]
     return AdjointGradient(obs, targets, parameters)
 end
+chars(x::AdjointGradient) = ("AdjointGradient(H)",) 
 
 
 """
@@ -222,6 +225,7 @@ function ir(a::Amplitude, ::Val{:OpenQASM}; kwargs...)
     states = join(repr.(a.states), ", ")
     return "#pragma braket result amplitude $states"
 end
+chars(x::Amplitude) = ("Amplitude(" * join(x.states, ", ") * ")",)
 
 """
     StateVector <: Result
@@ -231,6 +235,7 @@ Struct which represents a state vector measurement on a [`Circuit`](@ref).
 struct StateVector <: Result end
 ir(s::StateVector, ::Val{:OpenQASM}; kwargs...) = "#pragma braket result state_vector"
 Base.:(==)(sv1::StateVector, sv2::StateVector) = true
+chars(x::StateVector) = ("StateVector",)
 
 const ObservableResult = Union{Expectation, Variance, Sample}
 const ObservableParameterResult = Union{AdjointGradient,}

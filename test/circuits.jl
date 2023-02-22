@@ -739,4 +739,51 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             end
         end
     end
+    @testset "pretty-printing" begin
+        @testset "Circuit with FreeParameter" begin
+            a = FreeParameter("α")
+            c = Circuit([(H, collect(0:10)), (CNot, 0, 1), (CNot, 1, 3), (H, 2), (H, 2), (Rx, 0, a), (Expectation, Braket.Observables.TensorProduct(["x", "y"]), [0, 2]), (Variance, Braket.Observables.TensorProduct(["z", "x"]), [2, 1]), (Amplitude, "1111"), (Probability,)])
+            d = Circuit([(H, 0), (X, 1)])
+            c = Braket.add_verbatim_box!(c, d)
+            s = sprint((io, x)->show(io, "text/plain", x), c)
+            known_s = """
+            T   : |0|1|  2   |      3      |4|     5     |                 Result Types                 |
+                                                                                                         
+            q0  : -H-C--Rx(α)-StartVerbatim-H-EndVerbatim-Expectation(X @ Y)-----------------Probability-
+                     |        |               |           |                                  |           
+            q1  : -H-X-C--------------------X--------------------------------Variance(Z @ X)-Probability-
+                       |      |               |           |                  |               |           
+            q2  : -H-H--H---------------------------------Expectation(X @ Y)-Variance(Z @ X)-Probability-
+                       |      |               |                                              |           
+            q3  : -H---X---------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q4  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q5  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q6  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q7  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q8  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q9  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q10 : -H----------StartVerbatim---EndVerbatim------------------------------------Probability-
+                                                                                                         
+            T   : |0|1|  2   |      3      |4|     5     |                 Result Types                 |
+
+            Additional result types: Amplitude(1111)
+
+            Unassigned parameters: α
+            """
+            @test s == known_s
+        end
+        @testset "Circuit with Noise" begin
+            c = Circuit([(H, collect(0:10)), (BitFlip, 0, 0.2), (AmplitudeDamping, 0, 0.1), (Swap, 5, 9), (TwoQubitDepolarizing, 3, 7, 0.1), (DensityMatrix, [3, 4, 5])])
+            s = sprint((io, x)->show(io, "text/plain", x), c)
+            @test s == """T   : |            0             | 1  |Result Types |\n                                                     \nq0  : -H-BF(0.2)-AD(0.1)-----------------------------\n                                                     \nq1  : -H---------------------------------------------\n                                                     \nq2  : -H---------------------------------------------\n                                                     \nq3  : -H----------------DEPO(0.1)------Densitymatrix-\n                        |              |             \nq4  : -H-------------------------------Densitymatrix-\n                        |              |             \nq5  : -H--------------------------SWAP-Densitymatrix-\n                        |         |                  \nq6  : -H---------------------------------------------\n                        |         |                  \nq7  : -H----------------DEPO(0.1)--------------------\n                                  |                  \nq8  : -H---------------------------------------------\n                                  |                  \nq9  : -H--------------------------SWAP---------------\n                                                     \nq10 : -H---------------------------------------------\n                                                     \nT   : |            0             | 1  |Result Types |\n"""
+
+        end
+    end
 end

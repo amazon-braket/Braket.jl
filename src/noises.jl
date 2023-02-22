@@ -32,7 +32,7 @@ function ir(g::Kraus, target::QubitSet, ::Val{:OpenQASM}; serialization_properti
     return "#pragma braket noise kraus($ms) $t"
 end
 qubit_count(g::Kraus) = convert(Int, log2(size(g.matrices[1], 1)))
-
+chars(g::Kraus) = ntuple(i->"KR", qubit_count(g))
 
 """
     BitFlip <: Noise
@@ -45,7 +45,7 @@ end
 
 Parametrizable(g::BitFlip) = Parametrized()
 qubit_count(g::BitFlip) = 1
-
+chars(g::BitFlip) = ("BF(" * string(g.probability) * ")",)
 
 """
     PhaseFlip <: Noise
@@ -58,6 +58,7 @@ end
 
 Parametrizable(g::PhaseFlip) = Parametrized()
 qubit_count(g::PhaseFlip) = 1
+chars(g::PhaseFlip) = ("PF(" * string(g.probability) * ")",)
 
 
 """
@@ -73,7 +74,7 @@ end
 
 Parametrizable(g::PauliChannel) = Parametrized()
 qubit_count(g::PauliChannel) = 1
-
+chars(g::PauliChannel) = ("PC(" * join(string.([g.probX, g.probY, g.probZ]), ", ") * ")",)
 
 """
     AmplitudeDamping <: Noise
@@ -86,6 +87,7 @@ end
 
 Parametrizable(g::AmplitudeDamping) = Parametrized()
 qubit_count(g::AmplitudeDamping) = 1
+chars(g::AmplitudeDamping) = ("AD(" * string(g.gamma) * ")",)
 
 
 """
@@ -99,6 +101,7 @@ end
 
 Parametrizable(g::PhaseDamping) = Parametrized()
 qubit_count(g::PhaseDamping) = 1
+chars(g::PhaseDamping) = ("PD(" * string(g.gamma) * ")",)
 
 
 """
@@ -112,6 +115,7 @@ end
 
 Parametrizable(g::Depolarizing) = Parametrized()
 qubit_count(g::Depolarizing) = 1
+chars(g::Depolarizing) = ("DEPO(" * string(g.probability) * ")",)
 
 
 """
@@ -125,6 +129,7 @@ end
 
 Parametrizable(g::TwoQubitDephasing) = Parametrized()
 qubit_count(g::TwoQubitDephasing) = 2
+chars(g::TwoQubitDephasing) = ("DEPH(" * string(g.probability) * ")","DEPH(" * string(g.probability) * ")")
 
 
 """
@@ -138,6 +143,7 @@ end
 
 Parametrizable(g::TwoQubitDepolarizing) = Parametrized()
 qubit_count(g::TwoQubitDepolarizing) = 2
+chars(g::TwoQubitDepolarizing) = ("DEPO(" * string(g.probability) * ")","DEPO(" * string(g.probability) * ")")
 
 
 """
@@ -152,6 +158,7 @@ end
 
 Parametrizable(g::GeneralizedAmplitudeDamping) = Parametrized()
 qubit_count(g::GeneralizedAmplitudeDamping) = 1
+chars(g::GeneralizedAmplitudeDamping) = ("GAD(" * string(g.probability) * ", " * string(g.gamma) * ")",)
 
 
 """
@@ -179,6 +186,7 @@ function MultiQubitPauliChannel(probabilities::Dict{String, <:Union{Float64, Fre
     return MultiQubitPauliChannel{N}(probabilities)
 end
 Base.:(==)(c1::MultiQubitPauliChannel{N}, c2::MultiQubitPauliChannel{M}) where {N,M} = N == M && c1.probabilities == c2.probabilities
+chars(g::MultiQubitPauliChannel{N}) where {N} = ntuple(i->"PC_$N", N)
 
 for (N, IRN, label) in zip((:BitFlip, :PhaseFlip, :PauliChannel, :AmplitudeDamping, :PhaseDamping, :Depolarizing, :TwoQubitDephasing, :TwoQubitDepolarizing, :GeneralizedAmplitudeDamping), (:(IR.BitFlip), :(IR.PhaseFlip), :(IR.PauliChannel), :(IR.AmplitudeDamping), :(IR.PhaseDamping), :(IR.Depolarizing), :(IR.TwoQubitDephasing), :(IR.TwoQubitDepolarizing), :(IR.GeneralizedAmplitudeDamping)), ("bit_flip", "phase_flip", "pauli_channel", "amplitude_damping", "phase_damping", "depolarizing", "two_qubit_dephasing", "two_qubit_depolarizing", "generalized_amplitude_damping"))
     @eval begin
