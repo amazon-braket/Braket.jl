@@ -27,6 +27,8 @@ using LinearAlgebra: eigvals
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
         str = """{"observable": ["x", 1, "z"], "targets": [0, 1, 2], "type": "variance"}"""
         @test_throws ArgumentError JSON3.read(str, Braket.Result)
+        tp2 = 2.0 * tp
+        @test Braket.Observables.unscaled(tp) == tp
     end
     @testset "TensorProduct of Hermitians" begin
         m = [1. -im; im -1.]
@@ -55,22 +57,33 @@ using LinearAlgebra: eigvals
         @test length(s) == 2
         @test s.summands[1].coefficient == 2.0
         @test s.summands[2].coefficient == 3.0
+        @test_throws ErrorException ir(s, [1, 2], Val(:JAQCD))
+        @test_throws ErrorException ir(s, [QubitSet(1, 2)], Val(:JAQCD))
+        @test Braket.chars(s) == ("Sum",)
         s2 = -1.0 * s
         @test length(s2) == 2
         @test s2.summands[1].coefficient == -2.0
         @test s2.summands[2].coefficient == -3.0
+        s3 = Observables.Y() * Observables.Y() + s
+        @test length(s3) == 3
+        s4 = Observables.Y() * Observables.Y() + 2.0 * Observables.X() * Observables.X() + 3.0 * Observables.Z() * Observables.Z()
+        @test s3 == s4
+        s5 = Observables.Sum([Observables.X()])
+        @test s5 == Observables.X()
     end
     @test_throws ErrorException StructTypes.constructfrom(Observables.Observable, ["x", 1, "z"])
     m = [1 -im; im -1]
     HO = Observables.HermitianObservable(m)
+    @test Braket.chars(HO) == ("Hermitian",)
     HO_ir = ir(HO)
     @test JSON3.write(HO) == JSON3.write(ir(HO)) 
     @test StructTypes.constructfrom(Observables.Observable, convert(IRObservable, HO_ir)) == HO
     @test copy(HO) == HO
-    for typ in (Observables.H, Observables.I, Observables.Z, Observables.X, Observables.Y)
+    for (typ, char) in zip((Observables.H, Observables.I, Observables.Z, Observables.X, Observables.Y), ("H", "I", "Z", "X", "Y"))
         @test copy(typ()) == typ()
         @test JSON3.write(typ()) == JSON3.write(ir(typ()))
         @test ishermitian(typ())
+        @test Braket.chars(typ()) == (char,)
     end
     Braket.IRType[] = :OpenQASM
     @testset "eigenvalues" begin

@@ -119,7 +119,7 @@ export Program, AHSProgram, AbstractIR, AbstractProgramResult, CompilerDirective
 abstract type AbstractIR end
 StructTypes.StructType(::Type{AbstractIR}) = StructTypes.AbstractType()
 StructTypes.subtypekey(::Type{AbstractIR}) = :type
-StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, compilerdirective=CompilerDirective, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, setup=Setup, hamiltonian=Hamiltonian, shiftingfield=ShiftingField, atomarrangement=AtomArrangement, timeseries=TimeSeries, physicalfield=PhysicalField, ahsprogram=AHSProgram, drivingfield=DrivingField, abstractprogramresult=AbstractProgramResult)
+StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, compilerdirective=CompilerDirective, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, ms=MS, gpi=GPi, gpi2=GPi2, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, setup=Setup, hamiltonian=Hamiltonian, shiftingfield=ShiftingField, atomarrangement=AtomArrangement, timeseries=TimeSeries, physicalfield=PhysicalField, ahsprogram=AHSProgram, drivingfield=DrivingField, abstractprogramresult=AbstractProgramResult)
 
 const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, String}
 Base.convert(::Type{IRObservable}, v::Vector{String}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
@@ -522,6 +522,32 @@ end
 StructTypes.StructType(::Type{PSwap}) = StructTypes.UnorderedStruct()
 
 StructTypes.defaults(::Type{PSwap}) = Dict{Symbol, Any}(:type => "pswap")
+
+struct MS <: AbstractIR
+    angle1::Float64
+    angle2::Float64
+    targets::Vector{Int}
+    type::String
+end
+StructTypes.StructType(::Type{MS}) = StructTypes.UnorderedStruct()
+
+struct GPi <: AbstractIR
+    angle::Float64
+    target::Int
+    type::String
+end
+StructTypes.StructType(::Type{GPi}) = StructTypes.UnorderedStruct()
+
+StructTypes.defaults(::Type{GPi}) = Dict{Symbol, Any}(:type => "gpi")
+
+struct GPi2 <: AbstractIR
+    angle::Float64
+    target::Int
+    type::String
+end
+StructTypes.StructType(::Type{GPi2}) = StructTypes.UnorderedStruct()
+
+StructTypes.defaults(::Type{GPi2}) = Dict{Symbol, Any}(:type => "gpi2")
 struct Expectation <: AbstractProgramResult
     observable::IRObservable
     targets::Union{Nothing, Vector{Int}}
@@ -641,7 +667,7 @@ for g in [:CCNot]
 end
 abstract type Target end
 struct SingleTarget <: Target end
-for g in [:H, :I, :X, :Y, :Z, :Rx, :Ry, :Rz, :S, :T, :Si, :Ti, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :CNot, :CCNot, :CV, :CY, :CZ, :V, :Vi, :BitFlip, :PhaseFlip, :PauliChannel, :Depolarizing, :AmplitudeDamping, :GeneralizedAmplitudeDamping, :PhaseDamping]
+for g in [:H, :I, :X, :Y, :Z, :Rx, :Ry, :Rz, :S, :T, :Si, :Ti, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :CNot, :CCNot, :CV, :CY, :CZ, :V, :Vi, :GPi, :GPi2, :BitFlip, :PhaseFlip, :PauliChannel, :Depolarizing, :AmplitudeDamping, :GeneralizedAmplitudeDamping, :PhaseDamping]
     @eval begin
         Target(::Type{$g}) = SingleTarget()
     end
@@ -659,7 +685,7 @@ for g in [:AdjointGradient]
     end
 end
 struct DoubleTarget <: Target end
-for g in [:Swap, :CSwap, :ISwap, :PSwap, :XY, :ECR, :XX, :YY, :ZZ, :TwoQubitDepolarizing, :TwoQubitDephasing]
+for g in [:Swap, :CSwap, :ISwap, :PSwap, :XY, :ECR, :XX, :YY, :ZZ, :MS, :TwoQubitDepolarizing, :TwoQubitDephasing]
     @eval begin
         Target(::Type{$g}) = DoubleTarget()
     end
@@ -684,9 +710,14 @@ abstract type Angle end
 struct DoubleAngled <: Angle end
 struct Angled <: Angle end
 struct NonAngled <: Angle end
-for g in [:Rx, :Ry, :Rz, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :PSwap, :XY, :XX, :YY, :ZZ]
+for g in [:Rx, :Ry, :Rz, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :PSwap, :XY, :XX, :YY, :ZZ, :GPi, :GPi2]
     @eval begin
         Angle(::Type{$g}) = Angled()
+    end
+end
+for g in [:MS]
+    @eval begin
+        Angle(::Type{$g}) = DoubleAngled()
     end
 end
 Angle(::Type{G}) where {G<:AbstractIR} = NonAngled()

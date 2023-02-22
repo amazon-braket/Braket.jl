@@ -28,7 +28,7 @@ abstract type DoubleAngledGate <: Gate end
 
 StructTypes.StructType(::Type{DoubleAngledGate}) = StructTypes.AbstractType()
  
-StructTypes.subtypes(::Type{DoubleAngledGate}) = (ms=MS)
+StructTypes.subtypes(::Type{DoubleAngledGate}) = (ms=MS,)
 for (G, IRG, label, qc) in zip((:Rx, :Ry, :Rz, :PhaseShift, :PSwap, :XY, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :XX, :YY, :ZZ, :GPi, :GPi2), (:(IR.Rx), :(IR.Ry), :(IR.Rz), :(IR.PhaseShift), :(IR.PSwap), :(IR.XY), :(IR.CPhaseShift), :(IR.CPhaseShift00), :(IR.CPhaseShift01), :(IR.CPhaseShift10), :(IR.XX), :(IR.YY), :(IR.ZZ), :(IR.GPi), :(IR.GPi2)), ("rx", "ry", "rz", "phaseshift", "pswap", "xy", "cphaseshift", "cphaseshift00", "cphaseshift01", "cphaseshift10", "xx", "yy", "zz", "gpi", "gpi2"), (:1, :1, :1, :1, :2, :2, :2, :2, :2, :2, :2, :2, :2, :1, :1))
     @eval begin
         @doc """

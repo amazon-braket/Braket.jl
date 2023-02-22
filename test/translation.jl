@@ -89,6 +89,7 @@ using Braket: operator, target
         @test parsed.basis_rotation_instructions       == raw.basis_rotation_instructions
         @test Braket.parse_raw_schema(JSON3.write(raw)) == raw
         p = Braket.Program(Circuit(raw))
+        @test qubit_count(p) == qubit_count(Circuit(raw))
         for (pix, rix) in zip(p.instructions, raw.instructions)
             @test pix == rix
         end
