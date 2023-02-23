@@ -29,6 +29,37 @@ XANADU_ARN = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
             @test length(t) == 2
         end
     end
+    @testset "inputs" begin
+        dev = SV1_ARN
+        α = FreeParameter(:α)
+        c_params = Circuit([(H, [0, 1]), (CNot, 0, 1), (Rx, 0, α)])
+        @testset "one dict for multiple circuits" begin
+            resp_dict = Dict("quantumTaskArn"=>"arn/fake", "status"=>"COMPLETED")
+            req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+            apply(req_patch) do
+                t = Braket.AwsQuantumTaskBatch(dev, [c, c], s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=Dict("α"=>0.2))
+                @test arn.(Braket.tasks(t)) == ["arn/fake", "arn/fake"]
+                @test t isa Braket.AwsQuantumTaskBatch
+                @test length(t) == 2
+            end
+        end
+        @testset "one dict per circuit" begin
+            resp_dict = Dict("quantumTaskArn"=>"arn/fake", "status"=>"COMPLETED")
+            req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+            apply(req_patch) do
+                t = Braket.AwsQuantumTaskBatch(dev, [c, c], s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=[Dict("α"=>0.2), Dict("α"=>0.1)])
+                @test arn.(Braket.tasks(t)) == ["arn/fake", "arn/fake"]
+                @test t isa Braket.AwsQuantumTaskBatch
+                @test length(t) == 2
+            end
+        end
+        @testset "wrong vector of dicts length" begin
+            @test_throws DimensionMismatch Braket.AwsQuantumTaskBatch(dev, [c, c], s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=[Dict("α"=>0.2), Dict("α"=>0.1),  Dict("α"=>0.1)])
+        end
+        @testset "invalid inputs" begin
+            @test_throws ArgumentError Braket.AwsQuantumTaskBatch(dev, [c, c], s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=Set(1))
+        end
+    end
     @testset "unfinished" begin
         resp_dict = Dict("status"=>"RUNNING")
         req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))

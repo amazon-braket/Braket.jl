@@ -39,18 +39,18 @@ mutable struct AwsQuantumTaskBatch
 end
 
 function launch_batch(device_arn::String, task_specs::Vector{<:Union{AbstractProgram, Circuit}}; disable_qubit_rewiring::Bool=false, kwargs...)
-    tasks = Vector{AwsQuantumTask}(undef, length(task_specs))
-    s3_folder  = haskey(kwargs, :s3_destination_folder) ? kwargs[:s3_destination_folder] : default_task_bucket()
-    shots      = get(kwargs, :shots, DEFAULT_SHOTS)
+    tasks         = Vector{AwsQuantumTask}(undef, length(task_specs))
+    s3_folder     = haskey(kwargs, :s3_destination_folder) ? kwargs[:s3_destination_folder] : default_task_bucket()
+    shots         = get(kwargs, :shots, DEFAULT_SHOTS)
     device_params = get(kwargs, :device_params, Dict{String, Any}())
-    input_dicts = get(kwargs, :inputs, Dict{String, Float64}())
+    input_dicts   = get(kwargs, :inputs, Dict{String, Float64}())
     if !isempty(input_dicts)
         if input_dicts isa Dict
             input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; inputs=input_dicts, kwargs...) for ts in task_specs]
         elseif input_dicts isa Vector
             length(input_dicts) == length(task_specs) || throw(DimensionMismatch("number of input dictionaries $(length(input_dicts)) must equal number of task specifications $(length(task_specs))."))
-
-            input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; inputs=ts_input, kwargs...) for (ts, ts_input) in zip(task_specs, input_dicts)]
+            new_kwargs = delete(namedtuple(collect(kwargs)), :inputs)
+            input = [prepare_task_input(ts, device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; inputs=ts_input, new_kwargs...) for (ts, ts_input) in zip(task_specs, input_dicts)]
         else
             throw(ArgumentError("invalid inputs $input_dicts."))
         end

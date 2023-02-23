@@ -136,4 +136,7 @@ using Braket: operator, target
             @test StructTypes.constructfrom(Braket.AbstractProgram, raw) == p
         end
     end
+    @testset "ir fallbacks" begin
+        @test ir(X(), 1) == ir(X(), 1, Val(Braket.IRType[]))
+    end
 end

@@ -74,7 +74,7 @@ Base.isempty(qs::QubitSet)  = isempty(qs.dict)
 Base.in(q, qs::QubitSet)    = haskey(qs.dict, q)
 Base.push!(qs::QubitSet, q) = (qs.dict[q] = nothing; qs)
 Base.copy(qs::QubitSet)     = QubitSet(qs[ii] for ii in 1:length(qs))
-Base.popfirst!(qs::QubitSet) = (q = popfirst!(qs.dict); @show q; return q[1])
+Base.popfirst!(qs::QubitSet) = (q = popfirst!(qs.dict); return q[1])
 function Base.iterate(qs::QubitSet)::Union{Nothing, Tuple{IntOrQubit, Int}}
     qs.dict.ndel > 0 && OrderedCollections.rehash!(qs.dict)
     length(qs.dict.keys) < 1 && return nothing

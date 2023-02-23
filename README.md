@@ -76,6 +76,7 @@ What's currently implemented in *pure* Julia:
 - Searching device information and looking up availability windows
 - Noise models
 - Convenience `Circuit` features
+- Pretty printing of `Circuit`s
 - Cost tracking
 - All gates and noise operations
 - Analog Hamiltonian Simulation
@@ -85,7 +86,6 @@ What's currently implemented in *pure* Julia:
 - [Support for pickled jobs results](https://github.com/awslabs/Braket.jl/issues/18)
 - [Local jobs](https://github.com/awslabs/Braket.jl/issues/17)
 - More robust entry point verification for jobs
-- [Pretty printing of `Circuit`s](https://github.com/awslabs/Braket.jl/issues/14)
 - [Pulse control](https://github.com/awslabs/Braket.jl/issues/15)
 
 ## Security

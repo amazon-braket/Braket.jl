@@ -168,7 +168,8 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         @test c.instructions == [Instruction(CXX(angle), [0, 1, 2])]
     end
     @testset "OpenQASM IR" begin
-        fp = FreeParameter(:alpha)
+        fp  = FreeParameter(:alpha)
+        fp2 = FreeParameter(:beta)
         @testset for ir_bolus in [ 
             (Rx(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "rx(0.17) q[4];",),
             (Rx(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rx(0.17) \$4;",),
@@ -206,6 +207,10 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             (YY(0.17), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "yy(0.17) \$4, \$5;",),
             (XY(0.17), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "xy(0.17) q[4], q[5];",),
             (XY(0.17), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "xy(0.17) \$4, \$5;",),
+            (GPi(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "gpi(0.17) q[4];",),
+            (GPi(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "gpi(0.17) \$4;",),
+            (GPi2(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "gpi2(0.17) q[4];",),
+            (GPi2(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "gpi2(0.17) \$4;",),
             (ISwap(), [0, 1], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "iswap \$0, \$1;",),
             (ISwap(), [0, 1], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "iswap q[0], q[1];",),
             (Swap(), [0, 1], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "swap \$0, \$1;",),
@@ -232,6 +237,8 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             (Ti(), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "ti \$4;",),
             (PhaseShift(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "phaseshift(0.17) q[4];",),
             (PhaseShift(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "phaseshift(0.17) \$4;",),
+            (MS(0.17, 0.2), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "ms(0.17, 0.2) q[4], q[5];",),
+            (MS(0.17, 0.2), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "ms(0.17, 0.2) \$4, \$5;",),
             (CNot(), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "cnot q[4], q[5];",),
             (CNot(), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "cnot \$4, \$5;",),
             (PSwap(0.17), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "pswap(0.17) q[4], q[5];",),
@@ -294,6 +301,8 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             @test ir(gate, target, Val(:OpenQASM); serialization_properties=s_props) == expected_ir
         end
     end
+    @test StructTypes.StructType(X) == StructTypes.Struct()
     @test StructTypes.StructType(Gate) == StructTypes.AbstractType()
+    @test StructTypes.StructType(DoubleAngledGate) == StructTypes.AbstractType()
     @test StructTypes.StructType(AngledGate) == StructTypes.AbstractType()
 end
