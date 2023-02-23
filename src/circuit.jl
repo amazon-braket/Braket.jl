@@ -293,7 +293,7 @@ Program(c::Circuit) = convert(Program, c)
 
 function openqasm_header(c::Circuit, sps::SerializationProperties=OpenQASMSerializationProperties())
     ir_instructions = ["OPENQASM 3.0;"]
-    for p in c.parameters
+    for p in sort(string.(c.parameters))
         push!(ir_instructions, "input float $p;")
     end
     isempty(c.result_types) && push!(ir_instructions, "bit[$(qubit_count(c))] b;")

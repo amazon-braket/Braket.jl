@@ -86,6 +86,27 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         pg = g(α)
         @test Braket.parameters(pg) == [α]
     end
+    @testset for g in (MS(angle, angle),)
+        @test qubit_count(g) == 2
+        ix = Instruction(g, [0, 1])
+        @test JSON3.read(JSON3.write(ix), Instruction) == ix
+        @test Braket.Parametrizable(g) == Braket.Parametrized()
+        @test Braket.parameters(g) == Braket.FreeParameter[]
+    end
+    @testset for g in (MS,)
+        @test qubit_count(g) == 2
+        c = Circuit()
+        c = g(c, 0, 1, angle, angle)
+        @test c.instructions == [Instruction(g(angle, angle), [0, 1])]
+        c = Circuit()
+        c = g(c, 10, 1, angle, angle)
+        @test c.instructions == [Instruction(g(angle, angle), [10, 1])]
+        α = FreeParameter(:alpha)
+        β = FreeParameter(:beta)
+        pg = g(α, β)
+        @test Braket.parameters(pg) == [α, β]
+        pg = Braket.bind_value!(Braket.Parametrized(), pg, Dict{Symbol, Number}(:α=>0.1, :β=>0.5))
+    end
     @testset for g in (CCNot(), CSwap())
         @test qubit_count(g) == 3
         ix = Instruction(g, [0, 1, 2])

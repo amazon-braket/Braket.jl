@@ -156,6 +156,10 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         c = H(c, collect(0:10))
         c = DensityMatrix(c)
         @test c.result_types == [DensityMatrix()]
+        c = Circuit()
+        c = H(c, collect(0:10))
+        c = DensityMatrix(c, 1, 2)
+        @test c.result_types == [DensityMatrix(1, 2)]
 
         c = Circuit()
         c(H, collect(0:10))
@@ -272,21 +276,30 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
     end
     @testset "Adjoint gradient" begin
         α = FreeParameter(:alpha)
-        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
         op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
         op2 = 2.0 * Braket.Observables.Y() * Braket.Observables.Y()
-        c = AdjointGradient(c, op, [QubitSet(0, 1)], [α])
-        @test length(c.result_types) == 1
-        @test c.result_types[1] isa AdjointGradient
-        @test c.result_types[1].observable == op
-        @test c.result_types[1].targets == [QubitSet(0, 1)]
-        @test c.result_types[1].parameters == ["alpha"]
-        @test_throws ArgumentError AdjointGradient(c, op2, [QubitSet(0, 1)], [α])
+        @testset for targets ∈ ([QubitSet(0, 1)], [[0, 1]], [0, 1], QubitSet(0, 1))
+            c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+            c = AdjointGradient(c, op, targets, [α])
+            @test length(c.result_types) == 1
+            @test c.result_types[1] isa AdjointGradient
+            @test c.result_types[1].observable == op
+            @test c.result_types[1].targets == [QubitSet(0, 1)]
+            @test c.result_types[1].parameters == ["alpha"]
+            @test_throws ArgumentError AdjointGradient(c, op2, [QubitSet(0, 1)], [α])
+        end
+
         c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
         op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
         @test_throws DimensionMismatch AdjointGradient(c, op, [QubitSet(0)], [α])
         op3 = op + op2
         @test_throws DimensionMismatch AdjointGradient(c, op3, [QubitSet(0, 1)], [α])
+        
+        op  = 2.0 * Braket.Observables.X()
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        c = AdjointGradient(c, op, 0, [α])
+        @test c.result_types[1].targets == [QubitSet(0)]
+
         # make sure qubit count is correct
         α = FreeParameter(:alpha)
         c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
@@ -303,7 +316,51 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["x"], [0], "sample")]
             expected_bris = [Instruction(H(), 0)]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
             
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.Y(), 0)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["y"], [0], "sample")]
+            expected_bris = [Instruction(Z(), 0), Instruction(S(), 0), Instruction(H(), 0)]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
+            
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.Z(), 0)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["z"], [0], "sample")]
+            expected_bris = Instruction[]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
+
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.I(), 0)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["i"], [0], "sample")]
+            expected_bris = Instruction[]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
+
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.TensorProduct(["x", "h"]), 0, 1)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["x", "h"], [0, 1], "sample")]
+            expected_bris = [Instruction(H(), 0), Instruction(Ry(-π/4), 1)]
+
             @test p.instructions == expected_ixs
             @test p.results == expected_rts
             @test p.basis_rotation_instructions == expected_bris
@@ -737,6 +794,14 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             else
                 @test ir(c, Val(:OpenQASM)) == expected_ir
             end
+        end
+        @testset "with parameters" begin
+            a = FreeParameter("a")
+            b = FreeParameter("b")
+            c = Circuit([(H, [0, 1, 2]), (Rx, 0, a), (Ry, 1, b)])
+            props = OpenQASMSerializationProperties(PHYSICAL)
+            expected_ir = OpenQasmProgram(header, join([ "OPENQASM 3.0;", "input float a;", "input float b;", "bit[3] b;", "h \$0;", "h \$1;", "h \$2;", "rx(a) \$0;", "ry(b) \$1;", "b[0] = measure \$0;", "b[1] = measure \$1;", "b[2] = measure \$2;"], "\n"), nothing)
+            @test ir(c, Val(:OpenQASM), serialization_properties=props) == expected_ir
         end
     end
     @testset "pretty-printing" begin
