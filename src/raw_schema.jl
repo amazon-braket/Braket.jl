@@ -10,7 +10,7 @@ abstract type BraketSchemaBase end
 
 StructTypes.StructType(::Type{BraketSchemaBase}) = StructTypes.AbstractType()
 StructTypes.subtypekey(::Type{BraketSchemaBase}) = :braketSchemaHeader
- 
+
 
 struct braketSchemaHeader
     name::String

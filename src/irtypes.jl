@@ -13,9 +13,9 @@ Base.@kwdef struct OpenQASMSerializationProperties <: SerializationProperties
     qubit_reference_type::QubitReferenceType=VIRTUAL
 end
 
-format(target::Int, sps::OpenQASMSerializationProperties) = sps.qubit_reference_type == VIRTUAL ? "q[$target]" : "\$$target"
-format(target::Qubit, sps::OpenQASMSerializationProperties) = sps.qubit_reference_type == VIRTUAL ? "q[$target]" : "\$$target"
-format_qubits(qubits, sps::OpenQASMSerializationProperties) = chop(prod(map(q->format(q, sps), vcat(qubits...)) .* ", "), tail=2)
+format(target::Int, sps::OpenQASMSerializationProperties)   = sps.qubit_reference_type == VIRTUAL ? "q[$target]" : "\$$target"
+format(target::Qubit, sps::OpenQASMSerializationProperties) = format(Int(target), sps)
+format_qubits(qubits, sps::OpenQASMSerializationProperties) = join(map(q->format(q, sps), vcat(qubits...)), ", ")
 function format_complex(n::Number)
     iszero(real(n)) && iszero(imag(n)) && return 0
     isreal(n) && return real(n)
