@@ -71,7 +71,11 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         apply(req_patch) do
             t = AwsQuantumTask("fake_arn")
             t._metadata = Dict("status"=>"COMPLETED", "outputS3Bucket"=>"fake_bucket", "outputS3Directory"=>"fake_prefix")
-            @test result(t) isa Braket.GateModelQuantumTaskResult
+            res1 = result(t)
+            @test res1 isa Braket.GateModelQuantumTaskResult
+            # test getting cached result
+            res2 = result(t)
+            @test res2.values == res1.values
         end
         # test result timeout
         resp_dict = Dict("status"=>"RUNNING")
@@ -271,11 +275,13 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         dev = SV1_ARN
         α = FreeParameter(:α)
         c_params = Circuit([(H, [0, 1]), (CNot, 0, 1), (Rx, 0, α)])
-        resp_dict = Dict("quantumTaskArn"=>"arn/fake", "status"=>"COMPLETED")
-        req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
-        apply(req_patch) do
-            t = Braket.AwsQuantumTask(dev, c_params, s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=Dict("α"=>0.2))
-            @test arn(t) == "arn/fake"
+        @testset for prog in (c_params, ir(c_params, Val(:OpenQASM)))
+            resp_dict = Dict("quantumTaskArn"=>"arn/fake", "status"=>"COMPLETED")
+            req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+            apply(req_patch) do
+                t = Braket.AwsQuantumTask(dev, prog, s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=Dict("α"=>0.2))
+                @test arn(t) == "arn/fake"
+            end
         end
     end
 end

@@ -17,6 +17,8 @@ using LinearAlgebra: eigvals
         rt = Expectation(o, [0])
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
         @test ir(o) isa IRObservable
+        mult_h = 2.0 * o
+        @test mult_h.matrix == 2.0 * m
     end
     @testset "TensorProduct" begin
         tp = Observables.TensorProduct(["x", "y", "z"])
@@ -129,6 +131,7 @@ using LinearAlgebra: eigvals
             ( Observables.HermitianObservable(diagm(ones(Int64, 4))), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [1, 2], "hermitian([[1+0im, 0im, 0im, 0im], [0im, 1+0im, 0im, 0im], [0im, 0im, 1+0im, 0im], [0im, 0im, 0im, 1+0im]]) q[1], q[2]"),
             ( Observables.HermitianObservable(diagm(ones(Int64, 4))), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), [1, 2], "hermitian([[1+0im, 0im, 0im, 0im], [0im, 1+0im, 0im, 0im], [0im, 0im, 1+0im, 0im], [0im, 0im, 0im, 1+0im]]) \$1, \$2"),
             ( Observables.HermitianObservable(diagm(ones(Int64, 2))), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), nothing, "hermitian([[1+0im, 0im], [0im, 1+0im]]) all"),
+            ( Observables.HermitianObservable([1 1-im; 1+im 1]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), nothing, "hermitian([[1+0im, 1-1im], [1+1im, 1+0im]]) all"),
             ( Observables.TensorProduct([Observables.H(), Observables.Z()]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [3, 0], "h(q[3]) @ z(q[0])"),
             ( Observables.TensorProduct([Observables.H(), Observables.Z()]), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), [3, 0], "h(\$3) @ z(\$0)"),
             ( Observables.TensorProduct([Observables.H(), Observables.Z(), Observables.I()]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [3, 0, 1], "h(q[3]) @ z(q[0]) @ i(q[1])"),

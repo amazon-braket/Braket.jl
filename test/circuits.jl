@@ -103,6 +103,12 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             c(H, collect(0:10))
             @test qubits(c) == QubitSet(collect(0:10))
             @test length(c.instructions) == qubit_count(c)
+
+            c = Circuit()
+            c(X(), 0)
+            c(StartVerbatimBox())
+            @test qubits(c) == QubitSet(0)
+            @test length(c.instructions) == 2
         end
     end
 
@@ -388,7 +394,8 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         end
         @testset "tensor product" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
-            circ(Expectation, Observables.X() * Observables.Y() * Observables.Y(), [0, 1, 2])
+            obs =  Observables.X() * Observables.Y() * Observables.Y()
+            circ(Expectation, obs, [0, 1, 2])
             expected = [
                 Instruction(H(), 0),
                 Instruction(Z(), 1),
@@ -400,6 +407,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             ]
             Braket.basis_rotation_instructions!(circ)
             @test circ.basis_rotation_instructions == expected
+            @test Braket.basis_rotation_gates(obs) == ((H(),), (Z(), S(), H()), (Z(), S(), H()))
         end
         @testset "tensor product with shared target" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
@@ -597,6 +605,18 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         c = XX(c, 1, 2, rand())
         c = Braket.apply_initialization_noise!(c, [BitFlip(0.2), PhaseFlip(0.1)])
         c = Braket.apply_readout_noise!(c, [BitFlip(0.2), PhaseFlip(0.1)])
+        ts = Braket.time_slices(c.moments)
+        @test length(ts) == depth(c)
+        s = sprint(show, c.moments)
+        sd = sprint(show, c.moments._max_times)
+        @test s == "Circuit moments:\nMax times: $sd\n"
+
+        c = Circuit()
+        c = H(c, 0)
+        c = CNot(c, 0, 1)
+        c = XX(c, 1, 2, rand())
+        c = Braket.apply_initialization_noise!(c, BitFlip(0.2), 0)
+        c = Braket.apply_readout_noise!(c, PhaseFlip(0.1), 0)
         ts = Braket.time_slices(c.moments)
         @test length(ts) == depth(c)
         s = sprint(show, c.moments)
@@ -855,6 +875,9 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             s = sprint((io, x)->show(io, "text/plain", x), c)
             known_s = "T  : |0|1|    2     |  3   |Result Types|\n                                         \nq0 : -H-C-Phase(0.2)-X(0.1)--------------\n        | |          |                   \nq1 : -H-X-C------------------------------\n        |            |                   \nq2 : -H-C------------X(0.1)--------------\n                                         \nT  : |0|1|    2     |  3   |Result Types|\n"
             @test s == known_s
+        end
+        @testset "chars fallback" begin
+            @test Braket.chars('a') == ("a",)
         end
     end
 end

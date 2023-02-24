@@ -176,6 +176,7 @@ end
 (c::Circuit)(::Type{T}, args...) where {T<:Noise} = apply_noise!(T, c, args...)
 (c::Circuit)(::Type{T}) where {T<:CompilerDirective} = add_instruction!(c, Instruction(T()))
 (c::Circuit)(g::QuantumOperator, args...) = add_instruction!(c, Instruction(g, args...))
+(c::Circuit)(g::CompilerDirective) = add_instruction!(c, Instruction(g))
 (c::Circuit)(v::AbstractVector) = foreach(vi->c(vi...), v)
 (c::Circuit)(rt::Result, args...) = add_result_type!(c, rt, args...)
 (c::Circuit)(::Type{T}, args...) where {T<:Result} = T(c, args...)

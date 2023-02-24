@@ -156,7 +156,8 @@ function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_fol
     
     inputs = get(kwargs, :inputs, Dict{String, Float64}())
     if !isempty(inputs)
-        inputs_merged = merge(program.inputs, inputs)
+        prog_inputs = isnothing(program.inputs) ? Dict{String, Float64}() : program.inputs
+        inputs_merged = merge(prog_inputs, inputs)
         program_ = OpenQasmProgram(program.braketSchemaHeader, program.source, inputs_merged)
         action   = JSON3.write(program_)
     else

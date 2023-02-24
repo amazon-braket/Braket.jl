@@ -70,7 +70,12 @@ end
                             [Braket.IR.CNot(0, 1, "cnot"), Braket.IR.CNot(2, 3, "cnot")],
                             [Braket.IR.Probability([1], "probability"),
                              Braket.IR.Expectation(["z"], nothing, "expectation"),
-                             Braket.IR.Variance(["x", "x"], [0, 2], "variance"), samp],
+                             Braket.IR.Variance(["x", "x"], [0, 2], "variance"),
+                             samp,
+                             Braket.IR.Sample(["z"], [1], "sample"),
+                             Braket.IR.Sample(["x", "y"], [1, 2], "sample"),
+                             Braket.IR.Sample(["z"], nothing, "sample"),
+                            ],
                             [])
     task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
     additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
@@ -89,6 +94,29 @@ end
     @test quantum_task_result.values[4] ≈ [1.0, 1.0, -1.0, 1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0]
     @test quantum_task_result.result_types[1].type == Braket.IR.Probability([1], "probability")
     @test quantum_task_result.result_types[2].type == Braket.IR.Expectation(["z"], nothing, "expectation")
+    
+
+    action = Braket.Program(Braket.header_dict[Braket.Program],
+                            [Braket.IR.H(0, "h"), Braket.IR.H(1, "h"), Braket.IR.H(2, "h"), Braket.IR.H(3, "h")],
+                            [Braket.IR.Sample(["z"], [1], "sample"),
+                             Braket.IR.Sample(["x", "y"], [1, 2], "sample"),
+                             Braket.IR.Sample(["z"], nothing, "sample"),
+                            ],
+                            [])
+    task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
+    additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
+    task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
+        measurements,
+        nothing,
+        nothing,
+        [0, 1, 2, 3],
+        task_metadata_shots,
+        additional_metadata,
+    )
+    quantum_task_result = Braket.format_result(task_result)
+    @test quantum_task_result.values[1] ≈ [1, -1, 1, 1, -1, -1, 1, -1, 1, 1]
+    @test quantum_task_result.values[2] ≈ [-1, 1, 1, -1, 1, 1, 1, 1, 1, 1]
+    @test quantum_task_result.values[3] ≈ [[1, -1, -1, 1, -1, 1, 1, 1, 1, 1], [1, -1, 1, 1, -1, -1, 1, -1, 1, 1], [-1, -1, 1, -1, -1, -1, 1, -1, 1, 1], [1, -1, -1, 1, -1, -1, -1, -1, 1, -1]] 
 
     @testset "result without measurements or measurementProbabilities" begin
         task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)

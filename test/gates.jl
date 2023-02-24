@@ -170,7 +170,9 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     @testset "OpenQASM IR" begin
         fp  = FreeParameter(:alpha)
         fp2 = FreeParameter(:beta)
-        @testset for ir_bolus in [ 
+        @testset for ir_bolus in [
+            (Rx(0.17), [Qubit(4)], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "rx(0.17) q[4];",),
+            (Rx(0.17), [Qubit(4)], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rx(0.17) \$4;",),
             (Rx(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "rx(0.17) q[4];",),
             (Rx(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rx(0.17) \$4;",),
             (X(), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "x q[4];",),
