@@ -33,6 +33,7 @@ for group in groups
         if test_type == "unit"
             include("ahs.jl")
             include("utils.jl")
+            include("qubit_set.jl")
             include("dwave_device.jl")
             include("ionq_device.jl")
             include("rigetti_device.jl")

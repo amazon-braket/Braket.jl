@@ -70,6 +70,7 @@ using LinearAlgebra: eigvals
         @test s3 == s4
         s5 = Observables.Sum([Observables.X()])
         @test s5 == Observables.X()
+        @test Observables.X() == s5
     end
     @test_throws ErrorException StructTypes.constructfrom(Observables.Observable, ["x", 1, "z"])
     m = [1 -im; im -1]

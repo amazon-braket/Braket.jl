@@ -109,12 +109,13 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     oq3_program() = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], bell_qasm, nothing)
     bb_program()  = Braket.BlackbirdProgram(Braket.header_dict[Braket.BlackbirdProgram], "Vac | q[0]")
     bell_circ()   = (c = Circuit(); c=H(c, 0); c=CNot(c, 0, 1); return c)
+    bell_prog()   = Braket.Program(bell_circ())
     RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-11"
     IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
     SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
     OQC_ARN = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
     XANADU_ARN = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
-    @testset for (program, arn) in zip((bell_circ, bell_circ, bell_circ, bell_circ), (SV1_ARN, OQC_ARN, RIGETTI_ARN, IONQ_ARN))
+    @testset for program in (bell_circ, bell_prog), arn in (SV1_ARN, OQC_ARN, RIGETTI_ARN, IONQ_ARN)
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")
@@ -264,6 +265,17 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
                 db = Braket.default_task_bucket()
                 @test db == ("amazon-braket-fake_region-000000", "tasks")
             end
+        end
+    end
+    @testset "inputs" begin
+        dev = SV1_ARN
+        α = FreeParameter(:α)
+        c_params = Circuit([(H, [0, 1]), (CNot, 0, 1), (Rx, 0, α)])
+        resp_dict = Dict("quantumTaskArn"=>"arn/fake", "status"=>"COMPLETED")
+        req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        apply(req_patch) do
+            t = Braket.AwsQuantumTask(dev, c_params, s3_destination_folder=("fake_bucket", "fake_prefix"), inputs=Dict("α"=>0.2))
+            @test arn(t) == "arn/fake"
         end
     end
 end

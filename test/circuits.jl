@@ -850,5 +850,11 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             @test s == """T   : |            0             | 1  |Result Types |\n                                                     \nq0  : -H-BF(0.2)-AD(0.1)-----------------------------\n                                                     \nq1  : -H---------------------------------------------\n                                                     \nq2  : -H---------------------------------------------\n                                                     \nq3  : -H----------------DEPO(0.1)------Densitymatrix-\n                        |              |             \nq4  : -H-------------------------------Densitymatrix-\n                        |              |             \nq5  : -H--------------------------SWAP-Densitymatrix-\n                        |         |                  \nq6  : -H---------------------------------------------\n                        |         |                  \nq7  : -H----------------DEPO(0.1)--------------------\n                                  |                  \nq8  : -H---------------------------------------------\n                                  |                  \nq9  : -H--------------------------SWAP---------------\n                                                     \nq10 : -H---------------------------------------------\n                                                     \nT   : |            0             | 1  |Result Types |\n"""
 
         end
+        @testset "Circuit with 3 qubit gates" begin
+            c = Circuit([(H, [0, 1, 2]), (CCNot, [0, 2, 1]), (CPhaseShift, 1, 0, 0.2), (XX, 0, 2, 0.1)])
+            s = sprint((io, x)->show(io, "text/plain", x), c)
+            known_s = "T  : |0|1|    2     |  3   |Result Types|\n                                         \nq0 : -H-C-Phase(0.2)-X(0.1)--------------\n        | |          |                   \nq1 : -H-X-C------------------------------\n        |            |                   \nq2 : -H-C------------X(0.1)--------------\n                                         \nT  : |0|1|    2     |  3   |Result Types|\n"
+            @test s == known_s
+        end
     end
 end
