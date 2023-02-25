@@ -678,7 +678,7 @@ function apply_noise_to_moments!(c::Circuit, noise::Vector{<:Noise}, target_qubi
             push!(new_moments, [ix], moment_key.moment_type, moment_key.noise_index)
         end
     end
-    c.moments = new_moments
+    c.moments = sort_moments!(new_moments)
     c.instructions = collect(values(c.moments._moments))
     return c
 end

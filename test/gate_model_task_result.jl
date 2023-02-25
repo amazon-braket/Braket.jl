@@ -98,9 +98,9 @@ end
 
     action = Braket.Program(Braket.header_dict[Braket.Program],
                             [Braket.IR.H(0, "h"), Braket.IR.H(1, "h"), Braket.IR.H(2, "h"), Braket.IR.H(3, "h")],
-                            [Braket.IR.Sample(["z"], [1], "sample"),
+                            [Braket.IR.Sample("z", [1], "sample"),
                              Braket.IR.Sample(["x", "y"], [1, 2], "sample"),
-                             Braket.IR.Sample(["z"], nothing, "sample"),
+                             Braket.IR.Sample("z", nothing, "sample"),
                             ],
                             [])
     task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
