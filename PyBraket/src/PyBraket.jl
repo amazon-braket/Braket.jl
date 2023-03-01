@@ -5,7 +5,7 @@ module PyBraket
     import Braket: Instruction
     using Braket.IR
     import Braket.IR: TimeSeries, AtomArrangement, DrivingField, PhysicalField, ShiftingField, Setup, Hamiltonian, AHSProgram
-    export LocalSimulator, LocalJob, PyCircuit
+    export LocalSimulator, PyCircuit
     import PythonCall: Py
 
     const awsbraket   = PythonCall.pynew()
@@ -18,7 +18,6 @@ module PyBraket
     const pyopenqasm  = PythonCall.pynew()
     const pygates     = PythonCall.pynew()
     const pynoises    = PythonCall.pynew()
-    const local_job   = PythonCall.pynew()
     const collections = PythonCall.pynew()
 
     function __init__()
@@ -33,7 +32,6 @@ module PyBraket
         PythonCall.pycopy!(pyopenqasm,  pyimport("braket.ir.openqasm"))
         PythonCall.pycopy!(pyahs,       pyimport("braket.ir.ahs"))
         PythonCall.pycopy!(tasks,       pyimport("braket.tasks"))
-        PythonCall.pycopy!(local_job,   pyimport("braket.jobs.local.local_job"))
         PythonCall.pycopy!(collections, pyimport("collections"))
         PythonCall.pyconvert_add_rule("collections:Counter", Accumulator, counter_to_acc)
     end
@@ -85,5 +83,4 @@ module PyBraket
     using .PySchema
     include("pycircuit.jl")
     include("local_simulator.jl")
-    include("local_job.jl")
 end
