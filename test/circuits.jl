@@ -604,7 +604,6 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         c = CNot(c, 0, 1)
         c = XX(c, 1, 2, rand())
         c = Braket.apply_initialization_noise!(c, [BitFlip(0.2), PhaseFlip(0.1)])
-        @show c.moments._moments
         c = Braket.apply_readout_noise!(c, [BitFlip(0.2), PhaseFlip(0.1)])
         ts = Braket.time_slices(c.moments)
         @test length(ts) == depth(c)

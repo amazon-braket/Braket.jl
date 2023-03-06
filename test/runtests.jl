@@ -57,6 +57,7 @@ for group in groups
             include("tracker.jl")
             include("task.jl")
             include("task_batch.jl")
+            include("local_jobs.jl")
             include("jobs.jl")
             # test example notebooks that don't need AWS devices
             @testset "Examples" begin

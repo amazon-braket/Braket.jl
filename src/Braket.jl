@@ -1,7 +1,8 @@
 module Braket
 
 export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTaskBatch
-export metadata, status, Observable, Result, FreeParameter, AwsQuantumJob, Tracker, simulator_tasks_cost, qpu_tasks_cost
+export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob
+export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
 export apply_gate_noise!, apply
@@ -17,8 +18,10 @@ using AWS: @service, AWSConfig, global_aws_config, apply
 import AWS.Mocking: apply
 @service BRAKET use_response_type=true
 @service IAM use_response_type=true
+@service EcR use_response_type=true
 @service CLOUDWATCH_LOGS use_response_type=true
 
+using Base64
 using Compat
 using CSV
 using Dates
@@ -32,6 +35,7 @@ using DataStructures
 
 using NamedTupleTools
 using OrderedCollections
+using Tar
 
 include("utils.jl")
 """
@@ -126,6 +130,8 @@ include("device.jl")
 include("gate_applicators.jl")
 include("noise_applicators.jl")
 include("jobs.jl")
+include("aws_jobs.jl")
+include("local_jobs.jl")
 include("task.jl")
 include("task_batch.jl")
 

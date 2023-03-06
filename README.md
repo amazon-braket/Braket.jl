@@ -16,8 +16,8 @@ Please review the [CHANGELOG](CHANGELOG.md) for information about changes in eac
 ## Installation & Prerequisites
 
 You do *not* need a Python installation or the Python Amazon Braket SDK installed to use this package.
-However, to use the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html) or
-[Local Jobs](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs-local-mode.html), you'll need to install the sub-package `PyBraket.jl`,
+However, to use the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html)
+you'll need to install the sub-package `PyBraket.jl`,
 included in this repository. See its [`README`](PyBraket/README.md) for more information.
  
 All necessary Julia packages will be installed for you when you run `Pkg.add("Braket")`
@@ -69,6 +69,7 @@ What's currently implemented in *pure* Julia:
 
 - All of the [`Amazon Braket schemas`](https://github.com/aws/amazon-braket-schemas-python).
 - Submitting [`Amazon Braket Hybrid Jobs`](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs.html)
+- Local jobs
 - Building and submitting circuits to managed simulators and QPUs
 - Reading results from managed simulators and QPUs
 - Cancelling tasks and jobs
@@ -84,7 +85,6 @@ What's currently implemented in *pure* Julia:
 **Features to add:**
 
 - [Support for pickled jobs results](https://github.com/awslabs/Braket.jl/issues/18)
-- [Local jobs](https://github.com/awslabs/Braket.jl/issues/17)
 - More robust entry point verification for jobs
 - [Pulse control](https://github.com/awslabs/Braket.jl/issues/15)
 

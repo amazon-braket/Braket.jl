@@ -4,6 +4,7 @@ get_tol(shots::Int) = return (shots > 0 ? Dict("atol"=> 0.1, "rtol"=>0.15) : Dic
 s3_destination_folder = Braket.default_task_bucket()
 
 include("adjoint_gradient.jl")
+include("create_local_quantum_job.jl")
 include("create_quantum_job.jl")
 include("cost_tracking.jl")
 include("device_creation.jl")
