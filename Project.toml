@@ -1,7 +1,7 @@
 name = "Braket"
 uuid = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 authors = ["Katharine Hyatt <hyatkath@amazon.com>"]
-version = "0.5.1"
+version = "0.6.0"
 
 [deps]
 AWS = "fbe9abb3-538b-5e4e-ba9e-bc94f4f92ebc"
@@ -37,7 +37,7 @@ AxisArrays = "=0.4.6"
 CSV = "=0.10.9"
 Cairo = "=1.0.5"
 Colors = "=0.12.10"
-Compat = "=4.6.0"
+Compat = "=4.6.1"
 Compose = "=0.9.4"
 CondaPkg = "=0.2.17"
 DataStructures = "=0.18.13"
