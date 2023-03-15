@@ -1,7 +1,5 @@
 import StructTypes
 
-
-
 export AtomArrangementItem, AtomArrangement, TimeSeriesItem, TimeSeries, Field, DrivingField
 export ShiftingField, Hamiltonian, AnalogHamiltonianSimulation, Pattern, vacant, filled, SiteType, discretize
 
