@@ -1,7 +1,10 @@
 using Braket, Braket.JSON3, Test
 
+num_containers() = length(split(read(`docker container ls`, String), "\n"))
+
 @testset "Local Quantum Job" begin
     @testset "Completed" begin
+        initial_containers = num_containers()
         absolute_source_module = joinpath(@__DIR__, "job_test_script.py")
         current_dir = pwd()
         cd(mktempdir()) do
@@ -74,8 +77,13 @@ using Braket, Braket.JSON3, Test
                 end
             end
         end
+        # test the container was shut down
+        # invoke GC to make sure finalizer has run
+        GC.gc()
+        @test num_containers() == initial_containers 
     end
-    @testset "failed" begin
+    @testset "Failed" begin
+        initial_containers = num_containers()
         absolute_source_module = joinpath(@__DIR__, "job_test_script.py")
         current_dir = pwd()
         cd(mktempdir()) do
@@ -119,5 +127,9 @@ using Braket, Braket.JSON3, Test
                 end
             end
         end
+        # test the container was shut down
+        # invoke GC to make sure finalizer has run
+        GC.gc()
+        @test num_containers() == initial_containers 
     end
 end
