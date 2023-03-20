@@ -1,7 +1,7 @@
 name = "Braket"
 uuid = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 authors = ["Katharine Hyatt <hyatkath@amazon.com>"]
-version = "0.6.0"
+version = "0.7.0"
 
 [deps]
 AWS = "fbe9abb3-538b-5e4e-ba9e-bc94f4f92ebc"
