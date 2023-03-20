@@ -29,10 +29,10 @@ Cancels the job `j`.
 cancel(j::AwsQuantumJob) = (r = BRAKET.cancel_job(HTTP.escapeuri(arn(j))); return nothing)
 
 function describe_log_streams(log_group::String, stream_prefix::String, limit::Int=-1, next_token::String="")
-    args = Dict{String, Any}("logStreamNamePrefix"=>stream_prefix, "orderBy"=>"LogStreamName")
+    args = Dict{String, Any}("logGroupName"=>log_group, "logStreamNamePrefix"=>stream_prefix, "orderBy"=>"LogStreamName")
     limit > 0 && (args["limit"] = limit)
     !isempty(next_token) && (args["nextToken"] = next_token)
-    return CLOUDWATCH_LOGS.describe_log_streams(log_group, args) 
+    return CLOUDWATCH_LOGS.describe_log_streams(args) 
 end
 
 """
@@ -55,7 +55,7 @@ function log_stream(ch::Channel, log_group::String, stream_name::String, start_t
     next_token = nothing
     event_count = 1
     while event_count > 0
-        response = CLOUDWATCH_LOGS.get_log_events(log_group, stream_name, Dict("startTime"=>start_time, "nextToken"=>next_token, "startFromHead"=>true))
+        response = CLOUDWATCH_LOGS.get_log_events(stream_name, Dict("logGroupName"=>log_group, "startTime"=>start_time, "nextToken"=>next_token, "startFromHead"=>true))
         next_token = response["nextForwardToken"]
         events = response["events"]
         event_count = length(events)
