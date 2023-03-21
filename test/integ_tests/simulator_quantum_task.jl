@@ -242,14 +242,14 @@ end
         eigsz = eigvals(kron(z_array, ho_mat))
         eigsh = [-70.90875406, -31.04969387, 0, 3.26468993, 38.693758]
         obs_targets = [0, 1, 2]
-        @testset for (obs, expected_mean, expected_var, expected_eigs) in [(Observables.Y() * ho, meany, vary, eigsy),
-                                                                           (Observables.Z() * ho, meanz, varz, eigsz),
-                                                                           (ho2 * ho, meanh, varh, eigsh)], (simulator_arn, shots) in ARNS_WITH_SHOTS
+        @testset for (simulator_arn, shots) in ARNS_WITH_SHOTS, (obs, expected_mean, expected_var, expected_eigs) in [(Observables.Y() * ho, meany, vary, eigsy),
+                                                                                                                      (Observables.Z() * ho, meanz, varz, eigsz),
+                                                                                                                      (ho2 * ho, meanh, varh, eigsh)]
             device = AwsDevice(_arn=simulator_arn)
             circuit = three_qubit_circuit(θ, ϕ, φ, obs, obs_targets)
             shots > 0 && circuit(Sample, obs, obs_targets)
             tasks = (circuit, ir(circuit, Val(:OpenQASM)))
-            for task in tasks
+            @testset for task in tasks
                 res = result(device(task, shots=shots, s3_destination_folder=s3_destination_folder))
                 variance_expectation_sample_result(res, shots, expected_var, expected_mean, expected_eigs)
             end

@@ -8,7 +8,13 @@ mutable struct LocalJobContainer
     function LocalJobContainer(image_uri::String, create_job_args; config::AWSConfig=global_aws_config(), container_name::String="", container_code_path::String="/opt/ml/code", force_update::Bool=false)
         c = new(image_uri, container_name, container_code_path, Dict{String, String}(), "", config)
         c = start_container!(c, force_update)
-        finalizer(stop_container!, c)
+        finalizer(c) do c
+            # check that the container is still running
+            c_list = read(`docker container ls -q`, String)
+            stop_flag = occursin(first(c.container_name, 10), c_list)
+            stop_flag && read(Cmd(["docker", "stop", c.container_name]), String)
+            return
+        end
         return setup_container!(c, create_job_args)
     end
 end
@@ -126,8 +132,8 @@ function run_local_job!(c::LocalJobContainer)
     entry_point_cmd = `docker exec $c_name printenv SAGEMAKER_PROGRAM`
     entry_program, err, code = capture_docker_cmd(entry_point_cmd)
     (isnothing(entry_program) || isempty(entry_program)) && throw(ErrorException("Start program not found. The specified container is not setup to run Braket Jobs. Please see setup instructions for creating your own containers."))
-    env_list  = reduce(vcat, ["-e", k*"="*v] for (k,v) in c.env)
-    cmd  = Cmd(["docker", "exec", "-w", code_path, env_list..., c_name, "python", entry_program])
+    env_list  = String.(reduce(vcat, ["-e", k*"="*v] for (k,v) in c.env))
+    cmd  = Cmd(["docker", "exec", "-w", String(code_path), env_list..., String(c_name), "python", String(entry_program)])
     proc_out, proc_err, code = capture_docker_cmd(cmd)
     if code == 0
         c.run_log *= proc_out 
@@ -191,12 +197,6 @@ function start_container!(c::LocalJobContainer, force_update::Bool)
     code == 0 || throw(ErrorException(err))
     c.container_name = container_name
     return c 
-end
-
-function stop_container!(c::LocalJobContainer)
-    c_name = name(c)
-    proc_out, proc_err, code = capture_docker_cmd(`docker stop $c_name`)
-    return
 end
 
 function copy_from_container!(c::LocalJobContainer, src::String, dst::String)

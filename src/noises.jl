@@ -5,10 +5,9 @@ export Noise, Kraus, BitFlip, PhaseFlip, PauliChannel, AmplitudeDamping, PhaseDa
 Abstract type representing a quantum noise operation.
 """
 abstract type Noise <: QuantumOperator end
-
 StructTypes.StructType(::Type{Noise}) = StructTypes.AbstractType()
- 
 StructTypes.subtypes(::Type{Noise}) = (noise=Noise, kraus=Kraus, bit_flip=BitFlip, phase_flip=PhaseFlip, pauli_channel=PauliChannel, amplitude_damping=AmplitudeDamping, phase_damping=PhaseDamping, depolarizing=Depolarizing, two_qubit_dephasing=TwoQubitDephasing, two_qubit_depolarizing=TwoQubitDepolarizing, generalized_amplitude_damping=GeneralizedAmplitudeDamping, multi_qubit_pauli_channel=MultiQubitPauliChannel)
+
 """
     Kraus <: Noise
 
@@ -19,7 +18,7 @@ struct Kraus <: Noise
 end
 
 Kraus(mats::Vector{Vector{Vector{Vector{Float64}}}}) = Kraus(complex_matrix_from_ir.(mats))
-Base.:(==)(k1::Kraus, k2::Kraus) = all(m1 ≈ m2 for (m1, m2) in zip(k1.matrices, k2.matrices))
+Base.:(==)(k1::Kraus, k2::Kraus) = k1.matrices == k2.matrices
 function ir(g::Kraus, target::QubitSet, ::Val{:JAQCD}; kwargs...)
     mats = complex_matrix_to_ir.(g.matrices)
     t_c = collect(target[1:convert(Int, log2(size(g.matrices[1], 1)))])
@@ -32,7 +31,7 @@ function ir(g::Kraus, target::QubitSet, ::Val{:OpenQASM}; serialization_properti
     return "#pragma braket noise kraus($ms) $t"
 end
 qubit_count(g::Kraus) = convert(Int, log2(size(g.matrices[1], 1)))
-chars(g::Kraus) = ntuple(i->"KR", qubit_count(g))
+chars(n::Kraus) = ntuple(i->"KR", qubit_count(n))
 
 """
     BitFlip <: Noise
@@ -45,7 +44,7 @@ end
 
 Parametrizable(g::BitFlip) = Parametrized()
 qubit_count(g::BitFlip) = 1
-chars(g::BitFlip) = ("BF(" * string(g.probability) * ")",)
+chars(n::BitFlip) = map(char->replace(string(char), "prob"=>string(n.probability)), ("BF(prob)",))
 
 """
     PhaseFlip <: Noise
@@ -58,8 +57,7 @@ end
 
 Parametrizable(g::PhaseFlip) = Parametrized()
 qubit_count(g::PhaseFlip) = 1
-chars(g::PhaseFlip) = ("PF(" * string(g.probability) * ")",)
-
+chars(n::PhaseFlip) = map(char->replace(string(char), "prob"=>string(n.probability)), ("PF(prob)",))
 
 """
     PauliChannel <: Noise
@@ -74,7 +72,7 @@ end
 
 Parametrizable(g::PauliChannel) = Parametrized()
 qubit_count(g::PauliChannel) = 1
-chars(g::PauliChannel) = ("PC(" * join(string.([g.probX, g.probY, g.probZ]), ", ") * ")",)
+chars(n::PauliChannel) = map(char->replace(string(char), "prob"=>join([string(n.probX), string(n.probY), string(n.probX)], ", ")), ("PC(prob)",))
 
 """
     AmplitudeDamping <: Noise
@@ -87,8 +85,7 @@ end
 
 Parametrizable(g::AmplitudeDamping) = Parametrized()
 qubit_count(g::AmplitudeDamping) = 1
-chars(g::AmplitudeDamping) = ("AD(" * string(g.gamma) * ")",)
-
+chars(n::AmplitudeDamping) = map(char->replace(string(char), "prob"=>string(n.gamma)), ("AD(prob)",))
 
 """
     PhaseDamping <: Noise
@@ -101,8 +98,7 @@ end
 
 Parametrizable(g::PhaseDamping) = Parametrized()
 qubit_count(g::PhaseDamping) = 1
-chars(g::PhaseDamping) = ("PD(" * string(g.gamma) * ")",)
-
+chars(n::PhaseDamping) = map(char->replace(string(char), "prob"=>string(n.gamma)), ("PD(prob)",))
 
 """
     Depolarizing <: Noise
@@ -115,8 +111,7 @@ end
 
 Parametrizable(g::Depolarizing) = Parametrized()
 qubit_count(g::Depolarizing) = 1
-chars(g::Depolarizing) = ("DEPO(" * string(g.probability) * ")",)
-
+chars(n::Depolarizing) = map(char->replace(string(char), "prob"=>string(n.probability)), ("DEPO(prob)",))
 
 """
     TwoQubitDephasing <: Noise
@@ -129,8 +124,7 @@ end
 
 Parametrizable(g::TwoQubitDephasing) = Parametrized()
 qubit_count(g::TwoQubitDephasing) = 2
-chars(g::TwoQubitDephasing) = ("DEPH(" * string(g.probability) * ")","DEPH(" * string(g.probability) * ")")
-
+chars(n::TwoQubitDephasing) = map(char->replace(string(char), "prob"=>string(n.probability)), ("DEPH(prob)", "DEPH(prob)"))
 
 """
     TwoQubitDepolarizing <: Noise
@@ -143,8 +137,7 @@ end
 
 Parametrizable(g::TwoQubitDepolarizing) = Parametrized()
 qubit_count(g::TwoQubitDepolarizing) = 2
-chars(g::TwoQubitDepolarizing) = ("DEPO(" * string(g.probability) * ")","DEPO(" * string(g.probability) * ")")
-
+chars(n::TwoQubitDepolarizing) = map(char->replace(string(char), "prob"=>string(n.probability)), ("DEPO(prob)", "DEPO(prob)"))
 
 """
     GeneralizedAmplitudeDamping <: Noise
@@ -158,8 +151,7 @@ end
 
 Parametrizable(g::GeneralizedAmplitudeDamping) = Parametrized()
 qubit_count(g::GeneralizedAmplitudeDamping) = 1
-chars(g::GeneralizedAmplitudeDamping) = ("GAD(" * string(g.probability) * ", " * string(g.gamma) * ")",)
-
+chars(n::GeneralizedAmplitudeDamping) = map(char->replace(string(char), "prob"=>join([string(n.gamma), string(n.probability)], ", ")), ("GAD(prob)",))
 
 """
     MultiQubitPauliChannel{N} <: Noise
@@ -186,8 +178,7 @@ function MultiQubitPauliChannel(probabilities::Dict{String, <:Union{Float64, Fre
     return MultiQubitPauliChannel{N}(probabilities)
 end
 Base.:(==)(c1::MultiQubitPauliChannel{N}, c2::MultiQubitPauliChannel{M}) where {N,M} = N == M && c1.probabilities == c2.probabilities
-chars(g::MultiQubitPauliChannel{N}) where {N} = ntuple(i->"PC_$N", N)
-
+chars(n::TwoQubitPauliChannel) = ("PC2", "PC2")
 for (N, IRN, label) in zip((:BitFlip, :PhaseFlip, :PauliChannel, :AmplitudeDamping, :PhaseDamping, :Depolarizing, :TwoQubitDephasing, :TwoQubitDepolarizing, :GeneralizedAmplitudeDamping), (:(IR.BitFlip), :(IR.PhaseFlip), :(IR.PauliChannel), :(IR.AmplitudeDamping), :(IR.PhaseDamping), :(IR.Depolarizing), :(IR.TwoQubitDephasing), :(IR.TwoQubitDepolarizing), :(IR.GeneralizedAmplitudeDamping)), ("bit_flip", "phase_flip", "pauli_channel", "amplitude_damping", "phase_damping", "depolarizing", "two_qubit_dephasing", "two_qubit_depolarizing", "generalized_amplitude_damping"))
     @eval begin
         function ir(n::$N, target::QubitSet, ::Val{:JAQCD}; kwargs...)
