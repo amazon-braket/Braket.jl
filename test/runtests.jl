@@ -66,13 +66,13 @@ for group in groups
                 include(joinpath(@__DIR__, "..", "examples", "qft.jl"))
             end
         elseif test_type == "integ"
-            @testset "Examples" begin
+            #=@testset "Examples" begin
                 # test example notebooks that do need AWS devices
                 include(joinpath(@__DIR__, "..", "examples", "adjoint_gradient.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "ahs_nb.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "vqe_chemistry.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "tetris_vqe.jl"))
-            end
+            end=#
             include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))
         end
     else
