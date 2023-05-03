@@ -440,7 +440,7 @@ end
 
 function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{Int})
     result_types = ResultTypeValue[]
-    !haskey(ir_obj, "results") && return result_types
+    (!haskey(ir_obj, "results") || isnothing(ir_obj["results"])) && return result_types
     for result_type in ir_obj["results"]
         ir_obs = get(result_type, "observable", nothing)
         rt     = JSON3.read(JSON3.write(result_type), AbstractProgramResult)
