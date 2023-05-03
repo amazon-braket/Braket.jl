@@ -330,6 +330,9 @@ ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = convert(Program, c)
 ir(p::Program, ::Val{:JAQCD}; kwargs...) = p
 ir(p::Program; kwargs...) = ir(p, Val(:JAQCD); kwargs...)
 
+# convenience ctor for OpenQasmProgram
+OpenQasmProgram(source::String; inputs::Union{Nothing, Dict}=nothing) = OpenQasmProgram(header_dict[OpenQasmProgram], source, inputs)
+
 function Base.append!(c1::Circuit, c2::Circuit)
     foreach(ix->add_instruction!(c1, ix), c2.instructions)
     foreach(rt->add_result_type!(c1, rt), c2.result_types)
