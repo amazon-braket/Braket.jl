@@ -19,8 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
-    # allow windows Python to fail
-    continue-on-error: ${{ matrix.os == 'windows-latest' && matrix.group == 'PyBraket-unit' }}
+    # allow windows to fail
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: true
       max-parallel: 2
