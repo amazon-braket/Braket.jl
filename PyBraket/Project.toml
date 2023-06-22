@@ -1,33 +1,31 @@
 name = "PyBraket"
 uuid = "e85266a6-1825-490b-a80e-9b9469c53660"
 authors = ["Katharine Hyatt <hyatkath@amazon.com>"]
-version = "0.1.0"
+version = "0.7.4"
 
 [deps]
-AWS = "fbe9abb3-538b-5e4e-ba9e-bc94f4f92ebc"
 Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-MicroMamba = "0b3b1443-0f03-428d-bdfb-f27f9c1191ea"
 PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [compat]
-AWS = "=1.78.0"
-Aqua = "0.5"
-Braket = "=0.1.0"
-CondaPkg = "=0.2.14"
+Aqua = "=0.6"
+Braket = "=0.7.4"
+CondaPkg = "=0.2.18"
 DataStructures = "=0.18.13"
-MicroMamba = "=0.1.9"
-PythonCall = "=0.9.7"
+PythonCall = "=0.9.12"
 StructTypes = "=1.10.0"
 julia = "1.6"
 
 [extras]
-AWS = "fbe9abb3-538b-5e4e-ba9e-bc94f4f92ebc"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

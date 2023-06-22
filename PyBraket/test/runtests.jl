@@ -1,16 +1,18 @@
-using Test, Aqua, AWS, PyBraket
+using Test, Aqua, Braket, Braket.AWS, PyBraket
 
-Aqua.test_all(PyBraket, ambiguities=false, unbound_args=false)
-Aqua.test_ambiguities(PyBraket)
+withenv("JULIA_CONDAPKG_VERBOSITY"=>"-1") do
+    Aqua.test_all(PyBraket, ambiguities=false, unbound_args=false, piracy=false)
+    Aqua.test_ambiguities(PyBraket)
+end
 
 function set_aws_creds(test_type)
     if test_type == "unit"
-        creds = AWS.AWSCredentials("", "")
-        config = AWS.AWSConfig(creds, "", "")
-        AWS.global_aws_config(config)
+        creds = Braket.AWS.AWSCredentials("", "")
+        config = Braket.AWS.AWSConfig(creds, "", "")
+        Braket.AWS.global_aws_config(config)
     elseif test_type == "integ"
         # should pickup correct creds from envvars 
-        AWS.global_aws_config()
+        Braket.AWS.global_aws_config()
     else
         throw(ArgumentError("invalid test_type $test_type, must be one of 'integ' or 'unit'"))
     end

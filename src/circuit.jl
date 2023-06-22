@@ -61,6 +61,109 @@ julia> Circuit(v);
 ```
 """
 Circuit(v::AbstractVector) = (c = Circuit(); c(v); return c)
+Base.show(io::IO, circ::Circuit) = print(io, "Circuit($(qubit_count(circ)) qubits)")
+
+function build_blob!(lines::Vector{String}, strs, targets, hit_this_round::Set{Int}, qubit_lines, non_qubit_lines) 
+    bar_qubits = collect(minimum(targets)+1:maximum(targets)-1)
+    is_dis     = isdisjoint(hit_this_round, union(targets, bar_qubits))
+    ix_lines   = [3 + targ * 2 for targ in targets]
+    bar_lines  = [4 + q * 2 for q in minimum(targets):maximum(targets)-1]
+    if !isdisjoint(hit_this_round, union(targets, bar_qubits))
+        lines[ix_lines]        .*= "-"
+        pad_width               = maximum(length, lines)
+        lines[non_qubit_lines] .= (rpad(line, pad_width, " ") for line in lines[non_qubit_lines])
+        lines[qubit_lines]     .= (rpad(line, pad_width, "-") for line in lines[qubit_lines])
+    end
+    lines[ix_lines] .*= strs
+    # add | for multi qubit objects
+    lines[bar_lines] .*= "|"
+    union!(hit_this_round, targets)
+    union!(hit_this_round, bar_qubits)
+    return lines, hit_this_round
+end
+
+function update_border!(lines, header_str, border_lines)
+    pad_width     = maximum(length, lines)
+    border_length = length(lines[border_lines[1]])
+    pad_diff = pad_width - border_length 
+    half_pad = border_length + div(pad_width - border_length - length(header_str), 2)
+    lines[border_lines] .= (rpad(line, half_pad) for line in lines[border_lines])
+    lines[border_lines] .*= (header_str, header_str)
+    lines[border_lines] .= (rpad(line, pad_width) for line in lines[border_lines])
+    return lines
+end
+
+
+function build_slice!(lines::Vector{String}, strings_and_targets, line_groups, header::String, fallback)
+    hit_this_round = Set{Int}()
+    qubit_lines, non_qubit_lines, border_lines = line_groups
+    for (op_strings, op_targets) in strings_and_targets
+        targets = isempty(op_targets) ? fallback : op_targets
+        lines, hit_this_round = build_blob!(lines, op_strings, targets, hit_this_round, qubit_lines, non_qubit_lines)
+    end
+    lines = update_border!(lines, header, border_lines)
+    pad_width = maximum(length, lines)
+    lines[non_qubit_lines] .= [rpad(line, pad_width) for line in lines[non_qubit_lines]]
+    lines[qubit_lines]     .= [rpad(line, pad_width, "-") for line in lines[qubit_lines]]
+    lines[border_lines]    .*= "|"
+    lines[non_qubit_lines] .*= " "
+    lines[qubit_lines]     .*= "-"
+    return lines
+end
+
+function build_result_lines!(rts::Vector{Result}, lines::Vector{String}, line_groups, qc::Int)
+    strings_and_targets = zip([chars(rt)[1] for rt in rts], [rt.targets for rt in rts])
+    return build_slice!(lines, strings_and_targets, line_groups, "Result Types", collect(0:qc-1))
+end
+
+function build_left_column(qubit_count::Int)
+    qlines = vcat("T", ["q$q" for q in 0:qubit_count-1], "T")
+    nlines = ["" for line in qlines[1:end-1]]
+    lines  = Vector{String}(undef, 2*length(qlines)-1)
+    lines[1:2:end] = qlines[:]
+    lines[2:2:end] = nlines[:]
+    
+    non_qubit_lines = 2:2:length(lines)
+    qubit_lines     = 3:2:length(lines)-1
+    border_lines    = [1, length(lines)]
+    line_groups     = (qubit_lines, non_qubit_lines, border_lines)
+    
+    pad_width = maximum(length, lines)
+    lines[:] .= (rpad(line, pad_width) for line in lines[:])
+    lines[border_lines] .*= " : "
+    lines[qubit_lines]  .*= " : "
+    pad_width = maximum(length, lines)
+    lines[:] .= (rpad(line, pad_width) for line in lines[:])
+
+    lines[border_lines]    .*= "|"
+    lines[non_qubit_lines] .*= " "
+    lines[qubit_lines]     .*= "-"
+    return lines, line_groups
+end
+
+function Base.show(io::IO, ::MIME"text/plain", circ::Circuit)
+    lines, line_groups = build_left_column(qubit_count(circ))
+    targeted_rts = filter(r->hasproperty(r, :targets), circ.result_types)
+    non_targ_rts = filter(r->!hasproperty(r, :targets), circ.result_types)
+    for (t, ixs) in time_slices(circ.moments)
+        strings_and_targets = zip((chars(ix.operator) for ix in ixs), (ix.target for ix in ixs))
+        lines = build_slice!(lines, strings_and_targets, line_groups, string(t), (0, qubit_count(circ)-1))
+    end
+    lines = build_result_lines!(targeted_rts, lines, line_groups, qubit_count(circ))
+
+    circ_str = mapreduce(li->li*"\n", *, lines)
+    if !isempty(non_targ_rts)
+        circ_str *= "\nAdditional result types: "
+        circ_str *= join((chars(rt)[1] for rt in non_targ_rts), ", ")
+        circ_str *= "\n"
+    end
+    if !isempty(circ.parameters)
+        circ_str *= "\nUnassigned parameters: "
+        circ_str *= join((string(p) for p in circ.parameters), ", ") 
+        circ_str *= "\n"
+    end
+    return print(io, circ_str)
+end
 
 function make_bound_circuit(c::Circuit, param_values::Dict{Symbol, Number})
     clamped_circ = Circuit()
@@ -73,6 +176,7 @@ end
 (c::Circuit)(::Type{T}, args...) where {T<:Noise} = apply_noise!(T, c, args...)
 (c::Circuit)(::Type{T}) where {T<:CompilerDirective} = add_instruction!(c, Instruction(T()))
 (c::Circuit)(g::QuantumOperator, args...) = add_instruction!(c, Instruction(g, args...))
+(c::Circuit)(g::CompilerDirective) = add_instruction!(c, Instruction(g))
 (c::Circuit)(v::AbstractVector) = foreach(vi->c(vi...), v)
 (c::Circuit)(rt::Result, args...) = add_result_type!(c, rt, args...)
 (c::Circuit)(::Type{T}, args...) where {T<:Result} = T(c, args...)
@@ -179,17 +283,18 @@ julia> qubit_count(c)
 ```
 """
 qubit_count(c::Circuit) = length(qubits(c))
+qubit_count(p::Program) = length(mapreduce(ix->ix.target, union, p.instructions))
 
 (rt::Result)(c::Circuit) = add_result_type!(c, rt)
 
 Base.convert(::Type{Circuit}, p::Program) = Circuit(Moments(p.instructions), p.instructions, Result[StructTypes.constructfrom(Result, r) for r in p.results], p.basis_rotation_instructions)
-Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); return Program(braketSchemaHeader("braket.ir.jaqcd.program" ,"1"), c.instructions, ir.(c.result_types), c.basis_rotation_instructions))
+Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); return Program(braketSchemaHeader("braket.ir.jaqcd.program" ,"1"), c.instructions, ir.(c.result_types, Val(:JAQCD)), c.basis_rotation_instructions))
 Circuit(p::Program) = convert(Circuit, p)
 Program(c::Circuit) = convert(Program, c)
 
 function openqasm_header(c::Circuit, sps::SerializationProperties=OpenQASMSerializationProperties())
     ir_instructions = ["OPENQASM 3.0;"]
-    for p in c.parameters
+    for p in sort(string.(c.parameters))
         push!(ir_instructions, "input float $p;")
     end
     isempty(c.result_types) && push!(ir_instructions, "bit[$(qubit_count(c))] b;")
@@ -221,9 +326,12 @@ function ir(c::Circuit, ::Val{:OpenQASM}; serialization_properties::Serializatio
     end
     return OpenQasmProgram(header_dict[OpenQasmProgram], join(vcat(header, ixs, rts), "\n"), nothing)
 end
-ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = JSON3.write(convert(Program, c))
-ir(p::Program, ::Val{:JAQCD}; kwargs...) = JSON3.write(p)
-ir(p::Program; kwargs...) = ir(p, Val(IRType[]); kwargs...)
+ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = convert(Program, c)
+ir(p::Program, ::Val{:JAQCD}; kwargs...) = p
+ir(p::Program; kwargs...) = ir(p, Val(:JAQCD); kwargs...)
+
+# convenience ctor for OpenQasmProgram
+OpenQasmProgram(source::String; inputs::Union{Nothing, Dict}=nothing) = OpenQasmProgram(header_dict[OpenQasmProgram], source, inputs)
 
 function Base.append!(c1::Circuit, c2::Circuit)
     foreach(ix->add_instruction!(c1, ix), c2.instructions)
@@ -371,13 +479,17 @@ function add_to_qubit_observable_mapping!(c::Circuit, o::Observables.TensorProdu
 end
 add_to_qubit_observable_mapping!(c::Circuit, o::Observables.Observable, obs_targets::Vector) = add_to_qubit_observable_mapping!(c, o, QubitSet(obs_targets))
 add_to_qubit_observable_set!(c::Circuit, rt::ObservableResult) = union!(c.qubit_observable_set, Set(rt.targets))
+add_to_qubit_observable_set!(c::Circuit, rt::AdjointGradient)  = union!(c.qubit_observable_set, Set(reduce(union, rt.targets)))
 add_to_qubit_observable_set!(c::Circuit, rt::Result) = c.qubit_observable_set
 
 function add_result_type!(c::Circuit, rt::Result)
     rt_to_add = rt
     if rt_to_add ∉ c.result_types
+        if rt_to_add isa AdjointGradient && any(rt_ isa AdjointGradient for rt_ in c.result_types)
+            throw(ArgumentError("only one AdjointGradient result can be present on a circuit."))
+        end
         obs = extract_observable(rt_to_add)
-        if !isnothing(obs) && c.observables_simultaneously_measureable
+        if !isnothing(obs) && c.observables_simultaneously_measureable && !(rt isa AdjointGradient)
             add_to_qubit_observable_mapping!(c, obs, rt_to_add.targets)
         end
         add_to_qubit_observable_set!(c, rt_to_add)
@@ -387,7 +499,6 @@ function add_result_type!(c::Circuit, rt::Result)
 end
 add_result_type!(c::Circuit, rt::Result, target) = add_result_type!(c, remap(rt, target))
 add_result_type!(c::Circuit, rt::Result, target_mapping::Dict{<:Integer, <:Integer}) = add_result_type!(c, remap(rt, target_mapping))
-
 
 function add_instruction!(c::Circuit, ix::Instruction)
     to_add = [ix]
@@ -570,7 +681,7 @@ function apply_noise_to_moments!(c::Circuit, noise::Vector{<:Noise}, target_qubi
             push!(new_moments, [ix], moment_key.moment_type, moment_key.noise_index)
         end
     end
-    c.moments = new_moments
+    c.moments = sort_moments!(new_moments)
     c.instructions = collect(values(c.moments._moments))
     return c
 end
@@ -709,6 +820,36 @@ julia> c = StateVector(c);
 ```
 """
 StateVector(c::Circuit) = (sv = StateVector(); sv(c))
+        
+"""
+    AdjointGradient(c::Circuit, o::Observable, targets, parameters) -> Circuit
+
+Constructs an `AdjointGradient` computation with respect to the expectation value of an observable `o`
+on qubits `targets`, computing partial derivatives of `parameters`, and adds it as a result to [`Circuit`](@ref) `c`.
+
+`o` may be any `Observable`. `targets` must be a `Vector` of `QubitSet`s (or a single `QubitSet`, if `o` is not a `Sum`),
+each of which is the same length as the qubit count of the corresponding term in `o`.
+`parameters` can have elements which are [`FreeParameter`](@ref)s or `String`s, or `["all"]`,
+in which case the gradient is computed with respect to all parameters in the circuit.
+
+# Examples
+```jldoctest
+julia> c = Circuit();
+
+julia> α = FreeParameter("alpha");
+
+julia> c = H(c, collect(0:10));
+
+julia> c = Rx(c, collect(0:10), α);
+
+julia> c = AdjointGradient(c, Braket.Observables.Z(), 0, [α]);
+```
+"""
+AdjointGradient(c::Circuit, o::Observable, target::Vector{QubitSet}, parameters) = (ag = AdjointGradient(o, target, parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::Vector{Vector{T}}, parameters) where {T} = (ag = AdjointGradient(o, target, parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::Vector{<:IntOrQubit}, parameters) = (ag = AdjointGradient(o, target, parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::QubitSet, parameters) = (ag = AdjointGradient(o, [target], parameters); ag(c))
+AdjointGradient(c::Circuit, o::Observable, target::IntOrQubit, parameters) = (ag = AdjointGradient(o, [target], parameters); ag(c))
 
 function validate_circuit_and_shots(c::Circuit, shots::Int)
     isempty(c.instructions) && throw(ErrorException("Circuit must have instructions to run on a device."))
@@ -716,7 +857,7 @@ function validate_circuit_and_shots(c::Circuit, shots::Int)
     if shots > 0 && !isempty(c.result_types)
         !c.observables_simultaneously_measureable && throw(ErrorException("Observables cannot be measured simultaneously."))
         for rt in c.result_types
-            (rt isa StateVector || rt isa Amplitude) && throw(ErrorException("StateVector or Amplitude cannot be specified when shots>0"))
+            (rt isa StateVector || rt isa Amplitude || rt isa AdjointGradient) && throw(ErrorException("StateVector or Amplitude cannot be specified when shots>0"))
             if rt isa Probability
                 num_qubits = length(rt.targets) == 0 ? qubit_count(c) : length(rt.targets)
                 num_qubits > 40 && throw(ErrorException("Probability target must be less than or equal to 40 qubits."))
@@ -728,5 +869,5 @@ end
 
 Base.:(==)(c1::Circuit, c2::Circuit) = (c1.instructions == c2.instructions && c1.result_types == c2.result_types)
 function Base.show(io::IO, program::OpenQasmProgram)
-    println(io, "OpenQASM program")
+    print(io, "OpenQASM program")
 end

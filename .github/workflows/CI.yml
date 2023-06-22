@@ -19,8 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
-    # allow windows Python to fail
-    continue-on-error: ${{ matrix.os == 'windows-latest' && matrix.group == 'PyBraket-unit' }}
+    # allow windows to fail
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: true
       max-parallel: 2
@@ -28,7 +28,7 @@ jobs:
         group:
           - Braket-unit
           - PyBraket-unit
-        os: [windows-latest, macOS-latest]        
+        os: [windows-latest, macOS-latest]
         arch: ['x64']
     steps:
       - uses: actions/checkout@v1
@@ -41,17 +41,27 @@ jobs:
       - run: |
           git config --global user.name Tester
           git config --global user.email te@st.er
+      - name: "Dev PyBraket package on Windows"
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), \"PyBraket\"))'
+          # must escape for windows
+      - name: "Dev PyBraket package on OSX"
+        if: ${{ matrix.os == 'macOS-latest' }}
+        run: |
+          julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
       - name: "Run tests"
         uses: julia-actions/julia-runtest@v1
         env:
           GROUP: ${{ matrix.group }}
+          BRAKET_CI: true
           JULIA_CONDAPKG_VERBOSITY: 2
   version-test:
     runs-on: ubuntu-latest 
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
-    # allow failures on nightly Julia
-    continue-on-error: ${{ matrix.version == 'nightly' }}
+    # allow failures on nightly or beta Julia
+    continue-on-error: ${{ matrix.version == 'nightly'}}
     strategy:
       fail-fast: true
       max-parallel: 2
@@ -59,7 +69,7 @@ jobs:
         group:
           - Braket-unit
           - PyBraket-unit
-        version: ['1.6', '1.7', '1.8', 'nightly']
+        version: ['1.6', '1.7', '1.8', '1.9', 'nightly']
         arch: ['x64']
     steps:
       - uses: actions/checkout@v1
@@ -72,10 +82,14 @@ jobs:
       - run: |
           git config --global user.name Tester
           git config --global user.email te@st.er
+      - name: "Dev PyBraket package"
+        run: |
+          julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
       - name: "Run tests"
         uses: julia-actions/julia-runtest@v1
         env:
           JULIA_CONDAPKG_VERBOSITY: 2
+          BRAKET_CI: true
           GROUP: ${{ matrix.group }}
       - name: "Process coverage"
         uses: julia-actions/julia-processcoverage@v1

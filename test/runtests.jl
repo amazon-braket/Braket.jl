@@ -1,18 +1,10 @@
 using Pkg, Test, Aqua, Braket
 
-Aqua.test_all(Braket, ambiguities=false, unbound_args=false)
+in_ci = tryparse(Bool, get(ENV, "BRAKET_CI", "false"))
+Aqua.test_all(Braket, ambiguities=false, unbound_args=false, stale_deps=!in_ci, deps_compat=!in_ci)
 Aqua.test_ambiguities(Braket)
 
 const GROUP = get(ENV, "GROUP", "Braket-unit")
-
-subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
-develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
-function activate_subpackage_env(subpackage::String)
-    path = subpackage_path(subpackage)
-    Pkg.activate(path)
-    Pkg.develop(PackageSpec(; path=path))
-    return Pkg.instantiate()
-end
 
 function set_aws_creds(test_type)
     if test_type == "unit"
@@ -41,6 +33,7 @@ for group in groups
         if test_type == "unit"
             include("ahs.jl")
             include("utils.jl")
+            include("qubit_set.jl")
             include("dwave_device.jl")
             include("ionq_device.jl")
             include("rigetti_device.jl")
@@ -64,11 +57,27 @@ for group in groups
             include("tracker.jl")
             include("task.jl")
             include("task_batch.jl")
+            include("local_jobs.jl")
             include("jobs.jl")
+            # test example notebooks that don't need AWS devices
+            @testset "Examples" begin
+                include(joinpath(@__DIR__, "..", "examples", "ahs_rabi.jl"))
+                include(joinpath(@__DIR__, "..", "examples", "graph_coloring.jl"))
+                include(joinpath(@__DIR__, "..", "examples", "qft.jl"))
+            end
         elseif test_type == "integ"
+            #=@testset "Examples" begin
+                # test example notebooks that do need AWS devices
+                include(joinpath(@__DIR__, "..", "examples", "adjoint_gradient.jl"))
+                include(joinpath(@__DIR__, "..", "examples", "ahs_nb.jl"))
+                include(joinpath(@__DIR__, "..", "examples", "vqe_chemistry.jl"))
+                include(joinpath(@__DIR__, "..", "examples", "tetris_vqe.jl"))
+            end=#
             include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))
         end
     else
+        subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
+        develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
         develop_subpackage(pkg_name)
         subpkg_path = subpackage_path(pkg_name)
         # this should inherit the GROUP envvar

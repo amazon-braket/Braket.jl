@@ -2,6 +2,7 @@ using Test, PyBraket, Braket, Braket.IR, PythonCall
 using PythonCall: Py, pyconvert, pyisTrue
 
 @testset "Gates" begin
+    Braket.IRType[] = :JAQCD
     @testset for (gate, ir_gate) in ((H, IR.H),
                                      (Braket.I, IR.I),
                                      (X, IR.X),
@@ -77,4 +78,5 @@ using PythonCall: Py, pyconvert, pyisTrue
         @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
         @test pyconvert(IR.Unitary, Py(ir_n)) == ir_n
     end
+    Braket.IRType[] = :OpenQASM
 end

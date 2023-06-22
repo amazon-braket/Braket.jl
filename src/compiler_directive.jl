@@ -27,6 +27,8 @@ ir(s::StartVerbatimBox, ::Val{:JAQCD}; kwargs...)    = IR.StartVerbatimBox("Star
 ir(s::EndVerbatimBox,   ::Val{:JAQCD}; kwargs...)    = IR.EndVerbatimBox("EndVerbatimBox", "end_verbatim_box")
 ir(s::StartVerbatimBox, ::Val{:OpenQASM}; kwargs...) = "#pragma braket verbatim\nbox{"
 ir(s::EndVerbatimBox,   ::Val{:OpenQASM}; kwargs...) = "}"
-ir(c::CompilerDirective)                       = ir(c, Val(:JAQCD))
+ir(c::CompilerDirective; kwargs...)                  = ir(c, Val(IRType[]); kwargs...)
+chars(s::StartVerbatimBox) = ("StartVerbatim","StartVerbatim")
+chars(s::EndVerbatimBox)   = ("EndVerbatim","EndVerbatim")
 
 StructTypes.subtypes(::Type{CompilerDirective}) = (start_verbatim_box=StartVerbatimBox, end_verbatim_box=EndVerbatimBox)

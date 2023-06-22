@@ -103,6 +103,12 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             c(H, collect(0:10))
             @test qubits(c) == QubitSet(collect(0:10))
             @test length(c.instructions) == qubit_count(c)
+
+            c = Circuit()
+            c(X(), 0)
+            c(StartVerbatimBox())
+            @test qubits(c) == QubitSet(0)
+            @test length(c.instructions) == 2
         end
     end
 
@@ -156,6 +162,10 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         c = H(c, collect(0:10))
         c = DensityMatrix(c)
         @test c.result_types == [DensityMatrix()]
+        c = Circuit()
+        c = H(c, collect(0:10))
+        c = DensityMatrix(c, 1, 2)
+        @test c.result_types == [DensityMatrix(1, 2)]
 
         c = Circuit()
         c(H, collect(0:10))
@@ -270,6 +280,40 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         c = Probability(c)
         @test c.observables_simultaneously_measureable
     end
+    @testset "Adjoint gradient" begin
+        α = FreeParameter(:alpha)
+        op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
+        op2 = 2.0 * Braket.Observables.Y() * Braket.Observables.Y()
+        @testset for targets ∈ ([QubitSet(0, 1)], [[0, 1]], [0, 1], QubitSet(0, 1))
+            c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+            c = AdjointGradient(c, op, targets, [α])
+            @test length(c.result_types) == 1
+            @test c.result_types[1] isa AdjointGradient
+            @test c.result_types[1].observable == op
+            @test c.result_types[1].targets == [QubitSet(0, 1)]
+            @test c.result_types[1].parameters == ["alpha"]
+            @test_throws ArgumentError AdjointGradient(c, op2, [QubitSet(0, 1)], [α])
+        end
+
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
+        @test_throws DimensionMismatch AdjointGradient(c, op, [QubitSet(0)], [α])
+        op3 = op + op2
+        @test_throws DimensionMismatch AdjointGradient(c, op3, [QubitSet(0, 1)], [α])
+        
+        op  = 2.0 * Braket.Observables.X()
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        c = AdjointGradient(c, op, 0, [α])
+        @test c.result_types[1].targets == [QubitSet(0)]
+
+        # make sure qubit count is correct
+        α = FreeParameter(:alpha)
+        c = Circuit([(H, 0), (H, 1), (Rx, 0, α), (Rx, 1, α)])
+        op  = 2.0 * Braket.Observables.X() * Braket.Observables.X()
+        @test qubit_count(c) == 2
+        c = AdjointGradient(c, op, [QubitSet(1, 2)], [α])
+        @test qubit_count(c) == 3
+    end
     @testset "Basis rotation instructions" begin
         @testset "Basic" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
@@ -278,7 +322,51 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["x"], [0], "sample")]
             expected_bris = [Instruction(H(), 0)]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
             
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.Y(), 0)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["y"], [0], "sample")]
+            expected_bris = [Instruction(Z(), 0), Instruction(S(), 0), Instruction(H(), 0)]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
+            
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.Z(), 0)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["z"], [0], "sample")]
+            expected_bris = Instruction[]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
+
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.I(), 0)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["i"], [0], "sample")]
+            expected_bris = Instruction[]
+
+            @test p.instructions == expected_ixs
+            @test p.results == expected_rts
+            @test p.basis_rotation_instructions == expected_bris
+
+            circ = Circuit([(H, 0), (CNot, 0, 1)])
+            circ(Sample, Observables.TensorProduct(["x", "h"]), 0, 1)
+            p = Braket.Program(circ)
+            expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
+            expected_rts = [Braket.IR.Sample(["x", "h"], [0, 1], "sample")]
+            expected_bris = [Instruction(H(), 0), Instruction(Ry(-π/4), 1)]
+
             @test p.instructions == expected_ixs
             @test p.results == expected_rts
             @test p.basis_rotation_instructions == expected_bris
@@ -306,7 +394,8 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         end
         @testset "tensor product" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
-            circ(Expectation, Observables.X() * Observables.Y() * Observables.Y(), [0, 1, 2])
+            obs =  Observables.X() * Observables.Y() * Observables.Y()
+            circ(Expectation, obs, [0, 1, 2])
             expected = [
                 Instruction(H(), 0),
                 Instruction(Z(), 1),
@@ -318,6 +407,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             ]
             Braket.basis_rotation_instructions!(circ)
             @test circ.basis_rotation_instructions == expected
+            @test Braket.basis_rotation_gates(obs) == ((H(),), (Z(), S(), H()), (Z(), S(), H()))
         end
         @testset "tensor product with shared target" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
@@ -520,6 +610,18 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         s = sprint(show, c.moments)
         sd = sprint(show, c.moments._max_times)
         @test s == "Circuit moments:\nMax times: $sd\n"
+
+        c = Circuit()
+        c = H(c, 0)
+        c = CNot(c, 0, 1)
+        c = XX(c, 1, 2, rand())
+        c = Braket.apply_initialization_noise!(c, BitFlip(0.2), 0)
+        c = Braket.apply_readout_noise!(c, PhaseFlip(0.1), 0)
+        ts = Braket.time_slices(c.moments)
+        @test length(ts) == depth(c)
+        s = sprint(show, c.moments)
+        sd = sprint(show, c.moments._max_times)
+        @test s == "Circuit moments:\nMax times: $sd\n"
     end
 
     @testset "Mapped result types" begin
@@ -664,6 +766,8 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
     end
 
     @testset "Result types & OpenQASM" begin
+        sum_obs = 2.0 * Observables.H() - 5.0 * Observables.Z() * Observables.X()
+        herm = Observables.HermitianObservable(diagm(ones(2)))
         @testset for ir_bolus in [
             (Expectation(Braket.Observables.I(), 0), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result expectation i(q[0])",),
             (Expectation(Braket.Observables.I()), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result expectation i all",),
@@ -672,6 +776,14 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             (DensityMatrix([0, 2]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result density_matrix q[0], q[2]",),
             (DensityMatrix(0), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "#pragma braket result density_matrix \$0",),
             (Amplitude(["01", "10"]), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "#pragma braket result amplitude \"01\", \"10\"",),
+            (AdjointGradient(Observables.H(), 0, ["alpha"]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(h(q[0])) alpha",),
+            (AdjointGradient(Observables.H(), 0), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(h(q[0])) all",),
+            (AdjointGradient(Observables.X() * Observables.Y(), [0, 1], []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(x(q[0]) @ y(q[1])) all",),
+            (AdjointGradient(Observables.H(), 0, []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(h(q[0])) all",),
+            (AdjointGradient(sum_obs, [[0], [1, 2]], ["alpha"]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(2.0 * h(q[0]) - 5.0 * z(q[1]) @ x(q[2])) alpha",),
+            (AdjointGradient(sum_obs, [[0], [1, 2]]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(2.0 * h(q[0]) - 5.0 * z(q[1]) @ x(q[2])) all",),
+            (AdjointGradient(sum_obs, [[0], [1, 2]], []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(2.0 * h(q[0]) - 5.0 * z(q[1]) @ x(q[2])) all",),
+            (AdjointGradient(herm, 0, []), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result adjoint_gradient expectation(hermitian([[1.0+0im, 0im], [0im, 1.0+0im]]) q[0]) all",),
             (Probability(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result probability all",),
             (Probability([0, 2]), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "#pragma braket result probability q[0], q[2]",),
             (Probability(0), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "#pragma braket result probability \$0",),
@@ -686,15 +798,14 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
     end
 
     @testset "full Circuits to OpenQASM" begin
-        header = Braket.header_dict[OpenQasmProgram]
         @testset for ir_bolus in [
             (Rx(Rx(Circuit(), 0, 0.15), 1, 0.3), OpenQASMSerializationProperties(VIRTUAL),
-            OpenQasmProgram(header, join( [ "OPENQASM 3.0;", "bit[2] b;", "qubit[2] q;", "rx(0.15) q[0];", "rx(0.3) q[1];", "b[0] = measure q[0];", "b[1] = measure q[1];", ], "\n"), nothing)),
-            (Rx(Rx(Circuit(), 0, 0.15), 4, 0.3), OpenQASMSerializationProperties(PHYSICAL), OpenQasmProgram(header, join([ "OPENQASM 3.0;", "bit[2] b;", "rx(0.15) \$0;", "rx(0.3) \$4;", "b[0] = measure \$0;", "b[1] = measure \$4;"], "\n"), nothing)),
+            OpenQasmProgram(join( [ "OPENQASM 3.0;", "bit[2] b;", "qubit[2] q;", "rx(0.15) q[0];", "rx(0.3) q[1];", "b[0] = measure q[0];", "b[1] = measure q[1];", ], "\n"))),
+            (Rx(Rx(Circuit(), 0, 0.15), 4, 0.3), OpenQASMSerializationProperties(PHYSICAL), OpenQasmProgram(join([ "OPENQASM 3.0;", "bit[2] b;", "rx(0.15) \$0;", "rx(0.3) \$4;", "b[0] = measure \$0;", "b[1] = measure \$4;"], "\n"))),
             (Expectation(Braket.add_verbatim_box!(Rx(Circuit(), 0, 0.15), Rx(Circuit(), 4, 0.3)), Braket.Observables.I()), OpenQASMSerializationProperties(PHYSICAL),
-            OpenQasmProgram(header, join(["OPENQASM 3.0;", "rx(0.15) \$0;", "#pragma braket verbatim", "box{", "rx(0.3) \$4;", "}", "#pragma braket result expectation i all"], "\n"), nothing)),
+            OpenQasmProgram(join(["OPENQASM 3.0;", "rx(0.15) \$0;", "#pragma braket verbatim", "box{", "rx(0.3) \$4;", "}", "#pragma braket result expectation i all"], "\n"))),
             (Expectation(BitFlip(Rx(Rx(Circuit(), 0, 0.15), 4, 0.3), 3, 0.2), Braket.Observables.I(), 0), nothing,
-            OpenQasmProgram(header, join(["OPENQASM 3.0;", "qubit[5] q;", "rx(0.15) q[0];", "rx(0.3) q[4];", "#pragma braket noise bit_flip(0.2) q[3]", "#pragma braket result expectation i(q[0])"], "\n"), nothing))
+            OpenQasmProgram(join(["OPENQASM 3.0;", "qubit[5] q;", "rx(0.15) q[0];", "rx(0.3) q[4];", "#pragma braket noise bit_flip(0.2) q[3]", "#pragma braket result expectation i(q[0])"], "\n")))
         ]
             c, sps, expected_ir = ir_bolus
             if !isnothing(sps)
@@ -702,6 +813,73 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             else
                 @test ir(c, Val(:OpenQASM)) == expected_ir
             end
+        end
+        @testset "with parameters" begin
+            a = FreeParameter("a")
+            b = FreeParameter("b")
+            c = Circuit([(H, [0, 1, 2]), (Rx, 0, a), (Ry, 1, b)])
+            props = OpenQASMSerializationProperties(PHYSICAL)
+            expected_ir = OpenQasmProgram(join([ "OPENQASM 3.0;", "input float a;", "input float b;", "bit[3] b;", "h \$0;", "h \$1;", "h \$2;", "rx(a) \$0;", "ry(b) \$1;", "b[0] = measure \$0;", "b[1] = measure \$1;", "b[2] = measure \$2;"], "\n"))
+            @test ir(c, Val(:OpenQASM), serialization_properties=props) == expected_ir
+        end
+    end
+    @testset "pretty-printing" begin
+        @testset "Circuit with FreeParameter" begin
+            a = FreeParameter("α")
+            c = Circuit([(H, collect(0:10)), (CNot, 0, 1), (CNot, 1, 3), (H, 2), (H, 2), (Rx, 0, a), (Expectation, Braket.Observables.TensorProduct(["x", "y"]), [0, 2]), (Variance, Braket.Observables.TensorProduct(["z", "x"]), [2, 1]), (Amplitude, "1111"), (Probability,)])
+            d = Circuit([(H, 0), (X, 1)])
+            c = Braket.add_verbatim_box!(c, d)
+            s = sprint((io, x)->show(io, "text/plain", x), c)
+            known_s = """
+            T   : |0|1|  2   |      3      |4|     5     |                 Result Types                 |
+                                                                                                         
+            q0  : -H-C--Rx(α)-StartVerbatim-H-EndVerbatim-Expectation(X @ Y)-----------------Probability-
+                     |        |               |           |                                  |           
+            q1  : -H-X-C--------------------X--------------------------------Variance(Z @ X)-Probability-
+                       |      |               |           |                  |               |           
+            q2  : -H-H--H---------------------------------Expectation(X @ Y)-Variance(Z @ X)-Probability-
+                       |      |               |                                              |           
+            q3  : -H---X---------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q4  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q5  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q6  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q7  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q8  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q9  : -H-------------------------------------------------------------------------Probability-
+                              |               |                                              |           
+            q10 : -H----------StartVerbatim---EndVerbatim------------------------------------Probability-
+                                                                                                         
+            T   : |0|1|  2   |      3      |4|     5     |                 Result Types                 |
+
+            Additional result types: Amplitude(1111)
+
+            Unassigned parameters: α
+            """
+            @test s == known_s
+        end
+        @testset "Circuit with Noise" begin
+            c = Circuit([(H, collect(0:10)), (BitFlip, 0, 0.2), (AmplitudeDamping, 0, 0.1), (Swap, 5, 9), (TwoQubitDepolarizing, 3, 7, 0.1), (DensityMatrix, [3, 4, 5])])
+            s = sprint((io, x)->show(io, "text/plain", x), c)
+            @test s == """T   : |            0             | 1  |Result Types |\n                                                     \nq0  : -H-BF(0.2)-AD(0.1)-----------------------------\n                                                     \nq1  : -H---------------------------------------------\n                                                     \nq2  : -H---------------------------------------------\n                                                     \nq3  : -H----------------DEPO(0.1)------Densitymatrix-\n                        |              |             \nq4  : -H-------------------------------Densitymatrix-\n                        |              |             \nq5  : -H--------------------------SWAP-Densitymatrix-\n                        |         |                  \nq6  : -H---------------------------------------------\n                        |         |                  \nq7  : -H----------------DEPO(0.1)--------------------\n                                  |                  \nq8  : -H---------------------------------------------\n                                  |                  \nq9  : -H--------------------------SWAP---------------\n                                                     \nq10 : -H---------------------------------------------\n                                                     \nT   : |            0             | 1  |Result Types |\n"""
+
+        end
+        @testset "Circuit with 3 qubit gates" begin
+            c = Circuit([(H, [0, 1, 2]), (CCNot, [0, 2, 1]), (CPhaseShift, 1, 0, 0.2), (XX, 0, 2, 0.1)])
+            s = sprint((io, x)->show(io, "text/plain", x), c)
+            known_s = "T  : |0|1|    2     |   3   |Result Types|\n                                          \nq0 : -H-C-PHASE(0.2)-XX(0.1)--------------\n        | |          |                    \nq1 : -H-X-C-------------------------------\n        |            |                    \nq2 : -H-C------------XX(0.1)--------------\n                                          \nT  : |0|1|    2     |   3   |Result Types|\n" 
+            @test s == known_s
+        end
+        @testset "Circuit with Unitary and Kraus" begin
+
+        end
+        @testset "chars fallback" begin
+            @test Braket.chars('a') == ("a",)
         end
     end
 end

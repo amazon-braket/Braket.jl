@@ -28,6 +28,7 @@ using PythonCall: Py, pyconvert, pyisTrue
     @test length(circ.moments) == orig_len
     @test length(ts) == orig_len
     @testset "Conversions to/from Python" begin
+        Braket.IRType[] = :JAQCD
         @testset for (noise, ir_noise) in ( (BitFlip, IR.BitFlip),
                                             (PhaseFlip, IR.PhaseFlip),
                                             (AmplitudeDamping, IR.AmplitudeDamping), 
@@ -81,5 +82,6 @@ using PythonCall: Py, pyconvert, pyisTrue
             @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
             @test pyconvert(IR.Kraus, Py(ir_n)) == ir_n
         end 
+        Braket.IRType[] = :OpenQASM
     end
 end

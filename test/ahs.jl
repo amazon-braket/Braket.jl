@@ -1,4 +1,6 @@
-using Braket, Test, JSON3, StructTypes, UUIDs, DecFP
+using Braket, Test, JSON3, StructTypes, Mocking, UUIDs, DecFP
+
+Mocking.activate()
 
 struct MockRydbergLocal
     timeResolution::Dec128
@@ -126,15 +128,24 @@ end
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")
-        arn = "arn:fake:quera"
-        task_args = Braket.prepare_task_input(H, arn, s3_folder, shots, device_params)
+        arn_str = "arn:fake:quera"
+        task_args = Braket.prepare_task_input(H, arn_str, s3_folder, shots, device_params)
         @test task_args[:action] == JSON3.write(ir(H))
-        @test task_args[:device_arn] == arn
+        @test task_args[:device_arn] == arn_str
         @test UUID(task_args[:client_token]) isa UUID
         @test task_args[:shots] == shots
         @test task_args[:outputS3Bucket] == s3_folder[1]
         @test task_args[:outputS3KeyPrefix] == s3_folder[2]
         @test task_args[:extra_opts] == Dict{String, Any}("deviceParameters"=>"{}", "tags"=>Dict{String, String}())
+
+        # test that AwsDevice functor accepts AnalogHamiltonianSimulations
+        fake_device = AwsDevice(_arn=arn_str)
+        resp_dict = Dict("quantumTaskArn"=>"arn/fake", "status"=>"COMPLETED")
+        req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        apply(req_patch) do
+            t = fake_device(H, s3_destination_folder=("fake_bucket", "fake_prefix"), shots=100)
+            @test arn(t) == "arn/fake"
+        end
     end
     @testset "discretize" begin
         aa = map(AtomArrangementItem, [(0.0, 0.0), (0.0, 3.0e-6), (0.0, 6.0e-6), (3.0e-6, 0.0), (3.0e-6, 3.0e-6)])
