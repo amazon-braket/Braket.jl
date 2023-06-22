@@ -64,7 +64,7 @@ where $N$ is the number of atoms in the register. Here the first term is the dri
 H_\text{drive, k}(t) = \frac{\Omega(t)}{2}[e^{i\phi(t)}|g_k\rangle\langle r_k|+h.c.]-\Delta(t)|r_k\rangle\langle r_k|
 \end{align}
 ```
-and the second term is the van de Waals interaction between all pairs of atoms. An AHS program consists of the time series for the time-dependent coefficients $\Omega(t)$, $\phi(t)$ and $\Delta(t)$, which are specificied below.
+and the second term is the van de Waals interaction between all pairs of atoms. An AHS program consists of the time series for the time-dependent coefficients $\Omega(t)$, $\phi(t)$ and $\Delta(t)$, which are specified below.
 
 
 "
@@ -122,7 +122,7 @@ end
 
 # ╔═╡ 4e1a8a8d-ef9a-4bea-8dac-00c1e39f26b4
 md"
-## Analysizing simulator results
+## Analyzing simulator results
 
 We can aggregate the shot results with the following function that infers the state of each spin (which may be “d” for “down”, “u” for “up”, or “e” for empty site), and counts how many times each configuration occurred across the shots. 
 "
