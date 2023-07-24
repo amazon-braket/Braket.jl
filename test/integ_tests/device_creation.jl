@@ -2,7 +2,7 @@ using Braket, Test
 
 DWAVE_ARN = "arn:aws:braket:::device/qpu/d-wave/DW_2000Q_6"
 RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-11"
-IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
+IONQ_ARN = "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1"
 SIMULATOR_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 OQC_ARN = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
 
