@@ -18,6 +18,7 @@ struct Qubit <: Integer
     index::Int
     Qubit(q::Integer) = new(q)
     Qubit(q::AbstractFloat) = new(Int(q))
+    Qubit(q::DecFP.DecimalFloatingPoint) = new(Int(q))
     Qubit(q::BigFloat) = new(Int(q))
 end
 Qubit(q::Qubit) = q
