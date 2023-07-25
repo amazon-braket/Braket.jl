@@ -99,39 +99,41 @@ dev_arn = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
         end
     end
     @testset "input data handling" begin
-        log_streams = [Dict("logStreamName"=>"fake_name")]
-        events      = []
-        resp_dict   = Dict("jobArn"=>"arn:job/fake", "status"=>"COMPLETED", "instanceConfig"=>Dict("instanceCount"=>1), "logStreams"=>log_streams, "nextForwardToken"=>"0", "events"=>events, "GetCallerIdentityResult"=>Dict("Arn"=>"fake_arn", "Account"=>"000000"))
-        sm = joinpath(@__DIR__, "fake_code.jl")
-        code_loc = Braket.construct_s3_uri("fake_bucket", "fake_dir")
-        function f(http_backend, request, response_stream)
-            if request.service == "s3"
-                xml_str = """
-                    <ListAllMyBucketsResult>
-                        <Buckets>
-                            <Bucket>
-                                <CreationDate>2000:01:01T00:00:00</CreationDate>
-                                <Name>"amazon-braket-fake_region-000000"</Name>
-                            </Bucket>
-                        </Buckets>
-                        <Owner>
-                            <DisplayName>"fake_name"</DisplayName>
-                            <ID>000000</ID>
-                        </Owner>
-                    </ListAllMyBucketsResult>
-                """
-                return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/xml"]), IOBuffer(xml_str))
-            else
-                return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        withenv("AWS_DEFAULT_REGION"=>"fake_region") do 
+            log_streams = [Dict("logStreamName"=>"fake_name")]
+            events      = []
+            resp_dict   = Dict("jobArn"=>"arn:job/fake", "status"=>"COMPLETED", "instanceConfig"=>Dict("instanceCount"=>1), "logStreams"=>log_streams, "nextForwardToken"=>"0", "events"=>events, "GetCallerIdentityResult"=>Dict("Arn"=>"fake_arn", "Account"=>"000000"))
+            sm = joinpath(@__DIR__, "fake_code.jl")
+            code_loc = Braket.construct_s3_uri("fake_bucket", "fake_dir")
+            function f(http_backend, request, response_stream)
+                if request.service == "s3"
+                    xml_str = """
+                        <ListAllMyBucketsResult>
+                            <Buckets>
+                                <Bucket>
+                                    <CreationDate>2000:01:01T00:00:00</CreationDate>
+                                    <Name>"amazon-braket-fake_region-000000"</Name>
+                                </Bucket>
+                            </Buckets>
+                            <Owner>
+                                <DisplayName>"fake_name"</DisplayName>
+                                <ID>000000</ID>
+                            </Owner>
+                        </ListAllMyBucketsResult>
+                    """
+                    return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/xml"]), IOBuffer(xml_str))
+                else
+                    return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+                end
             end
-        end
-        req_patch  = @patch Braket.AWS._http_request(http_backend, request::Braket.AWS.Request, response_stream::IO) = f(http_backend, request, response_stream)
-        input_data = relpath(joinpath(pkgdir(Braket), "test", "fake_code.py"), @__DIR__)
-        apply(req_patch) do
-            output_dc = Braket.OutputDataConfig("s3://fake_bucket/fake_output")
-            checkpoint_cf = Braket.CheckpointConfig(nothing, "s3://fake_bucket/fake_checkpoints")
-            job = Braket.AwsQuantumJob(dev_arn, sm, entry_point="", input_data=input_data, role_arn="arn:fake:role", code_location=code_loc, hyperparameters=Dict("blah"=>1), output_data_config=output_dc, checkpoint_config=checkpoint_cf, wait_until_complete=true)
-            @test arn(job) == "arn:job/fake"
+            req_patch  = @patch Braket.AWS._http_request(http_backend, request::Braket.AWS.Request, response_stream::IO; kwargs...) = f(http_backend, request, response_stream)
+            input_data = relpath(joinpath(pkgdir(Braket), "test", "fake_code.py"), @__DIR__)
+            apply(req_patch) do
+                output_dc = Braket.OutputDataConfig("s3://fake_bucket/fake_output")
+                checkpoint_cf = Braket.CheckpointConfig(nothing, "s3://fake_bucket/fake_checkpoints")
+                job = Braket.AwsQuantumJob(dev_arn, sm, entry_point="", input_data=input_data, role_arn="arn:fake:role", code_location=code_loc, hyperparameters=Dict("blah"=>1), output_data_config=output_dc, checkpoint_config=checkpoint_cf, wait_until_complete=true)
+                @test arn(job) == "arn:job/fake"
+            end
         end
     end
     @testset "status" begin
