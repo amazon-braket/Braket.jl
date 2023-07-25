@@ -406,7 +406,7 @@ end
 
 # ╔═╡ f9b9df66-3a25-4e69-97c0-3c178d5a0602
 """
-Builds the naive ADAPT-VQE circuit from the selected excitations and molecular Hamilontonian.
+Builds the naive ADAPT-VQE circuit from the selected excitations and molecular Hamiltonian.
 """
 function adapt_circuit(hf_state, ordered_excitations, mol_H, H_targets)
     c = BasisState(hf_state)
@@ -422,7 +422,7 @@ end
 
 # ╔═╡ ef8fa936-359c-43f2-91b8-50f65324caa3
 """
-Builds the TETRIS-ADAPT-VQE circuit from the selected excitations and molecular Hamilontonian.
+Builds the TETRIS-ADAPT-VQE circuit from the selected excitations and molecular Hamiltonian.
 """
 function tetris_circuit(hf_state, ordered_excitations, mol_H, H_targets)
     c = BasisState(hf_state)

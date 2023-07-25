@@ -20,7 +20,7 @@ You'll need [`PythonCall.jl`](https://cjdoris.github.io/PythonCall.jl).
 
 ### Use native Python installation
 
-If you want to use an existing Python installion (a virtual environment you control, for example),
+If you want to use an existing Python installation (a virtual environment you control, for example),
 you will need a working installation of the [Amazon Braket SDK](https://github.com/aws/amazon-braket-sdk-python).
 You can install the Amazon Braket SDK and all its dependencies through `pip` as documented on its [README](https://github.com/aws/amazon-braket-sdk-python/blob/main/README.md).
  
