@@ -434,6 +434,7 @@ StructTypes.defaults(::Type{GeneralizedAmplitudeDamping}) = Dict{Symbol, Any}(:t
 struct MS <: AbstractIR
     angle1::Float64
     angle2::Float64
+    angle3::Float64
     targets::Vector{Int}
     type::String
 end
@@ -713,9 +714,15 @@ for g in [:Rx, :Ry, :Rz, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift
     end
 end
 struct DoubleAngled <: Angle end
-for g in [:MS]
+for g in []
     @eval begin
         Angle(::Type{$g}) = DoubleAngled()
+    end
+end
+struct TripleAngled <: Angle end
+for g in [:MS]
+    @eval begin
+        Angle(::Type{$g}) = TripleAngled()
     end
 end
 struct NonAngled <: Angle end
