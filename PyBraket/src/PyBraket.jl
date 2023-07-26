@@ -52,6 +52,7 @@ module PyBraket
         args = map(fns) do fn
             val = getproperty(x, fn)
             isnothing(val) && return fn=>pybuiltins.None
+            typeof(val) <: NTuple{1} && return fn=>Py(val[1])
             typeof(val) <: Vector{<:Number} && return fn=>pylist(Py(val))
             typeof(val) == Vector{String} && return fn=>pylist(pystr.(val))
             typeof(val) == Vector{Braket.IR.PhysicalField} && return fn=>pylist(Py.(val))

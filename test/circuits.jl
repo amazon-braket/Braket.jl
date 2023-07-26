@@ -809,7 +809,8 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         ]
             c, sps, expected_ir = ir_bolus
             if !isnothing(sps)
-                @test ir(c, Val(:OpenQASM), serialization_properties=sps) == expected_ir
+                generated_ir = ir(c, Val(:OpenQASM), serialization_properties=sps)
+                @test generated_ir == expected_ir
             else
                 @test ir(c, Val(:OpenQASM)) == expected_ir
             end
@@ -820,7 +821,8 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             c = Circuit([(H, [0, 1, 2]), (Rx, 0, a), (Ry, 1, b)])
             props = OpenQASMSerializationProperties(PHYSICAL)
             expected_ir = OpenQasmProgram(join([ "OPENQASM 3.0;", "input float a;", "input float b;", "bit[3] b;", "h \$0;", "h \$1;", "h \$2;", "rx(a) \$0;", "ry(b) \$1;", "b[0] = measure \$0;", "b[1] = measure \$1;", "b[2] = measure \$2;"], "\n"))
-            @test ir(c, Val(:OpenQASM), serialization_properties=props) == expected_ir
+            generated_ir = ir(c, Val(:OpenQASM), serialization_properties=props)
+            @test generated_ir == expected_ir
         end
     end
     @testset "pretty-printing" begin

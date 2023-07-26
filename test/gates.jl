@@ -149,25 +149,27 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     end
     @testset "Angled 3 qubit gates" begin
         # build some "fake" (for now) 3 qubit gates to test gate applicators
-        struct CCPhaseShift <: Braket.AngledGate
-            angle::Union{Float64, Braket.FreeParameter}
+        struct CCPhaseShift <: Braket.AngledGate{1}
+            angle::NTuple{1, Union{Float64, Braket.FreeParameter}}
         end
-        struct CXX <: Braket.AngledGate
-            angle::Union{Float64, Braket.FreeParameter}
+        CCPhaseShift(angles::Vararg{Union{Float64, FreeParameter}}) = CCPhaseShift(tuple(angles...))
+        struct CXX <: Braket.AngledGate{1}
+            angle::NTuple{1, Union{Float64, Braket.FreeParameter}}
         end
+        CXX(angles::Vararg{Union{Float64, FreeParameter}}) = CXX(tuple(angles...))
         angle = rand()
         c = Circuit()
-        c = Braket.apply_gate!(Braket.IR.Angled(), Braket.IR.DoubleControl(), Braket.IR.SingleTarget(), CCPhaseShift, c, 0, 1, 2, angle)
-        @test c.instructions == [Instruction(CCPhaseShift(angle), [0, 1, 2])]
+        c = Braket.apply_gate!(Val(1), Braket.IR.DoubleControl(), Braket.IR.SingleTarget(), CCPhaseShift, c, 0, 1, 2, angle)
+        @test c.instructions == [Instruction(CCPhaseShift((angle,)), [0, 1, 2])]
         c = Circuit()
-        c = Braket.apply_gate!(Braket.IR.Angled(), Braket.IR.DoubleControl(), Braket.IR.SingleTarget(), CCPhaseShift, c, [0, 1, 2], angle)
-        @test c.instructions == [Instruction(CCPhaseShift(angle), [0, 1, 2])]
+        c = Braket.apply_gate!(Val(1), Braket.IR.DoubleControl(), Braket.IR.SingleTarget(), CCPhaseShift, c, [0, 1, 2], angle)
+        @test c.instructions == [Instruction(CCPhaseShift((angle,)), [0, 1, 2])]
         c = Circuit()
-        c = Braket.apply_gate!(Braket.IR.Angled(), Braket.IR.SingleControl(), Braket.IR.DoubleTarget(), CXX, c, 0, 1, 2, angle)
-        @test c.instructions == [Instruction(CXX(angle), [0, 1, 2])]
+        c = Braket.apply_gate!(Val(1), Braket.IR.SingleControl(), Braket.IR.DoubleTarget(), CXX, c, 0, 1, 2, angle)
+        @test c.instructions == [Instruction(CXX((angle,)), [0, 1, 2])]
         c = Circuit()
-        c = Braket.apply_gate!(Braket.IR.Angled(), Braket.IR.SingleControl(), Braket.IR.DoubleTarget(), CXX, c, [0, 1, 2], angle)
-        @test c.instructions == [Instruction(CXX(angle), [0, 1, 2])]
+        c = Braket.apply_gate!(Val(1), Braket.IR.SingleControl(), Braket.IR.DoubleTarget(), CXX, c, [0, 1, 2], angle)
+        @test c.instructions == [Instruction(CXX((angle,)), [0, 1, 2])]
     end
     @testset "OpenQASM IR" begin
         fp  = FreeParameter(:alpha)
@@ -302,7 +304,8 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             )
         ]
             gate, target, s_props, expected_ir = ir_bolus
-            @test ir(gate, target, Val(:OpenQASM); serialization_properties=s_props) == expected_ir
+            generated_ir = ir(gate, target, Val(:OpenQASM); serialization_properties=s_props)
+            @test generated_ir == expected_ir
         end
     end
     @test StructTypes.StructType(X) == StructTypes.Struct()

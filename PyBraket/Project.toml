@@ -17,7 +17,7 @@ Aqua = "=0.6"
 Braket = "=0.7.5"
 CondaPkg = "=0.2.18"
 DataStructures = "=0.18.14"
-PythonCall = "=0.9.12"
+PythonCall = "=0.9.14"
 StructTypes = "=1.10.0"
 julia = "1.6"
 

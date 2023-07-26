@@ -385,7 +385,7 @@ basis_rotation_gates(o::Observables.I) = ()
 basis_rotation_gates(o::Observables.Z) = ()
 basis_rotation_gates(o::Observables.Y) = (Z(), S(), H())
 basis_rotation_gates(o::Observables.TensorProduct) = tuple(reduce(vcat, basis_rotation_gates.(o.factors))...)
-basis_rotation_gates(o::Observables.HermitianObservable) = (Unitary(adjoint(eigvecs(o.matrix))),)
+basis_rotation_gates(o::Observables.HermitianObservable) = (Unitary(Matrix(adjoint(eigvecs(o.matrix)))),)
 
 
 _observable_to_instruction(observable::Observables.Observable, target_list)::Vector{Instruction} = [Instruction(gate, target_list) for gate in basis_rotation_gates(observable)]
