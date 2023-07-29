@@ -1,10 +1,12 @@
 using Test, PyBraket, Braket, Braket.IR, PythonCall
 using PythonCall: Py, pyconvert, pyisTrue
 
+using Braket: I
+
 @testset "Gates" begin
     Braket.IRType[] = :JAQCD
     @testset for (gate, ir_gate) in ((H, IR.H),
-                                     (Braket.I, IR.I),
+                                     (I, IR.I),
                                      (X, IR.X),
                                      (Y, IR.Y),
                                      (Z, IR.Z),
