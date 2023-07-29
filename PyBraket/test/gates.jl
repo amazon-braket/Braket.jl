@@ -4,7 +4,7 @@ using PythonCall: Py, pyconvert, pyisTrue
 @testset "Gates" begin
     Braket.IRType[] = :JAQCD
     @testset for (gate, ir_gate) in ((H, IR.H),
-                                     (I, IR.I),
+                                     (Braket.I, IR.I),
                                      (X, IR.X),
                                      (Y, IR.Y),
                                      (Z, IR.Z),
