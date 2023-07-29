@@ -67,6 +67,7 @@ for group in groups
         end
     elseif pkg_name == "Examples"
         Pkg.activate(joinpath(@__DIR__, "..", "examples"))
+        Pkg.instantiate()
         if test_type == "unit"
             # test example notebooks that don't need AWS devices
             @testset "Local Examples" begin
