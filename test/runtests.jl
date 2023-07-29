@@ -19,8 +19,11 @@ function set_aws_creds(test_type)
     end
 end
 
-groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-integ", "PyBraket-unit"] : GROUP
+groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-integ", "PyBraket-unit", "Examples-unit", "Examples-integ"] : GROUP
 groups = (groups isa String ? [groups] : groups)
+        
+subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
+develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
 
 for group in groups
     @info "Testing $group"
@@ -59,25 +62,29 @@ for group in groups
             include("task_batch.jl")
             include("local_jobs.jl")
             include("jobs.jl")
+        elseif test_type == "integ"
+            include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))
+        end
+    elseif pkg_name == "Examples"
+        Pkg.activate(joinpath(@__DIR__, "..", "examples"))
+        Pkg.instantiate()
+        if test_type == "unit"
             # test example notebooks that don't need AWS devices
-            @testset "Examples" begin
+            @testset "Local Examples" begin
                 include(joinpath(@__DIR__, "..", "examples", "ahs_rabi.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "graph_coloring.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "qft.jl"))
             end
         elseif test_type == "integ"
-            #=@testset "Examples" begin
+            @testset "Examples-integ" begin
                 # test example notebooks that do need AWS devices
                 include(joinpath(@__DIR__, "..", "examples", "adjoint_gradient.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "ahs_nb.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "vqe_chemistry.jl"))
                 include(joinpath(@__DIR__, "..", "examples", "tetris_vqe.jl"))
-            end=#
-            include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))
+            end
         end
     else
-        subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
-        develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
         develop_subpackage(pkg_name)
         subpkg_path = subpackage_path(pkg_name)
         # this should inherit the GROUP envvar

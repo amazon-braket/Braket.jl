@@ -100,6 +100,47 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
+  examples:
+    name: Example notebooks
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+    needs: [os-test, version-test]
+    strategy:
+      fail-fast: true
+      matrix:
+        group:
+          - Examples-unit
+        version: ['1.9']
+        arch: ['x64']
+    steps:
+      - uses: actions/checkout@v1
+      - name: "Set up Julia"
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/julia-buildpkg@latest
+      - run: |
+          git config --global user.name Tester
+          git config --global user.email te@st.er
+      - name: "Dev PyBraket package"
+        run: |
+          julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
+      - name: "Run tests"
+        uses: julia-actions/julia-runtest@v1
+        env:
+          JULIA_CONDAPKG_VERBOSITY: 2
+          BRAKET_CI: true
+          GROUP: ${{ matrix.group }}
+      - name: "Process coverage"
+        uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: src,PyBraket/src
+      - name: "Upload coverage"
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
   docs:
     name: Documentation
     runs-on: ubuntu-latest
