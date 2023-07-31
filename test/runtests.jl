@@ -68,6 +68,7 @@ for group in groups
     elseif pkg_name == "Examples"
         Pkg.activate(joinpath(@__DIR__, "..", "examples"))
         Pkg.instantiate()
+        develop_subpackage("PyBraket")
         if test_type == "unit"
             # test example notebooks that don't need AWS devices
             @testset "Local Examples" begin

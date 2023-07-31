@@ -19,7 +19,7 @@ function many_layers(n_qubits::Int, n_layers::Int)
             for qubit in qubits
                 angle = rand(d)
                 gate = rand([Rx, Ry, Rz, H])
-                if gate isa AngledGate
+                if gate <: AngledGate{1}
                     circuit(gate, qubit, angle)
                 else
                     circuit(gate, qubit)

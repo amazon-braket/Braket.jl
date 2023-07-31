@@ -33,17 +33,27 @@ ir(x::Instruction, ::Val{:OpenQASM}; kwargs...) = isempty(x.target) ? ir(x.opera
 
 conc_types = filter(Base.isconcretetype, vcat(subtypes(AbstractIR), subtypes(CompilerDirective)))
 nt_dict = merge([Dict(zip(fieldnames(t), (Union{Nothing, x} for x in fieldtypes(t)))) for t in conc_types]...)
-ks = tuple(keys(nt_dict)...)
-vs = Tuple{values(nt_dict)...}
+ks = tuple(:angles, keys(nt_dict)...)
+vs = Tuple{Union{Nothing, Vector{Float64}}, values(nt_dict)...}
 inst_typ = NamedTuple{ks, vs}
 StructTypes.lowertype(::Type{Instruction}) = inst_typ
 function Instruction(x)
     sts    = merge(StructTypes.subtypes(Gate), StructTypes.subtypes(Noise), StructTypes.subtypes(CompilerDirective))
     o_type = sts[Symbol(x[:type])]
     (o_type <: CompilerDirective) && return Instruction(o_type(), Int[])
-    o_fns  = fieldnames(o_type)
-    args   = [x[fn] for fn in o_fns]
-    op     = o_type(args...)
+    if o_type <: AngledGate{1}
+        o_fns  = (:angles, :angle) 
+        args   = (x[:angle],)
+        op     = o_type(args)
+    elseif o_type <: AngledGate{3}
+        o_fns  = (:angles, :angle1, :angle2, :angle3) 
+        args   = tuple([x[fn] for fn in [Symbol("angle$i") for i in 1:n_angles(o_type)]]...)
+        op     = o_type(args)
+    else
+        o_fns  = fieldnames(o_type)
+        args   = [x[fn] for fn in o_fns]
+        op     = o_type(args...)
+    end
     raw_target  = Int[]
     target_keys = collect(setdiff(keys(x), vcat(o_fns..., :type)))
     for k in sort(target_keys, by=(x->occursin("target", string(x))))
