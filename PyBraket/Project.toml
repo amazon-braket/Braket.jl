@@ -15,7 +15,7 @@ StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 [compat]
 Aqua = "=0.6"
 Braket = "=0.7.6"
-CondaPkg = "=0.2.18"
+CondaPkg = "=0.2.20"
 DataStructures = "=0.18.15"
 PythonCall = "=0.9.14"
 StructTypes = "=1.10.0"
