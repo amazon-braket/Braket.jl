@@ -1,8 +1,9 @@
 using Pkg, Test, Aqua, Braket
 
 in_ci = tryparse(Bool, get(ENV, "BRAKET_CI", "false"))
-Aqua.test_all(Braket, ambiguities=false, unbound_args=false, stale_deps=!in_ci, deps_compat=!in_ci)
+Aqua.test_all(Braket, ambiguities=false, unbound_args=false, piracy=false, stale_deps=!in_ci, deps_compat=!in_ci)
 Aqua.test_ambiguities(Braket)
+Aqua.test_piracy(Braket, treat_as_own=[Braket.DecFP.Dec128])
 
 const GROUP = get(ENV, "GROUP", "Braket-unit")
 
