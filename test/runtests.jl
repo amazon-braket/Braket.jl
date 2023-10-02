@@ -24,7 +24,7 @@ groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-integ", "PyB
 groups = (groups isa String ? [groups] : groups)
         
 subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)
-develop_subpackage(subpackage::String) = Pkg.develop(PackageSpec(; path=subpackage_path(subpackage)))
+develop_subpackage(subpackage::String) = Pkg.activate(subpackage_path(subpackage))
 
 for group in groups
     @info "Testing $group"
