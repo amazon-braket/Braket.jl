@@ -69,7 +69,7 @@ for group in groups
     elseif pkg_name == "Examples"
         develop_subpackage(lowercase(pkg_name))
         Pkg.instantiate()
-        Pkg.develop([PackageSpec(; path=joinpath(@__DIR__, "..")), PackageSpec(; path=joinpath(@__DIR__, "..", "PyBraket"))])
+        Pkg.develop(PackageSpec(; path=joinpath(@__DIR__, "..", "PyBraket")))
         if test_type == "unit"
             # test example notebooks that don't need AWS devices
             @testset "Local Examples" begin
