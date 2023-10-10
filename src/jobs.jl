@@ -44,11 +44,11 @@ function retrieve_image(f::Framework, config::AWSConfig)
     version_config = conf["versions"][framework_version]
     registry = registry_for_region(version_config, aws_region)
     tag = if f == BASE
-        string(version_config["repository"]) * ":" * string(framework_version) * "-cpu-py37-ubuntu18.04"
+        string(version_config["repository"]) * ":" * "latest"
     elseif f == PL_TENSORFLOW
-        string(version_config["repository"]) * ":" * string(framework_version) * "-gpu-py37-cu110-ubuntu18.04"
+        string(version_config["repository"]) * ":" * "latest"
     elseif f == PL_PYTORCH
-        string(version_config["repository"]) * ":" * string(framework_version) * "-gpu-py38-cu111-ubuntu20.04"
+        string(version_config["repository"]) * ":" * "latest"
     end
     return string(registry) * ".dkr.ecr.$aws_region.amazonaws.com/$tag"
 end

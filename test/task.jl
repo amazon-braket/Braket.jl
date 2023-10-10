@@ -65,7 +65,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         c = CNot(Circuit(), 0, 1)
         action = Braket.Program(c)
         task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 0, "arn1", nothing, nothing, nothing, nothing, nothing)
-        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing)
+        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
         s3_req_str = JSON3.write(zero_shots_result(task_metadata, additional_metadata))
         req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200), IOBuffer(s3_req_str))
         apply(req_patch) do

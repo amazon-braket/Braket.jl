@@ -80,6 +80,7 @@ num_containers() = length(split(read(`docker container ls`, String), "\n"))
         # test the container was shut down
         # invoke GC to make sure finalizer has run
         GC.gc()
+        sleep(5)
         @test num_containers() == initial_containers 
     end
     @testset "Failed" begin
@@ -130,6 +131,7 @@ num_containers() = length(split(read(`docker container ls`, String), "\n"))
         # test the container was shut down
         # invoke GC to make sure finalizer has run
         GC.gc()
+        sleep(5)
         @test num_containers() == initial_containers 
     end
 end

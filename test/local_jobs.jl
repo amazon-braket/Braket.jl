@@ -3,7 +3,7 @@ dev_arn = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 
 Mocking.activate()
 script_mode_dict = OrderedDict("s3Uri"=>"fake_uri", "entryPoint"=>"fake_entry", "compressionType"=>"fake_type")
-@testset "Local Jobs" begin
+#@testset "Local Jobs" begin
     @test Braket.get_env_hyperparameters() == Dict("AMZN_BRAKET_HP_FILE"=>"/opt/braket/input/config/hyperparameters.json")
     @test Braket.get_env_input_data()      == Dict("AMZN_BRAKET_INPUT_DIR"=>"/opt/braket/input/data")
     @test Braket.get_env_script_mode_config(script_mode_dict) == Dict("AMZN_BRAKET_SCRIPT_S3_URI"=>"fake_uri", "AMZN_BRAKET_SCRIPT_ENTRY_POINT"=>"fake_entry", "AMZN_BRAKET_SCRIPT_COMPRESSION_TYPE"=>"fake_type")
@@ -362,4 +362,4 @@ script_mode_dict = OrderedDict("s3Uri"=>"fake_uri", "entryPoint"=>"fake_entry", 
         ljc = Braket.LocalJobContainer("fake_uri", args)
         @test name(ljc) == "fake_container_name"
     end
-end
+#end

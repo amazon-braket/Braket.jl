@@ -161,7 +161,7 @@ function pull_image(image_uri::String, config::AWSConfig)
     ecr_uri    = String(m[1])
     account_id = String(m[2])
     login_to_ecr(account_id, ecr_uri, config)
-    @warn "Pulling docker image. This may take a while."
+    @warn "Pulling docker image $image_uri. This may take a while."
     proc_out, proc_err, code = capture_docker_cmd(`docker pull $image_uri`)
     return
 end

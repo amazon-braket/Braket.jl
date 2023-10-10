@@ -131,6 +131,15 @@ function _create_common_params(device_arn::String, s3_destination_folder::Tuple{
     return (device_arn=device_arn, outputS3Bucket=s3_destination_folder[1],  outputS3KeyPrefix=s3_destination_folder[2], shots=shots, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds, config=config)
 end
 
+function _device_parameters_from_dict(device_parameters::Dict{String, Any}, device_arn::String, paradigm_parameters::GateModelParameters)
+    error_migitation = get(device_parameters, "errorMitigation", nothing)
+    device_parameters["errorMitigation"] = error_migitation isa ErrorMitigation ? ir(error_migitation) : error_migitation
+    occursin("ionq", device_arn) && return IonqDeviceParameters(header_dict[IonqDeviceParameters], paradigm_parameters, device_parameters["errorMitigation"])
+    occursin("rigetti", device_arn) && return RigettiDeviceParameters(header_dict[RigettiDeviceParameters], paradigm_parameters)
+    occursin("oqc", device_arn) && return OqcDeviceParameters(header_dict[OqcDeviceParameters], paradigm_parameters)
+    return GateModelSimulatorDeviceParameters(header_dict[GateModelSimulatorDeviceParameters], paradigm_parameters)
+end
+
 function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Union{Dict{String, Any}, DwaveDeviceParameters, DwaveAdvantageDeviceParameters, Dwave2000QDeviceParameters}, disable_qubit_rewiring::Bool=false; kwargs...)
     device_parameters = _create_annealing_device_params(device_params, device_arn)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
@@ -150,7 +159,7 @@ function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_fol
     common       = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
     tags         = get(kwargs, :tags, Dict{String,String}())
-    device_parameters = Dict{String, Any}() # not currently used
+    device_parameters = _device_parameters_from_dict(device_params, device_arn, GateModelParameters(header_dict[GateModelParameters], 0, false))  
     dev_params   = JSON3.write(device_parameters)
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
     
@@ -181,14 +190,6 @@ function prepare_task_input(circuit::Circuit, device_arn::String, s3_folder::Tup
     validate_circuit_and_shots(circuit, shots)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
-    T = GateModelSimulatorDeviceParameters # default to use simulator
-    if occursin("ionq", device_arn)
-        T = IonqDeviceParameters
-    elseif occursin("rigetti", device_arn)
-        T = RigettiDeviceParameters
-    elseif occursin("oqc", device_arn)
-        T = OqcDeviceParameters
-    end
     qubit_reference_type = VIRTUAL
     if disable_qubit_rewiring || Instruction(StartVerbatimBox()) in circuit.instructions
         #|| any(instruction.operator isa PulseGate for instruction in circuit.instructions)
@@ -201,7 +202,7 @@ function prepare_task_input(circuit::Circuit, device_arn::String, s3_folder::Tup
     inputs_merged = !isempty(inputs) ? merge(program_inputs, inputs) : oq3_program.inputs
     oq3_program = OpenQasmProgram(oq3_program.braketSchemaHeader, oq3_program.source, inputs_merged)
 
-    device_parameters = T(header_dict[T], paradigm_parameters)
+    device_parameters = _device_parameters_from_dict(device_params, device_arn, paradigm_parameters) 
     client_token = string(uuid1())
     action       = JSON3.write(oq3_program)
     dev_params   = JSON3.write(device_parameters)
@@ -213,17 +214,9 @@ end
 function prepare_task_input(circuit::Program, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
-    T = GateModelSimulatorDeviceParameters # default to use simulator
-    if occursin("ionq", device_arn)
-        T = IonqDeviceParameters
-    elseif occursin("rigetti", device_arn)
-        T = RigettiDeviceParameters
-    elseif occursin("oqc", device_arn)
-        T = OqcDeviceParameters
-    end
-    device_parameters = T(header_dict[T], paradigm_parameters)
     client_token = string(uuid1())
     action       = JSON3.write(circuit)
+    device_parameters = _device_parameters_from_dict(device_params, device_arn, paradigm_parameters) 
     dev_params   = JSON3.write(device_parameters)
     tags         = get(kwargs, :tags, Dict{String,String}())
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
