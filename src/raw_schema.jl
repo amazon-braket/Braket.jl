@@ -991,6 +991,7 @@ struct PulseFunction
     arguments::Vector{PulseFunctionArgument}
 end
 StructTypes.StructType(::Type{PulseFunction}) = StructTypes.UnorderedStruct()
+PulseFunction(name::Nothing, arguments::Vector{PulseFunctionArgument}) = PulseFunction("", arguments)
 
 struct PulseInstructionArgument
     name::String
@@ -1341,7 +1342,7 @@ struct IonqProviderProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
     fidelity::Dict{String, Dict{String, Float64}}
     timing::Dict{String, Float64}
-    errorMitigation::Union{Nothing, Dict{Type, ErrorMitigationProperties}}
+    errorMitigation::Union{Nothing, Dict{ErrorMitigationScheme, ErrorMitigationProperties}}
 end
 StructTypes.StructType(::Type{IonqProviderProperties}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{IonqProviderProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.ionq.ionq_provider_properties", "1"))
@@ -1639,4 +1640,8 @@ end
 Base.:(==)(o1::T, o2::T) where {T<:BraketSchemaBase} = all(Base.getproperty(o1, fn) == Base.getproperty(o2, fn) for fn in fieldnames(T))
 for T in (TaskMetadata, AdditionalMetadata)
     Base.:(==)(o1::T, o2::T) = all(Base.getproperty(o1, fn) == Base.getproperty(o2, fn) for fn in fieldnames(T))
+end
+
+function StructTypes.constructfrom(::Type{ErrorMitigationScheme}, x::Symbol)
+    occursin("debias", string(x)) && return Debias("braket.device_schema.error_mitigation.debias.Debias")
 end

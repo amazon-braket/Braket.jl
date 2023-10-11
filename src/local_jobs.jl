@@ -8,13 +8,6 @@ mutable struct LocalJobContainer
     function LocalJobContainer(image_uri::String, create_job_args; config::AWSConfig=global_aws_config(), container_name::String="", container_code_path::String="/opt/ml/code", force_update::Bool=false)
         c = new(image_uri, container_name, container_code_path, Dict{String, String}(), "", config)
         c = start_container!(c, force_update)
-        finalizer(c) do c
-            # check that the container is still running
-            c_list = read(`docker container ls -q`, String)
-            stop_flag = occursin(first(c.container_name, 10), c_list)
-            stop_flag && read(Cmd(["docker", "stop", c.container_name]), String)
-            return
-        end
         return setup_container!(c, create_job_args)
     end
 end
@@ -199,6 +192,14 @@ function start_container!(c::LocalJobContainer, force_update::Bool)
     return c 
 end
 
+function stop_container!(c::LocalJobContainer)
+    # check that the container is still running
+    c_list = read(`docker container ls -q`, String)
+    stop_flag = occursin(first(c.container_name, 10), c_list)
+    stop_flag && read(Cmd(["docker", "stop", c.container_name]), String)
+    return
+end
+
 function copy_from_container!(c::LocalJobContainer, src::String, dst::String)
     c_name = c.container_name
     cmd = `docker cp $c_name:$src $dst`
@@ -335,6 +336,7 @@ function LocalQuantumJob(
             copy_from_container!(local_job_container, checkpoint_path, joinpath(job_name, "checkpoints"))
         end
         run_log = local_job_container.run_log
+        stop_container!(local_job_container)
     end
     return LocalQuantumJob("local:job/$job_name", run_log=run_log)
 end

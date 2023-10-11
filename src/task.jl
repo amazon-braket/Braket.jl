@@ -159,7 +159,7 @@ function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_fol
     common       = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
     tags         = get(kwargs, :tags, Dict{String,String}())
-    device_parameters = _device_parameters_from_dict(device_params, device_arn, GateModelParameters(header_dict[GateModelParameters], 0, false))  
+    device_parameters = !isempty(device_params) ? _device_parameters_from_dict(device_params, device_arn, GateModelParameters(header_dict[GateModelParameters], 0, false)) : Dict{String, Any}() 
     dev_params   = JSON3.write(device_parameters)
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
     
