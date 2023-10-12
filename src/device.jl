@@ -63,6 +63,29 @@ function _construct_topology_graph(d::AwsDevice)
 end
 
 """
+    queue_depth(d::AwsDevice)
+"""
+function queue_depth(d::AwsDevice)
+    dev_name  = d._arn
+    metadata  = parse(BRAKET.get_device(HTTP.escapeuri(dev_name), aws_config=d._config))
+    queue_metadata = get(metadata, "deviceQueueInfo", nothing)
+    queue_info = Dict{String, Any}()
+    for response in queue_metadata
+        queue_name = get(response, "queue", "")
+        queue_priority = get(response, "queuePriority", "")
+        queue_size = get(response, "queueSize", "")
+        if queue_name == "QUANTUM_TASKS_QUEUE"
+            priority_enum = QueueType(queue_priority)
+            !haskey(queue_info, "quantum_tasks") && (queue_info["quantum_tasks"] = Dict{QueueType, String}())
+            queue_info["quantum_tasks"][priority_enum] = queue_size
+        else
+            queue_info["jobs"] = queue_size
+        end
+    end
+    return QueueDepthInfo(get(queue_info, "quantum_tasks", Dict{QueueType, String}()), get(queue_info, "jobs", ""))
+end
+
+"""
     refresh_metadata!(d::AwsDevice)
 
 Refreshes information contained in the [`AwsDevice`](@ref) struct, for example

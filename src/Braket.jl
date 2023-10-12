@@ -9,6 +9,7 @@ export apply_gate_noise!, apply
 export logs, log_metric, metrics
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
+export QueueDepthInfo, QueueType, Normal, Priority, queue_depth
 
 export AdjointGradient, Expectation, Sample, Variance, Amplitude, Probability, StateVector, DensityMatrix, Result
 
@@ -127,6 +128,7 @@ include("moments.jl")
 include("circuit.jl")
 include("noise_model.jl")
 include("ahs.jl")
+include("queue_information.jl")
 include("device.jl")
 include("gate_applicators.jl")
 include("noise_applicators.jl")

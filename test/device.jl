@@ -38,7 +38,8 @@ MOCK_GATE_MODEL_QPU_1() = """{
     "deviceType": "QPU",
     "providerName": "provider1",
     "deviceStatus": "OFFLINE",
-    "deviceCapabilities": $MOCK_GATE_MODEL_QPU_CAPABILITIES_1
+    "deviceCapabilities": $MOCK_GATE_MODEL_QPU_CAPABILITIES_1,
+    "deviceQueueInfo": [{"queue": "QUANTUM_TASKS_QUEUE", "queueSize": "19", "queuePriority": "Normal"}, {"queue": "QUANTUM_TASKS_QUEUE", "queueSize": "3", "queuePriority": "Priority"}, {"queue": "JOBS_QUEUE", "queueSize": "0 (3 prioritized job(s) running)"}]
 }"""
 
 MOCK_GATE_MODEL_QPU_CAPABILITIES_2 = """{
@@ -256,6 +257,14 @@ MOCK_DWAVE_QPU() = """{
         req_patch = @patch Braket.AWS._http_request(a...; b...) = throw(dl_ex)
         apply(req_patch) do
             @test_throws ErrorException("QPU arn:aws:braket:::device/qpu/fake_provider/fake_qpu not found") AwsDevice(NO_REGION_QPU_ARN)
+        end
+    end
+    @testset "Queue depth" begin
+        qpu = MOCK_GATE_MODEL_QPU_1
+        req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(qpu()))
+        apply(req_patch) do
+            dev = Braket.AwsDevice(_arn="fake_arn")
+            @test queue_depth(dev) == QueueDepthInfo(Dict(Normal=>"19", Priority=>"3"), "0 (3 prioritized job(s) running)")
         end
     end
 end
