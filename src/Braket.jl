@@ -9,7 +9,7 @@ export apply_gate_noise!, apply
 export logs, log_metric, metrics
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
-export QueueDepthInfo, QueueType, Normal, Priority, queue_depth
+export QueueDepthInfo, QueueType, Normal, Priority, queue_depth, queue_position
 
 export AdjointGradient, Expectation, Sample, Variance, Amplitude, Probability, StateVector, DensityMatrix, Result
 

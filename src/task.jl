@@ -223,6 +223,14 @@ function prepare_task_input(circuit::Program, device_arn::String, s3_folder::Tup
     return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
 end
 
+function queue_position(t::AwsQuantumTask)
+    response = metadata(t)["queueInfo"]
+    queue_type = QueueType(response["queuePriority"])
+    queue_position = get(response, "position", "None") == "None" ? "" : response["position"]
+    message = get(response, "message", "")
+    return QuantumTaskQueueInfo(queue_type, queue_position, message)
+end
+
 """
     cancel(t::AwsQuantumTask)
 
@@ -242,16 +250,18 @@ end
 Fetch metadata for task `t`.
 If the second argument is `::Val{true}`, use previously cached
 metadata, if available, otherwise fetch it from the Braket service.
-If the second argument is `::Val{false}`, do not use previously cached
+If the second argument is `::Val{false}` (default), do not use previously cached
 metadata, and fetch fresh metadata from the Braket service.
 """
 function metadata(t::AwsQuantumTask, ::Val{false})
-    resp = BRAKET.get_quantum_task(HTTP.escapeuri(t.arn))
+    uri = HTTP.escapeuri(t.arn) * "?additionalAttributeNames=QueueInfo"
+    resp = BRAKET.get_quantum_task(uri)
     payload = parse(resp)
     broadcast_event!(TaskStatusEvent(t.arn, payload["status"]))
     return payload
 end
 metadata(t::AwsQuantumTask, ::Val{true})  = !isempty(t._metadata) ? t._metadata : metadata(t, Val(false))
+metadata(t::AwsQuantumTask) = metadata(t, Val(false))
 
 """
     state(t::AwsQuantumTask, ::Val{false}) -> String

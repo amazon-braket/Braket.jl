@@ -26,7 +26,7 @@ Abstract type representing a Braket Job.
 abstract type Job end
 
 get_job(j::Job) = get_job(arn(j))
-get_job(arn::String) = startswith(arn, "local") ? LocalQuantumJob(arn) : BRAKET.get_job(HTTP.escapeuri(arn))
+get_job(arn::String) = startswith(arn, "local") ? LocalQuantumJob(arn) : BRAKET.get_job(HTTP.escapeuri(arn) * "?additionalAttributeNames=QueueInfo")
 
 config_fname(f::Framework) = joinpath(@__DIR__, "image_uri_config", lowercase(string(f))*".json")
 config_for_framework(f::Framework) = JSON3.read(read(config_fname(f), String), Dict)
