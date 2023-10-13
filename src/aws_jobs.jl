@@ -566,3 +566,4 @@ function AwsQuantumJob(
     wait_until_complete && logs(job, wait=true)
     return job
 end
+AwsQuantumJob(device::BraketDevice, source_module::String; kwargs...) = AwsQuantumJob(convert(String, device), source_module; kwargs...)

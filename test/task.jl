@@ -132,6 +132,20 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         @test task_args[:outputS3KeyPrefix] == s3_folder[2]
     end
 
+    @testset "Error Mitigation" for em in (Braket.DeBias(), ir(Braket.DeBias())) 
+        shots = 21
+        s3_folder = ("fake_bucket", "fake_folder")
+        device_params = Braket.IonqDeviceParameters(Braket.header_dict[Braket.IonqDeviceParameters], Braket.GateModelParameters(Braket.header_dict[Braket.GateModelParameters], 0, false), [Braket.Debias(StructTypes.defaults(Braket.Debias)[:type])])
+        task_args = Braket.prepare_task_input(oq3_program(), IONQ_ARN, s3_folder, shots, Dict("errorMitigation"=>em))
+        @test task_args[:action] == JSON3.write(ir(oq3_program()))
+        @test task_args[:device_arn] == IONQ_ARN
+        @test UUID(task_args[:client_token]) isa UUID
+        @test task_args[:shots] == shots
+        @test task_args[:outputS3Bucket] == s3_folder[1]
+        @test task_args[:outputS3KeyPrefix] == s3_folder[2]
+        @test task_args[:extra_opts]["deviceParameters"] == JSON3.write(device_params)
+    end
+
     @testset for (program, arn) in zip((oq3_program, bb_program), (SV1_ARN, XANADU_ARN))
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")

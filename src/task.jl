@@ -92,7 +92,7 @@ function AwsQuantumTask(device_arn::String,
                         task_spec::Union{AbstractProgram, Circuit, AnalogHamiltonianSimulation};
                         s3_destination_folder::Tuple{String, String}=default_task_bucket(),
                         shots::Int=DEFAULT_SHOTS,
-                        device_params::Dict{String, Any}=Dict{String,Any}(),
+                        device_params::Dict{String,<:Any}=Dict{String,Any}(),
                         disable_qubit_rewiring::Bool=false,
                         poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT,
                         poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL,
@@ -131,16 +131,16 @@ function _create_common_params(device_arn::String, s3_destination_folder::Tuple{
     return (device_arn=device_arn, outputS3Bucket=s3_destination_folder[1],  outputS3KeyPrefix=s3_destination_folder[2], shots=shots, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds, config=config)
 end
 
-function _device_parameters_from_dict(device_parameters::Dict{String, Any}, device_arn::String, paradigm_parameters::GateModelParameters)
-    error_migitation = get(device_parameters, "errorMitigation", nothing)
-    device_parameters["errorMitigation"] = error_migitation isa ErrorMitigation ? ir(error_migitation) : error_migitation
-    occursin("ionq", device_arn) && return IonqDeviceParameters(header_dict[IonqDeviceParameters], paradigm_parameters, device_parameters["errorMitigation"])
+function _device_parameters_from_dict(device_parameters::Dict{String,<:Any}, device_arn::String, paradigm_parameters::GateModelParameters)
+    error_mitigation = get(device_parameters, "errorMitigation", nothing)
+    processed_em = error_mitigation isa ErrorMitigation ? ir(error_mitigation) : error_mitigation
+    occursin("ionq", device_arn) && return IonqDeviceParameters(header_dict[IonqDeviceParameters], paradigm_parameters, processed_em)
     occursin("rigetti", device_arn) && return RigettiDeviceParameters(header_dict[RigettiDeviceParameters], paradigm_parameters)
     occursin("oqc", device_arn) && return OqcDeviceParameters(header_dict[OqcDeviceParameters], paradigm_parameters)
     return GateModelSimulatorDeviceParameters(header_dict[GateModelSimulatorDeviceParameters], paradigm_parameters)
 end
 
-function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Union{Dict{String, Any}, DwaveDeviceParameters, DwaveAdvantageDeviceParameters, Dwave2000QDeviceParameters}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Union{Dict{String,<:Any}, DwaveDeviceParameters, DwaveAdvantageDeviceParameters, Dwave2000QDeviceParameters}, disable_qubit_rewiring::Bool=false; kwargs...)
     device_parameters = _create_annealing_device_params(device_params, device_arn)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
@@ -151,11 +151,11 @@ function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tup
     return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
 end
 
-function prepare_task_input(ahs::AnalogHamiltonianSimulation, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(ahs::AnalogHamiltonianSimulation, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String,<:Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     return prepare_task_input(ir(ahs), device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; kwargs...)
 end
 
-function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String,<:Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     common       = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
     tags         = get(kwargs, :tags, Dict{String,String}())

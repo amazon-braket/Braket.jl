@@ -340,6 +340,7 @@ function LocalQuantumJob(
     end
     return LocalQuantumJob("local:job/$job_name", run_log=run_log)
 end
+LocalQuantumJob(device::BraketDevice, source_module::String; kwargs...) = LocalQuantumJob(convert(String, device), source_module; kwargs...)
 
 """
     arn(j::LocalQuantumJob)

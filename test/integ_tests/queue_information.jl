@@ -1,9 +1,8 @@
 using Braket, Test
 
-SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 @testset "Queue Information" begin
     @testset "Task Queue Position" begin
-        device = AwsDevice(SV1_ARN)
+        device = AwsDevice(Braket.SV1())
         bell = Circuit([(H, 0), (CNot, 0, 1)])
         task = device(bell, shots=10)
 
@@ -29,7 +28,7 @@ SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 
     @testset "Job queue position" begin
         job = AwsQuantumJob(
-            SV1_ARN,
+            Braket.SV1(),
             joinpath(@__DIR__, "job_test_script.py"),
             entry_point="job_test_script:start_here",
             wait_until_complete=true,
@@ -48,7 +47,7 @@ SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
     end
 
     @testset "Queue Depth" begin
-        device = AwsDevice(SV1_ARN)
+        device = AwsDevice(Braket.SV1())
 
         # call the queue_depth method.
         queue_information = queue_depth(device)
