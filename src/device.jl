@@ -18,7 +18,7 @@ end
 for (d, d_arn) in zip((:SV1, :DM1, :TN1), ("sv1", "dm1", "tn1"))
     @eval begin
         struct $d <: AmazonDevice end
-        Base.convert(::Type{String}, d::D) where {D<:AmazonDevice} = "arn:aws:braket:::device/quantum-simulator/amazon/" * $d_arn
+        Base.convert(::Type{String}, d::$d) = "arn:aws:braket:::device/quantum-simulator/amazon/" * $d_arn
     end
 end
 
