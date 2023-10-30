@@ -92,7 +92,7 @@ function AwsQuantumTask(device_arn::String,
                         task_spec::Union{AbstractProgram, Circuit, AnalogHamiltonianSimulation};
                         s3_destination_folder::Tuple{String, String}=default_task_bucket(),
                         shots::Int=DEFAULT_SHOTS,
-                        device_params::Dict{String, Any}=Dict{String,Any}(),
+                        device_params::Dict{String,<:Any}=Dict{String,Any}(),
                         disable_qubit_rewiring::Bool=false,
                         poll_timeout_seconds::Int=DEFAULT_RESULTS_POLL_TIMEOUT,
                         poll_interval_seconds::Int=DEFAULT_RESULTS_POLL_INTERVAL,
@@ -131,7 +131,16 @@ function _create_common_params(device_arn::String, s3_destination_folder::Tuple{
     return (device_arn=device_arn, outputS3Bucket=s3_destination_folder[1],  outputS3KeyPrefix=s3_destination_folder[2], shots=shots, poll_timeout_seconds=timeout_seconds, poll_interval_seconds=interval_seconds, config=config)
 end
 
-function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Union{Dict{String, Any}, DwaveDeviceParameters, DwaveAdvantageDeviceParameters, Dwave2000QDeviceParameters}, disable_qubit_rewiring::Bool=false; kwargs...)
+function _device_parameters_from_dict(device_parameters::Dict{String,<:Any}, device_arn::String, paradigm_parameters::GateModelParameters)
+    error_mitigation = get(device_parameters, "errorMitigation", nothing)
+    processed_em = error_mitigation isa ErrorMitigation ? ir(error_mitigation) : error_mitigation
+    occursin("ionq", device_arn) && return IonqDeviceParameters(header_dict[IonqDeviceParameters], paradigm_parameters, processed_em)
+    occursin("rigetti", device_arn) && return RigettiDeviceParameters(header_dict[RigettiDeviceParameters], paradigm_parameters)
+    occursin("oqc", device_arn) && return OqcDeviceParameters(header_dict[OqcDeviceParameters], paradigm_parameters)
+    return GateModelSimulatorDeviceParameters(header_dict[GateModelSimulatorDeviceParameters], paradigm_parameters)
+end
+
+function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Union{Dict{String,<:Any}, DwaveDeviceParameters, DwaveAdvantageDeviceParameters, Dwave2000QDeviceParameters}, disable_qubit_rewiring::Bool=false; kwargs...)
     device_parameters = _create_annealing_device_params(device_params, device_arn)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
@@ -142,15 +151,15 @@ function prepare_task_input(problem::Problem, device_arn::String, s3_folder::Tup
     return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
 end
 
-function prepare_task_input(ahs::AnalogHamiltonianSimulation, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(ahs::AnalogHamiltonianSimulation, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String,<:Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     return prepare_task_input(ir(ahs), device_arn, s3_folder, shots, device_params, disable_qubit_rewiring; kwargs...)
 end
 
-function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
+function prepare_task_input(program::OpenQasmProgram, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String,<:Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     common       = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     client_token = string(uuid1())
     tags         = get(kwargs, :tags, Dict{String,String}())
-    device_parameters = Dict{String, Any}() # not currently used
+    device_parameters = !isempty(device_params) ? _device_parameters_from_dict(device_params, device_arn, GateModelParameters(header_dict[GateModelParameters], 0, false)) : Dict{String, Any}() 
     dev_params   = JSON3.write(device_parameters)
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
     
@@ -181,14 +190,6 @@ function prepare_task_input(circuit::Circuit, device_arn::String, s3_folder::Tup
     validate_circuit_and_shots(circuit, shots)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
-    T = GateModelSimulatorDeviceParameters # default to use simulator
-    if occursin("ionq", device_arn)
-        T = IonqDeviceParameters
-    elseif occursin("rigetti", device_arn)
-        T = RigettiDeviceParameters
-    elseif occursin("oqc", device_arn)
-        T = OqcDeviceParameters
-    end
     qubit_reference_type = VIRTUAL
     if disable_qubit_rewiring || Instruction(StartVerbatimBox()) in circuit.instructions
         #|| any(instruction.operator isa PulseGate for instruction in circuit.instructions)
@@ -201,7 +202,7 @@ function prepare_task_input(circuit::Circuit, device_arn::String, s3_folder::Tup
     inputs_merged = !isempty(inputs) ? merge(program_inputs, inputs) : oq3_program.inputs
     oq3_program = OpenQasmProgram(oq3_program.braketSchemaHeader, oq3_program.source, inputs_merged)
 
-    device_parameters = T(header_dict[T], paradigm_parameters)
+    device_parameters = _device_parameters_from_dict(device_params, device_arn, paradigm_parameters) 
     client_token = string(uuid1())
     action       = JSON3.write(oq3_program)
     dev_params   = JSON3.write(device_parameters)
@@ -213,21 +214,21 @@ end
 function prepare_task_input(circuit::Program, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
     common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
     paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
-    T = GateModelSimulatorDeviceParameters # default to use simulator
-    if occursin("ionq", device_arn)
-        T = IonqDeviceParameters
-    elseif occursin("rigetti", device_arn)
-        T = RigettiDeviceParameters
-    elseif occursin("oqc", device_arn)
-        T = OqcDeviceParameters
-    end
-    device_parameters = T(header_dict[T], paradigm_parameters)
     client_token = string(uuid1())
     action       = JSON3.write(circuit)
+    device_parameters = _device_parameters_from_dict(device_params, device_arn, paradigm_parameters) 
     dev_params   = JSON3.write(device_parameters)
     tags         = get(kwargs, :tags, Dict{String,String}())
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
     return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
+end
+
+function queue_position(t::AwsQuantumTask)
+    response = metadata(t)["queueInfo"]
+    queue_type = QueueType(response["queuePriority"])
+    queue_position = get(response, "position", "None") == "None" ? "" : response["position"]
+    message = get(response, "message", "")
+    return QuantumTaskQueueInfo(queue_type, queue_position, message)
 end
 
 """
@@ -249,16 +250,18 @@ end
 Fetch metadata for task `t`.
 If the second argument is `::Val{true}`, use previously cached
 metadata, if available, otherwise fetch it from the Braket service.
-If the second argument is `::Val{false}`, do not use previously cached
+If the second argument is `::Val{false}` (default), do not use previously cached
 metadata, and fetch fresh metadata from the Braket service.
 """
 function metadata(t::AwsQuantumTask, ::Val{false})
-    resp = BRAKET.get_quantum_task(HTTP.escapeuri(t.arn))
+    uri = HTTP.escapeuri(t.arn) * "?additionalAttributeNames=QueueInfo"
+    resp = BRAKET.get_quantum_task(uri)
     payload = parse(resp)
     broadcast_event!(TaskStatusEvent(t.arn, payload["status"]))
     return payload
 end
 metadata(t::AwsQuantumTask, ::Val{true})  = !isempty(t._metadata) ? t._metadata : metadata(t, Val(false))
+metadata(t::AwsQuantumTask) = metadata(t, Val(false))
 
 """
     state(t::AwsQuantumTask, ::Val{false}) -> String

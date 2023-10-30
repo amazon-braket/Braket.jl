@@ -8,6 +8,68 @@ const _GET_DEVICES_ORDER_BY_KEYS = Set(("arn", "name", "type", "provider_name", 
 @enum AwsDeviceType SIMULATOR QPU
 const AwsDeviceTypeDict = Dict("SIMULATOR"=>SIMULATOR, "QPU"=>QPU)
 
+abstract type BraketDevice end
+for provider in (:AmazonDevice, :_XanaduDevice, :_DWaveDevice, :OQCDevice, :QuEraDevice, :IonQDevice, :RigettiDevice)
+    @eval begin
+        abstract type $provider <: BraketDevice end
+    end
+end
+
+for (d, d_arn) in zip((:SV1, :DM1, :TN1), ("sv1", "dm1", "tn1"))
+    @eval begin
+        struct $d <: AmazonDevice end
+        Base.convert(::Type{String}, d::$d) = "arn:aws:braket:::device/quantum-simulator/amazon/" * $d_arn
+    end
+end
+
+for (d, d_arn) in zip((:_Advantage1, :_Advantage3, :_Advantage4, :_Advantage6, :_DW2000Q6),
+                    ("arn:aws:braket:::device/qpu/d-wave/Advantage_system1",
+                     "arn:aws:braket:::device/qpu/d-wave/Advantage_system2",
+                     "arn:aws:braket:::device/qpu/d-wave/Advantage_system3",
+                     "arn:aws:braket:us-west-2::device/qpu/d-wave/Advantage_system6",
+                     "arn:aws:braket:::device/qpu/d-wave/DW_2000Q_6",
+                    ))
+    @eval begin
+        struct $d <: _DWaveDevice end
+        Base.convert(::Type{String}, d::$d) = $d_arn
+    end
+end
+
+struct _Borealis <: _XanaduDevice end
+Base.convert(::String, d::_Borealis) = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
+
+for (d, d_arn) in zip((:Harmony, :Aria1, :Aria2),
+                      ("arn:aws:braket:us-east-1::device/qpu/ionq/Harmony",
+                       "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1",
+                       "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-2",
+                      ))
+    @eval begin
+        struct $d <: IonQDevice end
+        Base.convert(::Type{String}, d::$d) = $d_arn
+    end
+end
+
+struct Aquila <: QuEraDevice end
+Base.convert(::Type{String}, d::Aquila) = "arn:aws:braket:us-east-1::device/qpu/quera/Aquila"
+
+struct Lucy <: OQCDevice end
+Base.convert(::Type{String}, d::Lucy) = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
+
+for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_AspenM2, :AspenM3),
+                      ("arn:aws:braket:::device/qpu/rigetti/Aspen-8",
+                       "arn:aws:braket:::device/qpu/rigetti/Aspen-9",
+                       "arn:aws:braket:::device/qpu/rigetti/Aspen-10",
+                       "arn:aws:braket:::device/qpu/rigetti/Aspen-11",
+                       "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-1",
+                       "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-2",
+                       "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-3",
+                      ))
+    @eval begin
+        struct $d <: RigettiDevice end
+        Base.convert(::Type{String}, d::$d) = $d_arn
+    end
+end
+
 """
     AwsDevice <: Device
 
@@ -60,6 +122,29 @@ function _construct_topology_graph(d::AwsDevice)
         edges = [Edge(i, j) for (i,j) in d._properties.provider.couplers]
         return SimpleDiGraphFromIterator(edges)
     end
+end
+
+"""
+    queue_depth(d::AwsDevice)
+"""
+function queue_depth(d::AwsDevice)
+    dev_name  = d._arn
+    metadata  = parse(BRAKET.get_device(HTTP.escapeuri(dev_name), aws_config=d._config))
+    queue_metadata = get(metadata, "deviceQueueInfo", nothing)
+    queue_info = Dict{String, Any}()
+    for response in queue_metadata
+        queue_name = get(response, "queue", "")
+        queue_priority = get(response, "queuePriority", "")
+        queue_size = get(response, "queueSize", "")
+        if queue_name == "QUANTUM_TASKS_QUEUE"
+            priority_enum = QueueType(queue_priority)
+            !haskey(queue_info, "quantum_tasks") && (queue_info["quantum_tasks"] = Dict{QueueType, String}())
+            queue_info["quantum_tasks"][priority_enum] = queue_size
+        else
+            queue_info["jobs"] = queue_size
+        end
+    end
+    return QueueDepthInfo(get(queue_info, "quantum_tasks", Dict{QueueType, String}()), get(queue_info, "jobs", ""))
 end
 
 """
@@ -118,6 +203,7 @@ function AwsDevice(device_arn::String; config::AWSConfig=global_aws_config())
         return d
     end
 end
+AwsDevice(d::BraketDevice; kwargs...) = AwsDevice(convert(String, d); kwargs...)
 
 """
     isavailable(d::AwsDevice) -> Bool

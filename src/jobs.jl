@@ -26,7 +26,7 @@ Abstract type representing a Braket Job.
 abstract type Job end
 
 get_job(j::Job) = get_job(arn(j))
-get_job(arn::String) = startswith(arn, "local") ? LocalQuantumJob(arn) : BRAKET.get_job(HTTP.escapeuri(arn))
+get_job(arn::String) = startswith(arn, "local") ? LocalQuantumJob(arn) : BRAKET.get_job(HTTP.escapeuri(arn) * "?additionalAttributeNames=QueueInfo")
 
 config_fname(f::Framework) = joinpath(@__DIR__, "image_uri_config", lowercase(string(f))*".json")
 config_for_framework(f::Framework) = JSON3.read(read(config_fname(f), String), Dict)
@@ -44,11 +44,11 @@ function retrieve_image(f::Framework, config::AWSConfig)
     version_config = conf["versions"][framework_version]
     registry = registry_for_region(version_config, aws_region)
     tag = if f == BASE
-        string(version_config["repository"]) * ":" * string(framework_version) * "-cpu-py37-ubuntu18.04"
+        string(version_config["repository"]) * ":" * "latest"
     elseif f == PL_TENSORFLOW
-        string(version_config["repository"]) * ":" * string(framework_version) * "-gpu-py37-cu110-ubuntu18.04"
+        string(version_config["repository"]) * ":" * "latest"
     elseif f == PL_PYTORCH
-        string(version_config["repository"]) * ":" * string(framework_version) * "-gpu-py38-cu111-ubuntu20.04"
+        string(version_config["repository"]) * ":" * "latest"
     end
     return string(registry) * ".dkr.ecr.$aws_region.amazonaws.com/$tag"
 end

@@ -8,13 +8,6 @@ mutable struct LocalJobContainer
     function LocalJobContainer(image_uri::String, create_job_args; config::AWSConfig=global_aws_config(), container_name::String="", container_code_path::String="/opt/ml/code", force_update::Bool=false)
         c = new(image_uri, container_name, container_code_path, Dict{String, String}(), "", config)
         c = start_container!(c, force_update)
-        finalizer(c) do c
-            # check that the container is still running
-            c_list = read(`docker container ls -q`, String)
-            stop_flag = occursin(first(c.container_name, 10), c_list)
-            stop_flag && read(Cmd(["docker", "stop", c.container_name]), String)
-            return
-        end
         return setup_container!(c, create_job_args)
     end
 end
@@ -146,12 +139,17 @@ function run_local_job!(c::LocalJobContainer)
 end
 
 function login_to_ecr(account_id::String, ecr_uri::String, config::AWSConfig)
+    @debug "Attempting to log in to ECR..."
+    @debug "Getting authorization token"
     authorization_data_result = EcR.get_authorization_token(Dict("registryIds"=>[account_id]), aws_config=config)
     isnothing(authorization_data_result) && throw(ErrorException("unable to get permissions to access ECR in order to log in to docker. Please pull down the container before proceeding."))
     raw_token = base64decode(authorization_data_result["authorizationData"][1]["authorizationToken"])
     token = String(raw_token)
     token = replace(token, "AWS:"=>"")
+    @debug "Performing docker login"
     proc_out, proc_err, code = capture_docker_cmd(`docker login -u AWS -p $token $ecr_uri`)
+    @debug "docker login complete"
+    code != 0 && throw(ErrorException("Unable to docker login to ECR with error $proc_err"))
     return
 end
 
@@ -161,8 +159,9 @@ function pull_image(image_uri::String, config::AWSConfig)
     ecr_uri    = String(m[1])
     account_id = String(m[2])
     login_to_ecr(account_id, ecr_uri, config)
-    @warn "Pulling docker image. This may take a while."
+    @warn "Pulling docker image $image_uri. This may take a while."
     proc_out, proc_err, code = capture_docker_cmd(`docker pull $image_uri`)
+    code != 0 && error(proc_err)
     return
 end
 
@@ -182,21 +181,40 @@ function start_container!(c::LocalJobContainer, force_update::Bool)
     get_image_name(image_uri) = capture_docker_cmd(`docker images -q $image_uri`)[1]
     image_name = get_image_name(image_uri)
     if isempty(image_name) || isnothing(image_name)
-        pull_image(image_uri, c.config)
-        image_name = get_image_name(image_uri)
-        (isempty(image_name) || isnothing(image_name)) && throw(ErrorException("The URI $(c.image_uri) is not available locally and cannot be pulled from Amazon ECR. Please pull down the container before proceeding."))
+        try
+            pull_image(image_uri, c.config)
+            image_name = get_image_name(image_uri)
+            (isempty(image_name) || isnothing(image_name)) && throw(ErrorException("The URI $(c.image_uri) is not available locally and cannot be pulled from Amazon ECR. Please pull down the container before proceeding."))
+        catch ex
+            throw(ErrorException("The URI $(c.image_uri) is not available locally and cannot be pulled from Amazon ECR due to $ex. Please pull down the container before proceeding."))
+        end
     elseif force_update
         try
-            pull_image(image_uri)
+            pull_image(image_uri, c.config)
             image_name = get_image_name(image_uri)
         catch e
-            @warn "Unable to update $(c.image_uri)"
+            @warn "Unable to update $(c.image_uri) with error $e"
         end
     end
     container_name, err, code = capture_docker_cmd(`docker run -d --rm $image_name tail -f /dev/null`)
     code == 0 || throw(ErrorException(err))
     c.container_name = container_name
     return c 
+end
+
+function stop_container!(c::LocalJobContainer)
+    # check that the container is still running
+    cmd = `docker container ls -q`
+    c_list, c_err, code = capture_docker_cmd(cmd)
+    if code == 0 && occursin(first(c.container_name, 10), c_list)
+        stop_out, stop_err, stop_code = capture_docker_cmd(Cmd(["docker", "stop", c.container_name]))
+        if stop_code != 0
+            error("unable to stop docker container $(c.contianer_name)! Error: $stop_err")
+        end
+    else
+        error("unable to read docker container list! Error: $c_err")
+    end
+    return
 end
 
 function copy_from_container!(c::LocalJobContainer, src::String, dst::String)
@@ -335,9 +353,11 @@ function LocalQuantumJob(
             copy_from_container!(local_job_container, checkpoint_path, joinpath(job_name, "checkpoints"))
         end
         run_log = local_job_container.run_log
+        stop_container!(local_job_container)
     end
     return LocalQuantumJob("local:job/$job_name", run_log=run_log)
 end
+LocalQuantumJob(device::BraketDevice, source_module::String; kwargs...) = LocalQuantumJob(convert(String, device), source_module; kwargs...)
 
 """
     arn(j::LocalQuantumJob)

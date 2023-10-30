@@ -43,7 +43,7 @@ using AWS, AWSS3, Braket, JSON3, Test
             @test errors == ""
             logs_to_validate = [
                 "Invoking script with the following command:",
-                "/usr/local/bin/python3.8 braket_container.py",
+                "braket_container.py",
                 "Running Code As Process",
                 "Test job started!!!!!",
                 "AssertionError",
@@ -135,7 +135,7 @@ using AWS, AWSS3, Braket, JSON3, Test
             @test errors == ""
             logs_to_validate = [
                 "Invoking script with the following command:",
-                "/usr/local/bin/python3.8 braket_container.py",
+                "braket_container.py",
                 "Running Code As Process",
                 "Test job started!!!!!",
                 "Test job completed!!!!!",

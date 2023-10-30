@@ -51,6 +51,14 @@ function log_metric(metric_name::String, value::Union{Float64, Int}; timestamp=t
     return
 end
 
+function queue_position(j::AwsQuantumJob)
+    md =  metadata(j)
+    response = md["queueInfo"]
+    queue_position = get(response, "position", "None") == "None" ? "" : get(response, "position", "")
+    message = get(response, "message", "")
+    return HybridJobQueueInfo(queue_position, message)
+end
+
 function log_stream(ch::Channel, log_group::String, stream_name::String, start_time::Int=0, skip::Int=0)
     next_token = nothing
     event_count = 1
@@ -558,3 +566,4 @@ function AwsQuantumJob(
     wait_until_complete && logs(job, wait=true)
     return job
 end
+AwsQuantumJob(device::BraketDevice, source_module::String; kwargs...) = AwsQuantumJob(convert(String, device), source_module; kwargs...)

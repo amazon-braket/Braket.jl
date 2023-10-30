@@ -9,6 +9,7 @@ export apply_gate_noise!, apply
 export logs, log_metric, metrics
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
+export QueueDepthInfo, QueueType, Normal, Priority, queue_depth, queue_position
 
 export AdjointGradient, Expectation, Sample, Variance, Amplitude, Probability, StateVector, DensityMatrix, Result
 
@@ -120,12 +121,14 @@ Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
 include("compiler_directive.jl")
 include("gates.jl")
 include("noises.jl")
+include("error_mitigation.jl")
 include("results.jl")
 include("schemas.jl")
 include("moments.jl")
 include("circuit.jl")
 include("noise_model.jl")
 include("ahs.jl")
+include("queue_information.jl")
 include("device.jl")
 include("gate_applicators.jl")
 include("noise_applicators.jl")
