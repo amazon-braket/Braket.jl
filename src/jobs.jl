@@ -52,3 +52,21 @@ function retrieve_image(f::Framework, config::AWSConfig)
     end
     return string(registry) * ".dkr.ecr.$aws_region.amazonaws.com/$tag"
 end
+
+Base.@kwdef mutable struct JobsOptions
+    entry_point::String=""
+    image_uri::String=""
+    job_name::String=_generate_default_job_name(image_uri)
+    code_location::String=construct_s3_uri(default_bucket(), "jobs", job_name, "script")
+    role_arn::String=get(ENV, "BRAKET_JOBS_ROLE_ARN", _get_default_jobs_role())
+    wait_until_complete::Bool=false
+    hyperparameters::Dict{String, <:Any}=Dict{String, Any}()
+    input_data::Union{String, Dict} = Dict()
+    instance_config::InstanceConfig = InstanceConfig()
+    distribution::String=""
+    stopping_condition::StoppingCondition = StoppingCondition()
+    output_data_config::OutputDataConfig = OutputDataConfig(job_name=job_name)
+    copy_checkpoints_from_job::String=""
+    checkpoint_config::CheckpointConfig = CheckpointConfig(job_name)
+    tags::Dict{String, String}=Dict{String, String}()
+end

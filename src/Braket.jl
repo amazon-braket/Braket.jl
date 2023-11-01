@@ -6,7 +6,7 @@ export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
 export apply_gate_noise!, apply
-export logs, log_metric, metrics
+export logs, log_metric, metrics, @hybrid_job
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
 export QueueDepthInfo, QueueType, Normal, Priority, queue_depth, queue_position
@@ -133,6 +133,7 @@ include("device.jl")
 include("gate_applicators.jl")
 include("noise_applicators.jl")
 include("jobs.jl")
+include("job_macro.jl")
 include("aws_jobs.jl")
 include("local_jobs.jl")
 include("task.jl")

@@ -55,6 +55,7 @@ function copy_hyperparameters(c::LocalJobContainer, args)
     mktempdir() do temp_dir
         file_path = joinpath(temp_dir, "hyperparameters.json")
         write(file_path, JSON3.write(hyperparameters))
+        write("/home/hyatkath/.julia/dev/Braket/hyperparameters.json", JSON3.write(hyperparameters))
         copy_to_container!(c, file_path, "/opt/ml/input/config/hyperparameters.json")
     end
     return true
@@ -102,18 +103,23 @@ function copy_input_data_list(c::LocalJobContainer, args)
 end
 
 function setup_container!(c::LocalJobContainer, create_job_args)
+    @debug "Setting up container..."
     c_name = c.container_name
     # create expected paths for a Braket job to run
+    @debug "Setting up container: creating expected paths"
     proc_out, proc_err, code = capture_docker_cmd(`docker exec $c_name mkdir -p /opt/ml/model`)
     local_path = create_job_args[:params]["checkpointConfig"]["localPath"]
     proc_out, proc_err, code = capture_docker_cmd(`docker exec $c_name mkdir -p $local_path`)
 
+    @debug "Setting up container: creating environment variables"
     env_vars = Dict{String, String}()
     merge!(env_vars, get_env_creds(c.config))
     script_mode = create_job_args[:algo_spec]["scriptModeConfig"]
     merge!(env_vars, get_env_script_mode_config(script_mode))
     merge!(env_vars, get_env_defaults(c.config, create_job_args))
+    @debug "Setting up container: copying hyperparameters"
     copy_hyperparameters(c, create_job_args) && merge!(env_vars, get_env_hyperparameters())
+    @debug "Setting up container: copying input data list"
     copy_input_data_list(c, create_job_args) && merge!(env_vars, get_env_input_data())
     c.env = env_vars
     return c
@@ -122,17 +128,19 @@ end
 function run_local_job!(c::LocalJobContainer)
     code_path = c.container_code_path
     c_name    = c.container_name
+    @debug "Running local job: capturing entry point command"
     entry_point_cmd = `docker exec $c_name printenv SAGEMAKER_PROGRAM`
     entry_program, err, code = capture_docker_cmd(entry_point_cmd)
     (isnothing(entry_program) || isempty(entry_program)) && throw(ErrorException("Start program not found. The specified container is not setup to run Braket Jobs. Please see setup instructions for creating your own containers."))
     env_list  = String.(reduce(vcat, ["-e", k*"="*v] for (k,v) in c.env))
     cmd  = Cmd(["docker", "exec", "-w", String(code_path), env_list..., String(c_name), "python", String(entry_program)])
+    @debug "Running local job: running full entry point command"
     proc_out, proc_err, code = capture_docker_cmd(cmd)
     if code == 0
         c.run_log *= proc_out 
     else
         err_str = "Run local job process exited with code: $code"
-        println(proc_err)
+        c.run_log *= proc_out 
         c.run_log *= err_str * proc_err
     end
     return c
@@ -179,6 +187,7 @@ end
 function start_container!(c::LocalJobContainer, force_update::Bool)
     image_uri = c.image_uri
     get_image_name(image_uri) = capture_docker_cmd(`docker images -q $image_uri`)[1]
+    @debug "Acquiring docker image for container start"
     image_name = get_image_name(image_uri)
     if isempty(image_name) || isnothing(image_name)
         try
@@ -196,6 +205,7 @@ function start_container!(c::LocalJobContainer, force_update::Bool)
             @warn "Unable to update $(c.image_uri) with error $e"
         end
     end
+    @debug "Launching container with docker run"
     container_name, err, code = capture_docker_cmd(`docker run -d --rm $image_name tail -f /dev/null`)
     code == 0 || throw(ErrorException(err))
     c.container_name = container_name
@@ -313,29 +323,13 @@ The keyword arguments `kwargs` control the launch configuration of the job.
 """
 function LocalQuantumJob(
     device::String,
-    source_module::String;
-    entry_point::String="",
-    image_uri::String="",
-    job_name::String=_generate_default_job_name(image_uri),
-    code_location::String=construct_s3_uri(default_bucket(), "jobs", job_name, "script"),
-    role_arn::String="",
-    wait_until_complete::Bool=false,
-    hyperparameters::Dict{String, <:Any}=Dict{String, Any}(),
-    input_data::Union{String, Dict} = Dict(),
-    instance_config::InstanceConfig = InstanceConfig(),
-    distribution::String="",
-    stopping_condition::StoppingCondition = StoppingCondition(),
-    output_data_config::OutputDataConfig = OutputDataConfig(job_name=job_name),
-    copy_checkpoints_from_job::String="",
-    checkpoint_config::CheckpointConfig = CheckpointConfig(job_name),
-    tags::Dict{String, String}=Dict{String, String}(),
+    source_module::String,
+    j_opts::JobsOptions;
     force_update::Bool=false,
     config::AWSConfig=global_aws_config()
     )
-    image_uri = isempty(image_uri) ? retrieve_image(BASE, config) : image_uri
-    args      = prepare_quantum_job(device, source_module, entry_point, image_uri, job_name, code_location,
-                                    role_arn, hyperparameters, input_data, instance_config, distribution,
-                                    stopping_condition, output_data_config, copy_checkpoints_from_job, checkpoint_config, tags)
+    image_uri = isempty(j_opts.image_uri) ? retrieve_image(BASE, config) : j_opts.image_uri
+    args      = prepare_quantum_job(device, source_module, j_opts)
     algo_spec = args[:algo_spec]
     job_name  = args[:job_name]
     ispath(job_name) && throw(ErrorException("a local directory called $job_name already exists. Please use a different job name."))
@@ -357,6 +351,7 @@ function LocalQuantumJob(
     end
     return LocalQuantumJob("local:job/$job_name", run_log=run_log)
 end
+LocalQuantumJob(device::String, source_module::String; force_update::Bool=false, config::AWSConfig=global_aws_config(), kwargs...) = LocalQuantumJob(device, source_module, JobsOptions(; kwargs...); force_update=force_update, config=config)
 LocalQuantumJob(device::BraketDevice, source_module::String; kwargs...) = LocalQuantumJob(convert(String, device), source_module; kwargs...)
 
 """
