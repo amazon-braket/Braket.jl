@@ -2,7 +2,7 @@ using AWS, AWSS3, Braket, JSON3, Test
 
 struct MyStruct
     attribute::String
-    MyStruct() = new("value)
+    MyStruct() = new("value")
 end
 Base.show(io::IO, s::MyStruct) = print(io, "MyStruct($(s.attribute))")
 @testset "Job creation macro" begin
@@ -22,9 +22,12 @@ Base.show(io::IO, s::MyStruct) = print(io, "MyStruct($(s.attribute))")
 
         write("test/output_file.txt", "hello")
     end
-    
-    j = @hybrid_job Braket.SV1() include_modules="job_test_module" py_dependencies=joinpath(@__DIR__, "requirements.txt") jl_dependencies=joinpath(@__DIR__, "JobProject.toml") input_data=joinpath(@__DIR__, "requirements") my_job_func(MyStruct(), 2, d=5.0, extra_kwarg="extra_value")
-    cd(tempdir(pwd())) do
+
+    py_deps = abspath(joinpath(@__DIR__, "requirements.txt"))
+    jl_deps = abspath(joinpath(@__DIR__, "JobProject.toml"))
+    input_data = abspath(joinpath(dirname(@__DIR__), "requirements"))
+    j = @hybrid_job Braket.SV1() include_modules="job_test_module" py_dependencies=py_deps jl_dependencies=jl_deps input_data=input_data my_job_func(MyStruct(), 2, d=5.0, extra_kwarg="extra_value")
+    cd(mktempdir(pwd())) do
         j_res = download_result(j)
         res_str = read(joinpath(name(j), "test", "output_file.txt"), String)
         @test res_str == "hello"

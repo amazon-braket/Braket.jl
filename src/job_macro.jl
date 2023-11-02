@@ -21,7 +21,7 @@ function _log_hyperparameters(f_args, f_kwargs)
     return sanitized_hyperparameters 
 end
 
-matches(prefix::String) = filter(path->startswith(path, prefix), readdir(dirname(prefix)))
+matches(prefix::String) = filter(path->startswith(path, prefix), readdir(dirname(abspath(prefix))))
 is_prefix(path::String) = length(matches(path)) > 1 || ispath(path)
 is_prefix(path) = false
 function _process_input_data(input_data::Union{String, Dict})
@@ -35,11 +35,11 @@ function _process_input_data(input_data::Union{String, Dict})
             channel_arg = channel != "input" ? "channel=$channel" : ""
             @warn "Input data channels mapped to an S3 source will not be available in the working directory. Use `get_input_data_dir($channel_arg)` to read input data from S3 source inside the job container."
         elseif is_prefix(data)
-            union!(prefix_channels, channel)
+            union!(prefix_channels, [channel])
         elseif isdir(data)
-            union!(directory_channels, channel)
+            union!(directory_channels, [channel])
         else
-            union!(file_channels, channel)
+            union!(file_channels, [channel])
         end
     end
     prefix_matches = Dict(channel=>matches(input_data[channel]) for channel in prefix_channels)
@@ -162,17 +162,10 @@ if __name__ == "__main__":
 end
 
 function parse_macro_args(args)
-    device       = length(args) == 0 || occursin("=", string(args[1])) ? "" : string(args[1])
-    raw_kwargs   = length(args) == 0 || occursin("=", string(args[1])) ? string.(args) : string.(args[2:end])
-    kwarg_names  = map(kw->Symbol(split(kw, " = ")[1]), raw_kwargs)
-    kwarg_values = map(kw->eval(Meta.parse(String(split(kw, " = ")[2]))), raw_kwargs)
-    kwargs_dict  = Dict(zip(kwarg_names, kwarg_values))
-    py_dependencies = pop!(kwargs_dict, :py_dependencies, "")
-    jl_dependencies = pop!(kwargs_dict, :jl_dependencies, "")
-    as_local     = pop!(kwargs_dict, :as_local, false)
-    kwargs       = namedtuple(kwargs_dict)
-    j_opts       = JobsOptions(; kwargs...)
-    return device, j_opts, py_dependencies, jl_dependencies, as_local
+    has_device   = length(args) == 0 || occursin("=", string(args[1]))
+    device = has_device ? string(args[1]) : ""
+    raw_kwargs   = has_device ? args : args[2:end]
+    return device, raw_kwargs
 end
 
 function _process_call_args(args)
@@ -195,15 +188,16 @@ function _process_call_args(args)
     for v_ix in 1:length(new_kwargs)
         push!(code.args, :($(kw_vars[v_ix]) = $(new_kwargs[v_ix])))
     end
-    # convert the arguments, compile the function and call the kernel
+    # convert the arguments
     # while keeping the original arguments alive
     var_expressions = [splatted_args[v_ix] ? Expr(:(...), vars[v_ix]) : vars[v_ix] for v_ix in 1:length(new_args)] 
     kw_var_expressions = [kw_vars[v_ix] for v_ix in 1:length(new_kwargs)]
     return code, vars, var_expressions, kw_var_expressions
 end
 
-function jobify_f(f, job_f_types, job_f_arguments, job_f_kwargs, device, py_dependencies, jl_dependencies, as_local, j_opts)
+function jobify_f(f, job_f_types, job_f_arguments, job_f_kwargs, device; jl_dependencies="", py_dependencies="", as_local=false, include_modules="", job_opts_kwargs...)
     mktempdir(pwd(), prefix="decorator_job_") do temp_path
+        j_opts = Braket.JobsOptions(; job_opts_kwargs...)
         entry_point_file = joinpath(temp_path, "entry_point.py")
         input_data = _process_input_data(j_opts.input_data)
         f_source = code_string(f, job_f_types)
@@ -219,12 +213,12 @@ function jobify_f(f, job_f_types, job_f_arguments, job_f_kwargs, device, py_depe
         file_contents = join((input_data, serialized_f), "\n")
         write(entry_point_file, file_contents)
         if !isempty(py_dependencies)
-            cp(relpath(py_dependencies), joinpath(temp_path, "requirements.txt"))
+            cp(py_dependencies, joinpath(temp_path, "requirements.txt"))
         else
             write(joinpath(temp_path, "requirements.txt"), "juliacall")
         end
         if !isempty(jl_dependencies)
-            cp(relpath(jl_dependencies), joinpath(temp_path, "Project.toml"))
+            cp(jl_dependencies, joinpath(temp_path, "Project.toml"))
         end
         device = isempty(device) ? "local:none/none" : string(device)
         hyperparams = _log_hyperparameters(job_f_arguments, job_f_kwargs)
@@ -239,12 +233,12 @@ macro hybrid_job(args...)
     # peel apart `args`
     entry_point = args[end]
     Meta.isexpr(entry_point, :call) || throw(ArgumentError("final argument to @hybrid_job must be a function call"))
-    device, j_opts, py_dependencies, jl_dependencies, as_local = parse_macro_args(args[1:end-1])
+    device, jobify_kwargs = parse_macro_args(args[1:end-1])
     f = entry_point.args[1]
     f_args = entry_point.args[2:end]
     # need to transform f to launch as a Job
     # and transform its arguments to be properly passed to the new call
-    code, vars, var_expressions, kw_var_expressions = _process_call_args(f_args) 
+    code, vars, var_expressions, kw_var_expressions = _process_call_args(f_args)
     @gensym job_f job_f_args job_f_kwargs job_f_types wrapped_f
     # now build up the actual call
     push!(code.args,
@@ -252,7 +246,7 @@ macro hybrid_job(args...)
                 $job_f_args = ($(var_expressions...),)
                 $job_f_kwargs = ($(kw_var_expressions...),)
                 $job_f_types = tuple(map(Core.Typeof, $job_f_args)...)
-                $wrapped_f = $jobify_f($f, $job_f_types, $job_f_args, $job_f_kwargs, $device, $py_dependencies, $jl_dependencies, $as_local, $j_opts)
+                $wrapped_f = $jobify_f($f, $job_f_types, $job_f_args, $job_f_kwargs, $device; $(jobify_kwargs...))
                 $wrapped_f
             end
            )
