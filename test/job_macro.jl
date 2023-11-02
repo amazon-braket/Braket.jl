@@ -19,7 +19,7 @@ Mocking.activate()
 
     end
     @testset "Hyperparameter sanitization" for (hyperparameter, expected) in (("with\nnewline", "with newline"),
-                                                                              ("with weird chars: (&$`)", "with weird chars: {+?'}"),
+                                                                              ("with weird chars: (&\$`)", "with weird chars: {+?'}"),
                                                                               (repeat('?', 2600), repeat('?', 2477)*"..."*repeat('?', 20)))
         @test Braket._sanitize(hyperparameter) == expected
     end

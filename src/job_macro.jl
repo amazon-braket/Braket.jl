@@ -4,10 +4,10 @@ using CodeTracking
 function _sanitize(hyperparameter)
     # replace forbidden characters with close matches
     # , not technically forbidden, but to avoid mismatched parens
-    sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ", "=>"}")
+    sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}")
     # max allowed length for a hyperparameter is 2500
     # show as much as possible, including the final 20 characters
-    length(sanitized) > 2500 && return "$(sanitized[1:2500-23])...$(sanitized[end-20:end])"
+    length(sanitized) > 2500 && return "$(sanitized[1:2500-23])...$(sanitized[end-19:end])"
     return sanitized
 end
 
@@ -172,7 +172,7 @@ function parse_macro_args(args)
     as_local     = pop!(kwargs_dict, :as_local, false)
     kwargs       = namedtuple(kwargs_dict)
     j_opts       = JobsOptions(; kwargs...)
-    return device, j_opts, dependencies, as_local
+    return device, j_opts, py_dependencies, jl_dependencies, as_local
 end
 
 function _process_call_args(args)
