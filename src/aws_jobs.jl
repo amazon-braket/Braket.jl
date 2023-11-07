@@ -309,12 +309,6 @@ function download_result(j::AwsQuantumJob; extract_to=pwd(), poll_timeout_second
     return ""
 end
 
-function deserialize_values(data_dictionary::Dict{String, Any}, data_format::PersistedJobDataFormat)
-    data_format == plaintext && return data_dictionary
-    throw(ArgumentError("unpickling results not yet supported!"))
-end
-deserialize_values(data_dictionary::Dict{String, Any}, data_format::String) = deserialize_values(data_dictionary, PersistedJobDataFormatDict[data_format])
-
 function _read_and_deserialize_results(j::AwsQuantumJob, loc::String)
     try
         open(joinpath(loc, RESULTS_FILENAME), "r") do f
@@ -409,10 +403,11 @@ function _tar_and_upload(source_module_path::String, code_location::String)
 end
 
 function _process_input_data(input_data::Dict, job_name::String)
+    processed_input_data = Dict{String, Any}()
     for (k, v) in filter(x->!(x.second isa S3DataSourceConfig), input_data)
-        input_data[k] = _process_channel(v, job_name, k)
+        processed_input_data[k] = _process_channel(v, job_name, k)
     end
-    return [merge(Dict("channelName"=>k), v.config) for (k,v) in input_data] 
+    return [merge(Dict("channelName"=>k), v.config) for (k,v) in processed_input_data] 
 end
 _process_input_data(input_data, job_name::String) = _process_input_data(Dict{String, Any}("input_data"=>input_data), job_name)
 
@@ -420,6 +415,8 @@ function _process_channel(loc::String, job_name::String, channel_name::String)
     is_s3_uri(loc) && return S3DataSourceConfig(loc)
     loc_name = splitdir(loc)[2]
     s3_prefix = construct_s3_uri(default_bucket(), "jobs", job_name, "data", channel_name, loc_name)
+    @debug "Uploading input data for channel $channel_name from $loc to s3 $s3_prefix"
+    @debug "\n\n"
     upload_local_data(loc, s3_prefix)
     return S3DataSourceConfig(s3_prefix)
 end
@@ -437,6 +434,8 @@ end
 
 function prepare_quantum_job(device::String, source_module::String, j_opts::JobsOptions)
     hyperparams     = Dict(zip(keys(j_opts.hyperparameters), map(string, values(j_opts.hyperparameters))))
+    @debug "Job input data: $(j_opts.input_data)"
+    @debug "\n\n"
     input_data_list = _process_input_data(j_opts.input_data, j_opts.job_name)
     if is_s3_uri(source_module)
         _process_s3_source_module(source_module, j_opts.entry_point, j_opts.code_location)

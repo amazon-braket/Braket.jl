@@ -42,23 +42,28 @@ end
 function upload_local_data(local_prefix::String, s3_prefix::String)
     base_dir        = isabspath(local_prefix) ? joinpath(splitpath(local_prefix)[1:end-1]...) : pwd()
     relative_prefix = isabspath(local_prefix) ? relpath(local_prefix, base_dir) : local_prefix
+    @debug "Uploading local data with relative prefix $relative_prefix and base_dir $base_dir"
     isfile(relative_prefix) && return upload_to_s3(relative_prefix, s3_prefix)
     isdir(base_dir) || throw(ErrorException("uploading data $local_prefix to $s3_prefix failed!"))
     for (root, dirs, files) in walkdir(base_dir)
-        fns = String[]
+        fn_to_uri = Dict{String, String}()
         if root == base_dir
             fns = filter(x->startswith(x, relative_prefix), files)
+            for fn in fns
+                fn_to_uri[joinpath(base_dir, fn)] = replace(fn, relative_prefix=>s3_prefix)
+            end
         elseif startswith(relpath(root, base_dir), relative_prefix)
             fns = map(fn->joinpath(relpath(root, base_dir), fn), files)
+            for fn in fns
+                fn_to_uri[fn] = replace(fn, relative_prefix=>s3_prefix)
+            end
         end
-        # need to fix s3 URIs on Windows
-        foreach(fns) do fn
+        for (fn, uri) in fn_to_uri
             if !Sys.iswindows()
-                upload_to_s3(fn, replace(fn, relative_prefix=>s3_prefix))
+                @debug "Uploading $fn to S3 URI $uri"
+                upload_to_s3(fn, uri)
             else
-                s3_uri = replace(fn, relative_prefix=>s3_prefix)
-                s3_uri = replace(s3_uri, "\\"=>"/")
-                upload_to_s3(fn, s3_uri)
+                upload_to_s3(fn, replace(uri, "\\"=>"/"))
             end
         end
     end

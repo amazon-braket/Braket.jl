@@ -53,6 +53,52 @@ function retrieve_image(f::Framework, config::AWSConfig)
     return string(registry) * ".dkr.ecr.$aws_region.amazonaws.com/$tag"
 end
 
+function get_input_data_dir(channel::String="input")
+    input_dir = get(ENV, "AMZN_BRAKET_INPUT_DIR", ".")
+    return input_dir == "." ? input_dir : joinpath(input_dir, channel)
+end
+get_job_name() = get(ENV, "AMZN_BRAKET_JOB_NAME", "")
+get_job_device_arn() = get(ENV, "AMZN_BRAKET_DEVICE_ARN", "local:none/none")
+get_results_dir() = get(ENV, "AMZN_BRAKET_JOB_RESULTS_DIR", ".")
+get_checkpoint_dir() = get(ENV, "AMZN_BRAKET_CHECKPOINT_DIR", ".")
+function get_hyperparameters()
+    haskey(ENV, "AMZN_BRAKET_HP_FILE") || return Dict{String, Any}()
+    return JSON3.read(read(ENV["AMZN_BRAKET_HP_FILE"], String), Dict{String, Any}) 
+end
+
+function serialize_values(data_dictionary::Dict{String, Any}, data_format::PersistedJobDataFormat)
+    data_format == pickled_v4 && throw(ArgumentError("pickling data not yet supported!"))
+    return data_dictionary
+end
+
+function deserialize_values(data_dictionary::Dict{String, Any}, data_format::PersistedJobDataFormat)
+    data_format == plaintext && return data_dictionary
+    throw(ArgumentError("unpickling results not yet supported!"))
+end
+deserialize_values(data_dictionary::Dict{String, Any}, data_format::String) = deserialize_values(data_dictionary, PersistedJobDataFormatDict[data_format])
+
+function _load_persisted_data(filename::String="")
+    isempty(filename) && (filename = joinpath(get_results_dir(), "results.json"))
+    try    
+        return JSON3.read(read(filename, String), Dict{String, Any})
+    catch
+        return PersistedJobData(header_dict[PersistedJobData], Dict{String, Any}(), plaintext)
+    end
+end
+
+function save_job_result(result_data::Dict{String, Any}, data_format::PersistedJobDataFormat=plaintext)
+    # can't handle pickled data yet
+    current_persisted_data = _load_persisted_data()
+    current_results = deserialize_values(current_persisted_data.dataDictionary, current_persisted_data.dataFormat)
+    updated_results = merge(current_results, result_data)
+    result_path = joinpath(get_results_dir(), "results.json")
+    serialized_data = serialize_values(updated_results, data_format)
+    persisted_data = PersistedJobData(header_dict[PersistedJobData], serialized_data, data_format)
+    write(result_path, JSON3.write(persisted_data))
+    return
+end
+save_job_result(result_data, data_format::PersistedJobDataFormat=plaintext) = save_job_result(Dict{String, Any}("result"=>result_data), data_format)
+
 Base.@kwdef mutable struct JobsOptions
     entry_point::String=""
     image_uri::String=""

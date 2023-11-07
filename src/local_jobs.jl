@@ -84,7 +84,8 @@ function download_input_data(config::AWSConfig, download_dir, input_data::Dict{S
         download_path = joinpath(download_dir, channel_name, relative_key)
         if !endswith(s3_key, "/")
             mkpath(dirname(download_path))
-            s3_get_file(config, bucket, s3_key, joinpath(download_path, s3_key))
+            @debug "Getting file from S3: bucket $bucket, s3_key $s3_key, relative_key $relative_key download path $download_path"
+            s3_get_file(config, bucket, s3_key, download_path)
             found_item = true
         end
     end
@@ -97,7 +98,8 @@ function copy_input_data_list(c::LocalJobContainer, args)
     input_data_list = args[:params]["inputDataConfig"]
     mktempdir() do temp_dir
         foreach(input_data->download_input_data(c.config, temp_dir, input_data), input_data_list)
-        copy_to_container!(c, temp_dir, "/opt/ml/input/data/")
+        # add dot to copy temp_dir's CONTENTS
+        copy_to_container!(c, temp_dir * "/.", "/opt/ml/input/data/")
     end
     return !isempty(input_data_list)
 end
@@ -412,7 +414,8 @@ Copy, extract, and deserialize the results of local job `j`.
 function result(j::LocalQuantumJob; kwargs...)
     try
         raw = read(joinpath(name(j), "results.json"), String)
-        persisted_data = parse_raw_schema(raw)
+        persisted_data    = parse_raw_schema(raw)
+        @debug "Persisted data format: $(persisted_data.dataFormat)"
         deserialized_data = deserialize_values(persisted_data.dataDictionary, persisted_data.dataFormat)
         return deserialized_data
     catch
