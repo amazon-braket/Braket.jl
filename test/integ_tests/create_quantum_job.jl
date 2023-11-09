@@ -54,7 +54,7 @@ using AWS, AWSS3, Braket, JSON3, Test
                 @test occursin(data, log_data)
             end
         end
-        @test startswith(metadata(job)["failureReason"], "AlgorithmError: Job at job_test_script:start_here")
+        @test startswith(metadata(job)["failureReason"], "AlgorithmError: AssertionError, exit code: 1")
     end
     # Asserts the job is completed with the output, checkpoints, tasks and
     # script folder created in S3 for respective job. Validate the results are

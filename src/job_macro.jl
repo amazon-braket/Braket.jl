@@ -22,9 +22,10 @@ Captures the arguments and keyword arguments of
 `entry_point` as hyperparameters for the Job.
 """
 function _log_hyperparameters(f_args, f_kwargs)
-    hyperparams = Dict{String, Any}("_jl_args"=>"["*join(string.(f_args), ", ")*"]", "_jl_kwargs"=>_kwarg_to_string.(f_kwargs))
-    sanitized_hyperparameters = Dict(name=>_sanitize(param) for (name, param) in hyperparams)
-    return sanitized_hyperparameters 
+    # dummy function, as we are now using the input data JLD2 file for this 
+    hyperparams = Dict{String, Any}()
+    sanitized_hyperparameters = Dict{String, Any}(name=>_sanitize(param) for (name, param) in hyperparams)
+    return hyperparams 
 end
 
 function matches(prefix::String)
@@ -44,6 +45,7 @@ function _process_input_data(input_data::Union{String, Dict})
     prefix_channels = Set{String}()
     directory_channels = Set{String}()
     file_channels = Set{String}()
+    @debug "All input data channels: $(collect(keys(input_data)))"
     for (channel, data) in input_data
         @debug "Channel $channel, data $data"
         if is_s3_uri(string(data))
@@ -72,7 +74,9 @@ function _process_input_data(input_data::Union{String, Dict})
     @debug "Prefix matches string: $prefix_matches_str"
 
     prefix_channels_str = "{" * join(prefix_channels, ", ") * "}"
-    directory_channels_str = "{" * join(directory_channels, ", ") * "}"
+    directory_channels_str = "{" * join(["\"" * d * "\"" for d in directory_channels], ", ") * "}"
+    @debug "Directory channels: $directory_channels"
+    @debug "Directory channels string: $directory_channels_str"
     input_data_items = [(channel, relpath(input_data[channel])) for channel in filter(ch->ch∈union(prefix_channels, directory_channels, file_channels), collect(keys(input_data)))]
     @debug "Input data items: $input_data_items"
     @debug "\n\n"
@@ -113,7 +117,6 @@ function _process_input_data(input_data::Union{String, Dict})
                 else:
                     # link file source to file within input channel directory
                     input_data_path = Path(get_input_data_dir(channel), Path(data).name)
-                    print(f'Channel: {channel}, input_data_path: {input_data_path}, input_link_path: {input_link_path}')
 
                 make_link(input_link_path, input_data_path, links)
 
@@ -135,8 +138,9 @@ function _process_input_data(input_data::Union{String, Dict})
     """
 end
 
-function _serialize_function(f_name::String, f_source::String, included_pkgs::Union{String, Vector{String}}="")
-    include_list = isempty(included_pkgs) ? "JLD2, Braket" : join(vcat(included_pkgs, ["JLD2", "Braket"]), ", ")
+function _serialize_function(f_name::String, f_source::String, included_pkgs::Union{String, Vector{String}}="", included_jl_files::Union{String, Vector{String}}="")
+    using_list  = isempty(included_pkgs) ? "JLD2, Braket" : join(vcat(included_pkgs, ["JLD2", "Braket"]), ", ")
+    included_jl_files = included_jl_files isa String ? [included_jl_files] : included_jl_files
     return """
 import os
 import json
@@ -147,7 +151,12 @@ from braket.jobs_data import PersistedJobDataFormat
 
 jlPkg.activate(".")
 jlPkg.instantiate()
-jl.seval(f'using $include_list')
+jl.seval(f'using $using_list')
+
+input_file_dir = get_input_data_dir("jl_include_files")
+for fi in os.listdir(input_file_dir):
+    full_path = input_file_dir + '/' + fi
+    jl.seval(f'include("{full_path}")')
 
 # set working directory to results dir
 results_dir = get_results_dir()
@@ -187,9 +196,9 @@ if __name__ == "__main__":
 end
 
 function parse_macro_args(args)
-    has_device   = length(args) == 0 || occursin("=", string(args[1]))
-    device = has_device ? string(args[1]) : ""
-    raw_kwargs   = has_device ? args : args[2:end]
+    has_device = length(args) != 0 && occursin("=", string(args[1]))
+    device     = has_device ? string(args[1]) : ""
+    raw_kwargs = has_device ? args : args[2:end]
     return device, raw_kwargs
 end
 
@@ -220,21 +229,31 @@ function _process_call_args(args)
     return code, vars, var_expressions, kw_var_expressions
 end
 
-function jobify_f(f, job_f_types, job_f_arguments, job_f_kwargs, device; jl_dependencies="", py_dependencies="", as_local=false, include_modules="", include_jl_modules="", job_opts_kwargs...)
+function jobify_f(f, job_f_types, job_f_arguments, job_f_kwargs, device; jl_dependencies="", py_dependencies="", as_local=false, include_modules="", using_jl_pkgs="", include_jl_files="", job_opts_kwargs...)
     mktempdir(pwd(), prefix="decorator_job_") do temp_path
         j_opts = Braket.JobsOptions(; job_opts_kwargs...)
         entry_point_file = joinpath(temp_path, "entry_point.py")
         # create JLD2 file with function arguments and kwargs
         save(joinpath(temp_path, "job_f_args.jld2"), "jl_args", job_f_arguments, "jl_kwargs", Dict(kw[1]=>kw[2] for kw in job_f_kwargs))
 
+        included_jl_files_vec = include_jl_files isa String ? [include_jl_files] : include_jl_files
+        jl_files_dict = Dict{String, String}()
+        if !isempty(include_jl_files)
+            mkdir(joinpath(temp_path, "jl_input_files"))
+            for fi in included_jl_files_vec
+                dest_fi = isabspath(fi) ? basename(fi) : fi
+                cp(fi, joinpath(temp_path, "jl_input_files", dest_fi))
+            end
+            jl_files_dict["jl_include_files"] = joinpath(temp_path, "jl_input_files")
+        end
         raw_input_data = Dict{String, Any}()
         if j_opts.input_data isa String
             raw_input_data = Dict("input"=>j_opts.input_data, "jl_args"=>joinpath(temp_path, "job_f_args.jld2"))
-            j_opts.input_data = raw_input_data
         else
             raw_input_data = merge(j_opts.input_data, Dict("jl_args"=>joinpath(temp_path, "job_f_args.jld2")))
-            j_opts.input_data = raw_input_data
         end
+        merge!(raw_input_data , jl_files_dict)
+        j_opts.input_data = raw_input_data
         input_data = _process_input_data(raw_input_data)
         
         f_source = code_string(f, job_f_types)
@@ -244,7 +263,7 @@ function jobify_f(f, job_f_types, job_f_arguments, job_f_kwargs, device; jl_depe
         end
         isempty(f_source) && error("no method instance for $f found with types $job_f_types")
         f_source = String(escape_string(f_source))
-        serialized_f = _serialize_function(string(Symbol(f)), f_source, include_jl_modules)
+        serialized_f = _serialize_function(string(Symbol(f)), f_source, using_jl_pkgs, include_jl_files)
         file_contents = join((input_data, serialized_f), "\n")
         write(entry_point_file, file_contents)
         

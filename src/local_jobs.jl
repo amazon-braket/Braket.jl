@@ -71,6 +71,7 @@ function download_input_data(config::AWSConfig, download_dir, input_data::Dict{S
     s3_uri_prefix  = input_data["dataSource"]["s3DataSource"]["s3Uri"]
     bucket, prefix = parse_s3_uri(s3_uri_prefix)
     s3_keys        = collect(s3_list_keys(bucket, prefix))
+    @debug "Channel name: $channel_name, S3 URI: $s3_uri_prefix, S3 keys: $s3_keys, bucket: $bucket, prefix: $prefix, all bucket keys: $(collect(s3_list_keys(bucket)))"
     top_level      = is_s3_dir(prefix, s3_keys) ? prefix : dirname(prefix)
     top_level      = isempty(top_level) ? prefix : top_level
     found_item     = false
@@ -81,10 +82,11 @@ function download_input_data(config::AWSConfig, download_dir, input_data::Dict{S
     end
     for s3_key in s3_keys
         relative_key  = relpath(s3_key, top_level)
+        relative_key  = relative_key == "." ? basename(prefix) : relative_key
         download_path = joinpath(download_dir, channel_name, relative_key)
         if !endswith(s3_key, "/")
+            @debug "Getting file from S3: bucket $bucket, s3_key $s3_key, top level $top_level, relative_key $relative_key, download path $download_path"
             mkpath(dirname(download_path))
-            @debug "Getting file from S3: bucket $bucket, s3_key $s3_key, relative_key $relative_key download path $download_path"
             s3_get_file(config, bucket, s3_key, download_path)
             found_item = true
         end
@@ -96,6 +98,7 @@ end
 function copy_input_data_list(c::LocalJobContainer, args)
     haskey(args[:params], "inputDataConfig") || return false
     input_data_list = args[:params]["inputDataConfig"]
+    @debug "Input data list for copy: $input_data_list"
     mktempdir() do temp_dir
         foreach(input_data->download_input_data(c.config, temp_dir, input_data), input_data_list)
         # add dot to copy temp_dir's CONTENTS

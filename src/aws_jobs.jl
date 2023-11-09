@@ -186,13 +186,15 @@ function _parse_query_results(results::Vector, metric_type::String=TIMESTAMP, st
         end
         mergewith!(vcat, metrics_dict, parsed_metrics)
     end
+    @debug "results: $results, metrics_dict: $metrics_dict"
     p = sortperm(metrics_dict[sortby])
     expanded_metrics_dict = Dict{String, Vector}(sortby=>metrics_dict[sortby][p])
     for k in filter(k->k!=sortby, keys(metrics_dict))
         expanded_metrics_dict[k] = []
         for ind in expanded_metrics_dict[sortby]
             ix = findfirst(local_ind -> local_ind == ind, first.(metrics_dict[k]))
-            push!(expanded_metrics_dict[k], isnothing(ix) ? missing : last(metrics_dict[k][ix]))
+            val = popat!(metrics_dict[k], ix, (missing,))
+            push!(expanded_metrics_dict[k], last(val))
         end
     end
     return expanded_metrics_dict
@@ -403,6 +405,7 @@ function _tar_and_upload(source_module_path::String, code_location::String)
 end
 
 function _process_input_data(input_data::Dict, job_name::String)
+    @debug "_process_input_data Input data: $input_data"
     processed_input_data = Dict{String, Any}()
     for (k, v) in filter(x->!(x.second isa S3DataSourceConfig), input_data)
         processed_input_data[k] = _process_channel(v, job_name, k)
@@ -415,10 +418,10 @@ function _process_channel(loc::String, job_name::String, channel_name::String)
     is_s3_uri(loc) && return S3DataSourceConfig(loc)
     loc_name = splitdir(loc)[2]
     s3_prefix = construct_s3_uri(default_bucket(), "jobs", job_name, "data", channel_name, loc_name)
-    @debug "Uploading input data for channel $channel_name from $loc to s3 $s3_prefix"
-    @debug "\n\n"
+    @debug "Uploading input data for channel $channel_name from $loc to s3 $s3_prefix with loc_name $loc_name"
     upload_local_data(loc, s3_prefix)
-    return S3DataSourceConfig(s3_prefix)
+    suffixed_prefix = isdir(loc) ? s3_prefix * "/" : s3_prefix
+    return S3DataSourceConfig(suffixed_prefix)
 end
 
 function _get_default_jobs_role()
@@ -427,7 +430,7 @@ function _get_default_jobs_role()
     response = IAM.list_roles(params, aws_config=AWS.AWSConfig(creds=global_conf.credentials, region="us-east-1", output=global_conf.output))
     roles = response["ListRolesResult"]["Roles"]["member"]
     for role in roles
-        startswith("AmazonBraketJobsExecutionRole", role["RoleName"]) && return role["Arn"]
+        startswith(role["RoleName"], "AmazonBraketJobsExecutionRole") && return role["Arn"]
     end
     throw(ErrorException("No default jobs roles found. Please create a role using the Amazon Braket console or supply a custom role."))
 end
@@ -437,6 +440,7 @@ function prepare_quantum_job(device::String, source_module::String, j_opts::Jobs
     @debug "Job input data: $(j_opts.input_data)"
     @debug "\n\n"
     input_data_list = _process_input_data(j_opts.input_data, j_opts.job_name)
+    entry_point = j_opts.entry_point
     if is_s3_uri(source_module)
         _process_s3_source_module(source_module, j_opts.entry_point, j_opts.code_location)
     else

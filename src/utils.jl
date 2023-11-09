@@ -55,10 +55,11 @@ function upload_local_data(local_prefix::String, s3_prefix::String)
         elseif startswith(relpath(root, base_dir), relative_prefix)
             fns = map(fn->joinpath(relpath(root, base_dir), fn), files)
             for fn in fns
-                fn_to_uri[fn] = replace(fn, relative_prefix=>s3_prefix)
+                fn_to_uri[joinpath(base_dir, fn)] = replace(fn, relative_prefix=>s3_prefix)
             end
         end
         for (fn, uri) in fn_to_uri
+            @debug "$fn, is file? $(isfile(fn))"
             if !Sys.iswindows()
                 @debug "Uploading $fn to S3 URI $uri"
                 upload_to_s3(fn, uri)

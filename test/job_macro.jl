@@ -4,8 +4,29 @@ Mocking.activate()
 
 @testset "Job macro" begin
     @testset "Macro defaults" begin
-        resp_dict = Dict("jobArn"=>"arn:job/fake")
-        req_patch  = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+        resp_dict = Dict("jobArn"=>"arn:job/fake", "GetCallerIdentityResult"=>Dict("Arn"=>"fake_arn", "Account"=>"000000"), "ListRolesResult"=>Dict("Roles"=>Dict("member"=>[Dict("RoleName"=>"AmazonBraketJobsExecutionRoleFake", "Arn"=>"fake_arn")])))
+        function f(http_backend, request, response_stream)
+            if request.service == "s3"
+                xml_str = """
+                    <ListAllMyBucketsResult>
+                        <Buckets>
+                            <Bucket>
+                                <CreationDate>2000:01:01T00:00:00</CreationDate>
+                                <Name>"amazon-braket-fake_region-000000"</Name>
+                            </Bucket>
+                        </Buckets>
+                        <Owner>
+                            <DisplayName>"fake_name"</DisplayName>
+                            <ID>000000</ID>
+                        </Owner>
+                    </ListAllMyBucketsResult>
+                """
+                return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/xml"]), IOBuffer(xml_str))
+            else
+                return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+            end
+        end
+        req_patch  = @patch Braket.AWS._http_request(http_backend, request::Braket.AWS.Request, response_stream::IO; kwargs...) = f(http_backend, request, response_stream)
         apply(req_patch) do
             function my_job_func(a, b; c)
                 println(2)
