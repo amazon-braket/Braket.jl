@@ -24,7 +24,7 @@ Captures the arguments and keyword arguments of
 function _log_hyperparameters(f_args, f_kwargs)
     # dummy function, as we are now using the input data JLD2 file for this 
     hyperparams = Dict{String, String}()
-    sanitized_hyperparameters = Dict{String, String}(name=>_sanitize(param) for (name, param) in hyperparams)
+    #sanitized_hyperparameters = Dict{String, String}(name=>_sanitize(param) for (name, param) in hyperparams)
     return hyperparams 
 end
 
