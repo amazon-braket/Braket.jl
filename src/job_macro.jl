@@ -4,7 +4,7 @@ using CodeTracking, JLD2
 function _sanitize(hyperparameter::String)
     # replace forbidden characters with close matches
     # , not technically forbidden, but to avoid mismatched parens
-    if VERSION > v"1.6"
+    if VERSION >= v"1.7"
         sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}")
     else
         sanitized = copy(hyperparameter)
