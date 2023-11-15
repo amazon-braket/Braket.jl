@@ -32,12 +32,11 @@ Mocking.activate()
                 println(2)
                 return 0
             end
+            ENV["AMZN_BRAKET_OUT_S3_BUCKET"] = "fake_bucket"
             j = @hybrid_job my_job_func(0, 1, c=1)
+            delete!(ENV, "AMZN_BRAKET_OUT_S3_BUCKET")
             @test arn(j) == "arn:job/fake"
         end
-    end
-    @testset "Non-default macro options" begin
-
     end
     @testset "Hyperparameter sanitization" for (hyperparameter, expected) in (("with\nnewline", "with newline"),
                                                                               ("with weird chars: (&\$`)", "with weird chars: {+?'}"),
