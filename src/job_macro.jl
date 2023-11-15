@@ -7,7 +7,7 @@ function _sanitize(hyperparameter::String)
     if VERSION >= v"1.7"
         sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}")
     else
-        sanitized = copy(hyperparameter)
+        sanitized = deepcopy(hyperparameter)
         for pat in ["\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}"] 
             sanitized = replace(sanitized, pat)
         end
