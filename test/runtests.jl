@@ -1,7 +1,7 @@
 using Pkg, Test, Aqua, Braket
 
 in_ci = tryparse(Bool, get(ENV, "BRAKET_CI", "false"))
-Aqua.test_all(Braket, ambiguities=false, unbound_args=false, piracies=false, stale_deps=!in_ci, deps_compat=!in_ci)
+Aqua.test_all(Braket, ambiguities=false, unbound_args=false, piracies=false, stale_deps=!in_ci, deps_compat=!in_ci, persistent_tasks=false)
 Aqua.test_ambiguities(Braket)
 Aqua.test_piracies(Braket, treat_as_own=[Braket.DecFP.Dec128])
 

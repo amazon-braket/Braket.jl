@@ -283,11 +283,43 @@ mutable struct LocalQuantumJob <: Job
     end
 end
 
+function LocalQuantumJob(
+    device::String,
+    source_module::String,
+    j_opts::JobsOptions;
+    force_update::Bool=false,
+    config::AWSConfig=global_aws_config()
+    )
+    image_uri = isempty(j_opts.image_uri) ? retrieve_image(BASE, config) : j_opts.image_uri
+    args      = prepare_quantum_job(device, source_module, j_opts)
+    algo_spec = args[:algo_spec]
+    job_name  = args[:job_name]
+    ispath(job_name) && throw(ErrorException("a local directory called $job_name already exists. Please use a different job name."))
+    image_uri = haskey(algo_spec, "containerImage") ? algo_spec["containerImage"]["uri"] : retrieve_image(BASE, config)
+
+    run_log = ""
+    let local_job_container=LocalJobContainer(image_uri, args, force_update=force_update)
+        local_job_container = run_local_job!(local_job_container)
+        # copy results out
+        copy_from_container!(local_job_container, "/opt/ml/model", job_name)
+        !ispath(job_name) && mkdir(job_name)
+        write(joinpath(job_name, "log.txt"), local_job_container.run_log)
+        if haskey(args, :params) && haskey(args[:params], "checkpointConfig") && haskey(args[:params]["checkpointConfig"], "localPath")
+            checkpoint_path = args[:params]["checkpointConfig"]["localPath"]
+            copy_from_container!(local_job_container, checkpoint_path, joinpath(job_name, "checkpoints"))
+        end
+        run_log = local_job_container.run_log
+        stop_container!(local_job_container)
+    end
+    return LocalQuantumJob("local:job/$job_name", run_log=run_log)
+end
+
 """
-    LocalQuantumJob(device::String, source_module::String; kwargs...)
+    LocalQuantumJob(device::Union{String, BraketDevice}, source_module::String; kwargs...)
 
 Create and launch a `LocalQuantumJob` which will use device `device` (a managed simulator, a QPU, or an [embedded simulator](https://docs.aws.amazon.com/braket/latest/developerguide/pennylane-embedded-simulators.html))
-and will run the code (either a single file, or a Julia package, or a Python module) located at `source_module`. A *local* job
+and will run the code (either a single file, or a Julia package, or a Python module) located at `source_module`. `device` can be either the device's ARN as a `String`, or a [`BraketDevice`](@ref). 
+A *local* job
 runs *locally* on your computational resource by launching the Job container locally using `docker`. The job will block
 until it completes, replicating the `wait_until_complete` behavior of [`AwsQuantumJob`](@ref).
 
@@ -325,36 +357,6 @@ The keyword arguments `kwargs` control the launch configuration of the job.
     The default is `CheckpointConfig("/opt/jobs/checkpoints", "s3://{default_bucket_name}/jobs/{job_name}/checkpoints")`.
   - `tags::Dict{String, String}` - specifies the key-value pairs for tagging this job.
 """
-function LocalQuantumJob(
-    device::String,
-    source_module::String,
-    j_opts::JobsOptions;
-    force_update::Bool=false,
-    config::AWSConfig=global_aws_config()
-    )
-    image_uri = isempty(j_opts.image_uri) ? retrieve_image(BASE, config) : j_opts.image_uri
-    args      = prepare_quantum_job(device, source_module, j_opts)
-    algo_spec = args[:algo_spec]
-    job_name  = args[:job_name]
-    ispath(job_name) && throw(ErrorException("a local directory called $job_name already exists. Please use a different job name."))
-    image_uri = haskey(algo_spec, "containerImage") ? algo_spec["containerImage"]["uri"] : retrieve_image(BASE, config)
-
-    run_log = ""
-    let local_job_container=LocalJobContainer(image_uri, args, force_update=force_update)
-        local_job_container = run_local_job!(local_job_container)
-        # copy results out
-        copy_from_container!(local_job_container, "/opt/ml/model", job_name)
-        !ispath(job_name) && mkdir(job_name)
-        write(joinpath(job_name, "log.txt"), local_job_container.run_log)
-        if haskey(args, :params) && haskey(args[:params], "checkpointConfig") && haskey(args[:params]["checkpointConfig"], "localPath")
-            checkpoint_path = args[:params]["checkpointConfig"]["localPath"]
-            copy_from_container!(local_job_container, checkpoint_path, joinpath(job_name, "checkpoints"))
-        end
-        run_log = local_job_container.run_log
-        stop_container!(local_job_container)
-    end
-    return LocalQuantumJob("local:job/$job_name", run_log=run_log)
-end
 LocalQuantumJob(device::String, source_module::String; force_update::Bool=false, config::AWSConfig=global_aws_config(), kwargs...) = LocalQuantumJob(device, source_module, JobsOptions(; kwargs...); force_update=force_update, config=config)
 LocalQuantumJob(device::BraketDevice, source_module::String; kwargs...) = LocalQuantumJob(convert(String, device), source_module; kwargs...)
 

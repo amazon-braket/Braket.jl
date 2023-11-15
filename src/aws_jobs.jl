@@ -474,12 +474,28 @@ function prepare_quantum_job(device::String, source_module::String, j_opts::Jobs
     return (algo_spec=algo_spec, token=token, dev_conf=dev_conf, inst_conf=inst_conf, job_name=j_opts.job_name, out_conf=out_conf, role_arn=j_opts.role_arn, params=params)
 end
 
+function AwsQuantumJob(device::String, source_module::String, job_opts::JobsOptions)
+    args      = prepare_quantum_job(device, source_module, job_opts)
+    algo_spec = args[:algo_spec]
+    token     = args[:token]
+    dev_conf  = args[:dev_conf]
+    inst_conf = args[:inst_conf]
+    job_name  = args[:job_name]
+    out_conf  = args[:out_conf]
+    role_arn  = args[:role_arn]
+    params    = args[:params]
+    response  = BRAKET.create_job(algo_spec, token, dev_conf, inst_conf, job_name, out_conf, role_arn, params)
+    job       = AwsQuantumJob(response["jobArn"])
+    job_opts.wait_until_complete && logs(job, wait=true)
+    return job
+end
+
 """
-    AwsQuantumJob(device::String, source_module::String; kwargs...)
+    AwsQuantumJob(device::Union{String, BraketDevice}, source_module::String; kwargs...)
 
 Create and launch an `AwsQuantumJob` which will use device `device` (a managed simulator, a QPU, or an [embedded simulator](https://docs.aws.amazon.com/braket/latest/developerguide/pennylane-embedded-simulators.html))
 and will run the code (either a single file, or a Julia package, or a Python module) located at `source_module`. The keyword arguments
-`kwargs` control the launch configuration of the job.
+`kwargs` control the launch configuration of the job. `device` can be either the device's ARN as a `String`, or a [`BraketDevice`](@ref). 
 
 # Keyword Arguments
   - `entry_point::String` - the function to run in `source_module` if `source_module` is a Python module/Julia package. Defaults to an empty string, in which case
@@ -517,20 +533,5 @@ and will run the code (either a single file, or a Julia package, or a Python mod
     The default is `CheckpointConfig("/opt/jobs/checkpoints", "s3://{default_bucket_name}/jobs/{job_name}/checkpoints")`.
   - `tags::Dict{String, String}` - specifies the key-value pairs for tagging this job.
 """
-function AwsQuantumJob(device::String, source_module::String, job_opts::JobsOptions)
-    args      = prepare_quantum_job(device, source_module, job_opts)
-    algo_spec = args[:algo_spec]
-    token     = args[:token]
-    dev_conf  = args[:dev_conf]
-    inst_conf = args[:inst_conf]
-    job_name  = args[:job_name]
-    out_conf  = args[:out_conf]
-    role_arn  = args[:role_arn]
-    params    = args[:params]
-    response  = BRAKET.create_job(algo_spec, token, dev_conf, inst_conf, job_name, out_conf, role_arn, params)
-    job       = AwsQuantumJob(response["jobArn"])
-    job_opts.wait_until_complete && logs(job, wait=true)
-    return job
-end
 AwsQuantumJob(device::String, source_module::String; kwargs...) = AwsQuantumJob(device, source_module, JobsOptions(; kwargs...))
 AwsQuantumJob(device::BraketDevice, source_module::String; kwargs...) = AwsQuantumJob(convert(String, device), source_module, JobsOptions(; kwargs...))
