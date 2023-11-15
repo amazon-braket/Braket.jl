@@ -1,7 +1,7 @@
 using CodeTracking, JLD2
 
 """Sanitize forbidden characters from hyperparameter strings"""
-function _sanitize(hyperparameter)
+function _sanitize(hyperparameter::String)
     # replace forbidden characters with close matches
     # , not technically forbidden, but to avoid mismatched parens
     sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}")
@@ -23,8 +23,8 @@ Captures the arguments and keyword arguments of
 """
 function _log_hyperparameters(f_args, f_kwargs)
     # dummy function, as we are now using the input data JLD2 file for this 
-    hyperparams = Dict{String, Any}()
-    sanitized_hyperparameters = Dict{String, Any}(name=>_sanitize(param) for (name, param) in hyperparams)
+    hyperparams = Dict{String, String}()
+    sanitized_hyperparameters = Dict{String, String}(name=>_sanitize(param) for (name, param) in hyperparams)
     return hyperparams 
 end
 
