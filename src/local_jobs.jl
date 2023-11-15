@@ -55,7 +55,6 @@ function copy_hyperparameters(c::LocalJobContainer, args)
     mktempdir() do temp_dir
         file_path = joinpath(temp_dir, "hyperparameters.json")
         write(file_path, JSON3.write(hyperparameters))
-        write("/home/hyatkath/.julia/dev/Braket/hyperparameters.json", JSON3.write(hyperparameters))
         copy_to_container!(c, file_path, "/opt/ml/input/config/hyperparameters.json")
     end
     return true
