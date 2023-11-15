@@ -4,7 +4,14 @@ using CodeTracking, JLD2
 function _sanitize(hyperparameter::String)
     # replace forbidden characters with close matches
     # , not technically forbidden, but to avoid mismatched parens
-    sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}")
+    if VERSION > v"1.6"
+        sanitized = replace(hyperparameter, "\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}")
+    else
+        sanitized = copy(hyperparameter)
+        for pat in ["\n"=>" ", "\$"=>"?", "("=>"{", "&"=>"+", "`"=>"'", ")"=>"}"] 
+            sanitized = replace(sanitized, pat)
+        end
+    end
     # max allowed length for a hyperparameter is 2500
     # show as much as possible, including the final 20 characters
     length(sanitized) > 2500 && return "$(sanitized[1:2500-23])...$(sanitized[end-19:end])"
