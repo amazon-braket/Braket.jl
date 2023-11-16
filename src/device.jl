@@ -8,12 +8,27 @@ const _GET_DEVICES_ORDER_BY_KEYS = Set(("arn", "name", "type", "provider_name", 
 @enum AwsDeviceType SIMULATOR QPU
 const AwsDeviceTypeDict = Dict("SIMULATOR"=>SIMULATOR, "QPU"=>QPU)
 
+"""
+    BraketDevice
+
+An abstract type representing one of the devices available on Amazon Braket, which will automatically
+generate its ARN when passed to the appropriate function.
+
+# Examples
+```jldoctest
+julia> d = Braket.SV1()
+
+julia> arn(d)
+"arn:aws:braket:::device/quantum-simulator/amazon/sv1"
+```
+"""
 abstract type BraketDevice end
 for provider in (:AmazonDevice, :_XanaduDevice, :_DWaveDevice, :OQCDevice, :QuEraDevice, :IonQDevice, :RigettiDevice)
     @eval begin
         abstract type $provider <: BraketDevice end
     end
 end
+arn(d::BraketDevice) = convert(String, d)
 
 for (d, d_arn) in zip((:SV1, :DM1, :TN1), ("sv1", "dm1", "tn1"))
     @eval begin

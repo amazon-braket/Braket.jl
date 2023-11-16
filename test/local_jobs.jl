@@ -45,7 +45,12 @@ script_mode_dict = OrderedDict("s3Uri"=>"fake_uri", "entryPoint"=>"fake_entry", 
         end
         @testset "Successful input data download" begin
             args = (algo_spec=Dict("scriptModeConfig"=>script_mode_dict),
-                    params=Dict("hyperParameters"=>Dict("cool"=>"beans"), "checkpointConfig"=>Dict("localPath"=>"fake_local_path"), "inputDataConfig"=>[Dict("channelName"=>"fake_channel", "dataSource"=>Dict("s3DataSource"=>Dict("s3Uri"=>"s3://fake_bucket/fake_input")))]),
+                    params=Dict(
+                                "hyperParameters"=>Dict("cool"=>"beans"),
+                                "checkpointConfig"=>Dict("localPath"=>"fake_local_path"),
+                                "inputDataConfig"=>[Dict("channelName"=>"fake_channel",
+                                                         "dataSource"=>Dict("s3DataSource"=>Dict("s3Uri"=>"s3://fake_bucket/fake_input")))]
+                               ),
                     job_name=job_name,
                     out_conf=Dict("s3Path"=>"s3://fake_s3_bucket/fake_s3_path"),
                     dev_conf=Dict("device"=>"fake_device")
@@ -194,24 +199,29 @@ script_mode_dict = OrderedDict("s3Uri"=>"fake_uri", "entryPoint"=>"fake_entry", 
         end
         @testset "run a facsimile LocalQuantumJob" begin
             function f(http_backend, request, response_stream)
-                xml_str = """
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                        <Name>fake_bucket</Name>
-                        <Prefix>fake_channel</Prefix>
-                        <KeyCount>205</KeyCount>
-                        <MaxKeys>1000</MaxKeys>
-                        <IsTruncated>false</IsTruncated>
-                        <Contents>
-                            <Key>fake_input</Key>
-                            <LastModified>2009-10-12T17:50:30.000Z</LastModified>
-                            <ETag>"fba9dede5f27731c9771645a39863328"</ETag>
-                            <Size>434234</Size>
-                            <StorageClass>STANDARD</StorageClass>
-                        </Contents>
-                    </ListBucketResult>
-                    """
-                return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/xml"]), IOBuffer(xml_str))
+                resp_dict = Dict("ListRolesResult"=>Dict("Roles"=>Dict("member"=>[Dict("RoleName"=>"AmazonBraketJobsExecutionRolenoMemberHere", "Arn"=>"fake_job_arn")])))
+                if request.service == "s3"
+                    xml_str = """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                            <Name>fake_bucket</Name>
+                            <Prefix>fake_channel</Prefix>
+                            <KeyCount>205</KeyCount>
+                            <MaxKeys>1000</MaxKeys>
+                            <IsTruncated>false</IsTruncated>
+                            <Contents>
+                                <Key>fake_input</Key>
+                                <LastModified>2009-10-12T17:50:30.000Z</LastModified>
+                                <ETag>"fba9dede5f27731c9771645a39863328"</ETag>
+                                <Size>434234</Size>
+                                <StorageClass>STANDARD</StorageClass>
+                            </Contents>
+                        </ListBucketResult>
+                        """
+                    return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/xml"]), IOBuffer(xml_str))
+                else
+                    return Braket.AWS.Response(Braket.HTTP.Response(200, ["Content-Type"=>"application/json"]), IOBuffer(JSON3.write(resp_dict)))
+                end
             end
             req_patch  = @patch Braket.AWS._http_request(http_backend, request::Braket.AWS.Request, response_stream::IO) = f(http_backend, request, response_stream)
             apply(req_patch) do
@@ -321,7 +331,7 @@ script_mode_dict = OrderedDict("s3Uri"=>"fake_uri", "entryPoint"=>"fake_entry", 
         Braket.capture_docker_cmd(c::Cmd) = ("braket_container.py", "sadness", 1)
         apply(req_patch) do
             ljc = Braket.run_local_job!(ljc)
-            @test ljc.run_log == "successsuccesssuccesssuccessRun local job process exited with code: 1sadness"
+            @test ljc.run_log == "successsuccesssuccesssuccessbraket_container.pyRun local job process exited with code: 1sadness"
         end
         @testset "errors in copying to/from container" begin
             ljc.run_log = ""

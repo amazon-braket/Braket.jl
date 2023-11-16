@@ -1,9 +1,9 @@
 using Pkg, Test, Aqua, Braket
 
 in_ci = tryparse(Bool, get(ENV, "BRAKET_CI", "false"))
-Aqua.test_all(Braket, ambiguities=false, unbound_args=false, piracy=false, stale_deps=!in_ci, deps_compat=!in_ci)
+Aqua.test_all(Braket, ambiguities=false, unbound_args=false, piracies=false, stale_deps=!in_ci, deps_compat=!in_ci, persistent_tasks=false)
 Aqua.test_ambiguities(Braket)
-Aqua.test_piracy(Braket, treat_as_own=[Braket.DecFP.Dec128])
+Aqua.test_piracies(Braket, treat_as_own=[Braket.DecFP.Dec128])
 
 const GROUP = get(ENV, "GROUP", "Braket-unit")
 
@@ -62,6 +62,7 @@ for group in groups
             include("task.jl")
             include("task_batch.jl")
             include("local_jobs.jl")
+            include("job_macro.jl")
             include("jobs.jl")
         elseif test_type == "integ"
             include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))

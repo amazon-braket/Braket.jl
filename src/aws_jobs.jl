@@ -186,13 +186,15 @@ function _parse_query_results(results::Vector, metric_type::String=TIMESTAMP, st
         end
         mergewith!(vcat, metrics_dict, parsed_metrics)
     end
+    @debug "results: $results, metrics_dict: $metrics_dict"
     p = sortperm(metrics_dict[sortby])
     expanded_metrics_dict = Dict{String, Vector}(sortby=>metrics_dict[sortby][p])
     for k in filter(k->k!=sortby, keys(metrics_dict))
         expanded_metrics_dict[k] = []
         for ind in expanded_metrics_dict[sortby]
             ix = findfirst(local_ind -> local_ind == ind, first.(metrics_dict[k]))
-            push!(expanded_metrics_dict[k], isnothing(ix) ? missing : last(metrics_dict[k][ix]))
+            val = popat!(metrics_dict[k], ix, (missing,))
+            push!(expanded_metrics_dict[k], last(val))
         end
     end
     return expanded_metrics_dict
@@ -309,12 +311,6 @@ function download_result(j::AwsQuantumJob; extract_to=pwd(), poll_timeout_second
     return ""
 end
 
-function deserialize_values(data_dictionary::Dict{String, Any}, data_format::PersistedJobDataFormat)
-    data_format == plaintext && return data_dictionary
-    throw(ArgumentError("unpickling results not yet supported!"))
-end
-deserialize_values(data_dictionary::Dict{String, Any}, data_format::String) = deserialize_values(data_dictionary, PersistedJobDataFormatDict[data_format])
-
 function _read_and_deserialize_results(j::AwsQuantumJob, loc::String)
     try
         open(joinpath(loc, RESULTS_FILENAME), "r") do f
@@ -409,10 +405,12 @@ function _tar_and_upload(source_module_path::String, code_location::String)
 end
 
 function _process_input_data(input_data::Dict, job_name::String)
+    @debug "_process_input_data Input data: $input_data"
+    processed_input_data = Dict{String, Any}()
     for (k, v) in filter(x->!(x.second isa S3DataSourceConfig), input_data)
-        input_data[k] = _process_channel(v, job_name, k)
+        processed_input_data[k] = _process_channel(v, job_name, k)
     end
-    return [merge(Dict("channelName"=>k), v.config) for (k,v) in input_data] 
+    return [merge(Dict("channelName"=>k), v.config) for (k,v) in processed_input_data] 
 end
 _process_input_data(input_data, job_name::String) = _process_input_data(Dict{String, Any}("input_data"=>input_data), job_name)
 
@@ -420,8 +418,10 @@ function _process_channel(loc::String, job_name::String, channel_name::String)
     is_s3_uri(loc) && return S3DataSourceConfig(loc)
     loc_name = splitdir(loc)[2]
     s3_prefix = construct_s3_uri(default_bucket(), "jobs", job_name, "data", channel_name, loc_name)
+    @debug "Uploading input data for channel $channel_name from $loc to s3 $s3_prefix with loc_name $loc_name"
     upload_local_data(loc, s3_prefix)
-    return S3DataSourceConfig(s3_prefix)
+    suffixed_prefix = isdir(loc) ? s3_prefix * "/" : s3_prefix
+    return S3DataSourceConfig(suffixed_prefix)
 end
 
 function _get_default_jobs_role()
@@ -430,70 +430,72 @@ function _get_default_jobs_role()
     response = IAM.list_roles(params, aws_config=AWS.AWSConfig(creds=global_conf.credentials, region="us-east-1", output=global_conf.output))
     roles = response["ListRolesResult"]["Roles"]["member"]
     for role in roles
-        startswith("AmazonBraketJobsExecutionRole", role["RoleName"]) && return role["Arn"]
+        startswith(role["RoleName"], "AmazonBraketJobsExecutionRole") && return role["Arn"]
     end
     throw(ErrorException("No default jobs roles found. Please create a role using the Amazon Braket console or supply a custom role."))
 end
 
-function prepare_quantum_job(
-    device::String,
-    source_module::String,
-    entry_point::String,
-    image_uri::String,
-    job_name::String,
-    code_location::String,
-    role_arn::String,
-    hyperparameters::Dict{String, <:Any},
-    input_data::Union{String, Dict},
-    instance_config::InstanceConfig,
-    distribution::String,
-    stopping_condition::StoppingCondition,
-    output_data_config::OutputDataConfig,
-    copy_checkpoints_from_job::String,
-    checkpoint_config::CheckpointConfig,
-    tags::Dict{String, String},
-    )
-    hyperparams     = Dict(zip(keys(hyperparameters), map(string, values(hyperparameters))))
-    input_data_list = _process_input_data(input_data, job_name)
+function prepare_quantum_job(device::String, source_module::String, j_opts::JobsOptions)
+    hyperparams     = Dict(zip(keys(j_opts.hyperparameters), map(string, values(j_opts.hyperparameters))))
+    @debug "Job input data: $(j_opts.input_data)"
+    @debug "\n\n"
+    input_data_list = _process_input_data(j_opts.input_data, j_opts.job_name)
+    entry_point = j_opts.entry_point
     if is_s3_uri(source_module)
-        _process_s3_source_module(source_module, entry_point, code_location)
+        _process_s3_source_module(source_module, j_opts.entry_point, j_opts.code_location)
     else
-        entry_point = _process_local_source_module(source_module, entry_point, code_location)
+        entry_point = _process_local_source_module(source_module, j_opts.entry_point, j_opts.code_location)
     end
     algo_spec = Dict("scriptModeConfig"=>OrderedDict("entryPoint"=>entry_point,
-                                                     "s3Uri"=>code_location*"/source.tar.gz",
+                                                     "s3Uri"=>j_opts.code_location*"/source.tar.gz",
                                                      "compressionType"=>"GZIP"))
 
-    !isempty(image_uri) && setindex!(algo_spec, Dict("uri"=>image_uri), "containerImage")
-    if !isempty(copy_checkpoints_from_job)
-        checkpoints_to_copy = get_job(copy_checkpoints_from_job)["checkpointConfig"]["s3Uri"]
-        copy_s3_directory(checkpoints_to_copy, checkpoint_config.s3Uri)
+    !isempty(j_opts.image_uri) && setindex!(algo_spec, Dict("uri"=>j_opts.image_uri), "containerImage")
+    if !isempty(j_opts.copy_checkpoints_from_job)
+        checkpoints_to_copy = get_job(j_opts.copy_checkpoints_from_job)["checkpointConfig"]["s3Uri"]
+        copy_s3_directory(checkpoints_to_copy, j_opts.checkpoint_config.s3Uri)
     end
-    if distribution == "data_parallel"
+    if j_opts.distribution == "data_parallel"
         merge!(hyperparams, Dict("sagemaker_distributed_dataparallel_enabled"=>"true",
-                                 "sagemaker_instance_type"=>instance_config.instanceType))
+                                 "sagemaker_instance_type"=>j_opts.instance_config.instanceType))
     end
 
     params = OrderedDict(
-                  "checkpointConfig"=>Dict(checkpoint_config),
+                  "checkpointConfig"=>Dict(j_opts.checkpoint_config),
                   "hyperParameters"=>hyperparams,
                   "inputDataConfig"=>input_data_list,
-                  "stoppingCondition"=>Dict(stopping_condition),
-                  "tags"=>tags,
+                  "stoppingCondition"=>Dict(j_opts.stopping_condition),
+                  "tags"=>j_opts.tags,
                  )
     token     = string(uuid1())
     dev_conf  = Dict(DeviceConfig(device))
-    inst_conf = Dict(instance_config)
-    out_conf  = Dict(output_data_config)
-    return (algo_spec=algo_spec, token=token, dev_conf=dev_conf, inst_conf=inst_conf, job_name=job_name, out_conf=out_conf, role_arn=role_arn, params=params)
+    inst_conf = Dict(j_opts.instance_config)
+    out_conf  = Dict(j_opts.output_data_config)
+    return (algo_spec=algo_spec, token=token, dev_conf=dev_conf, inst_conf=inst_conf, job_name=j_opts.job_name, out_conf=out_conf, role_arn=j_opts.role_arn, params=params)
+end
+
+function AwsQuantumJob(device::String, source_module::String, job_opts::JobsOptions)
+    args      = prepare_quantum_job(device, source_module, job_opts)
+    algo_spec = args[:algo_spec]
+    token     = args[:token]
+    dev_conf  = args[:dev_conf]
+    inst_conf = args[:inst_conf]
+    job_name  = args[:job_name]
+    out_conf  = args[:out_conf]
+    role_arn  = args[:role_arn]
+    params    = args[:params]
+    response  = BRAKET.create_job(algo_spec, token, dev_conf, inst_conf, job_name, out_conf, role_arn, params)
+    job       = AwsQuantumJob(response["jobArn"])
+    job_opts.wait_until_complete && logs(job, wait=true)
+    return job
 end
 
 """
-    AwsQuantumJob(device::String, source_module::String; kwargs...)
+    AwsQuantumJob(device::Union{String, BraketDevice}, source_module::String; kwargs...)
 
 Create and launch an `AwsQuantumJob` which will use device `device` (a managed simulator, a QPU, or an [embedded simulator](https://docs.aws.amazon.com/braket/latest/developerguide/pennylane-embedded-simulators.html))
 and will run the code (either a single file, or a Julia package, or a Python module) located at `source_module`. The keyword arguments
-`kwargs` control the launch configuration of the job.
+`kwargs` control the launch configuration of the job. `device` can be either the device's ARN as a `String`, or a [`BraketDevice`](@ref). 
 
 # Keyword Arguments
   - `entry_point::String` - the function to run in `source_module` if `source_module` is a Python module/Julia package. Defaults to an empty string, in which case
@@ -531,39 +533,5 @@ and will run the code (either a single file, or a Julia package, or a Python mod
     The default is `CheckpointConfig("/opt/jobs/checkpoints", "s3://{default_bucket_name}/jobs/{job_name}/checkpoints")`.
   - `tags::Dict{String, String}` - specifies the key-value pairs for tagging this job.
 """
-function AwsQuantumJob(
-    device::String,
-    source_module::String;
-    entry_point::String="",
-    image_uri::String="",
-    job_name::String=_generate_default_job_name(image_uri),
-    code_location::String=construct_s3_uri(default_bucket(), "jobs", job_name, "script"),
-    role_arn::String=get(ENV, "BRAKET_JOBS_ROLE_ARN", _get_default_jobs_role()),
-    wait_until_complete::Bool=false,
-    hyperparameters::Dict{String, <:Any}=Dict{String, Any}(),
-    input_data::Union{String, Dict} = Dict(),
-    instance_config::InstanceConfig = InstanceConfig(),
-    distribution::String="",
-    stopping_condition::StoppingCondition = StoppingCondition(),
-    output_data_config::OutputDataConfig = OutputDataConfig(job_name=job_name),
-    copy_checkpoints_from_job::String="",
-    checkpoint_config::CheckpointConfig = CheckpointConfig(job_name),
-    tags::Dict{String, String}=Dict{String, String}(),
-    )
-    args      = prepare_quantum_job(device, source_module, entry_point, image_uri, job_name, code_location,
-                                    role_arn, hyperparameters, input_data, instance_config, distribution,
-                                    stopping_condition, output_data_config, copy_checkpoints_from_job, checkpoint_config, tags)
-    algo_spec = args[:algo_spec]
-    token     = args[:token]
-    dev_conf  = args[:dev_conf]
-    inst_conf = args[:inst_conf]
-    job_name  = args[:job_name]
-    out_conf  = args[:out_conf]
-    role_arn  = args[:role_arn]
-    params    = args[:params]
-    response  = BRAKET.create_job(algo_spec, token, dev_conf, inst_conf, job_name, out_conf, role_arn, params)
-    job       = AwsQuantumJob(response["jobArn"])
-    wait_until_complete && logs(job, wait=true)
-    return job
-end
-AwsQuantumJob(device::BraketDevice, source_module::String; kwargs...) = AwsQuantumJob(convert(String, device), source_module; kwargs...)
+AwsQuantumJob(device::String, source_module::String; kwargs...) = AwsQuantumJob(device, source_module, JobsOptions(; kwargs...))
+AwsQuantumJob(device::BraketDevice, source_module::String; kwargs...) = AwsQuantumJob(convert(String, device), source_module, JobsOptions(; kwargs...))

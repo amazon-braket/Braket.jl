@@ -14,4 +14,5 @@ log_metric
 metrics
 logs
 download_result
+@hybrid_job
 ```

@@ -1,9 +1,7 @@
 using Test, Aqua, Braket, Braket.AWS, PyBraket
 
-withenv("JULIA_CONDAPKG_VERBOSITY"=>"-1") do
-    Aqua.test_all(PyBraket, ambiguities=false, unbound_args=false, piracy=false)
-    Aqua.test_ambiguities(PyBraket)
-end
+Aqua.test_all(PyBraket, ambiguities=false, unbound_args=false, piracies=false, persistent_tasks=false)
+Aqua.test_ambiguities(PyBraket)
 
 function set_aws_creds(test_type)
     if test_type == "unit"

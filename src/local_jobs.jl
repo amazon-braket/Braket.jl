@@ -70,6 +70,7 @@ function download_input_data(config::AWSConfig, download_dir, input_data::Dict{S
     s3_uri_prefix  = input_data["dataSource"]["s3DataSource"]["s3Uri"]
     bucket, prefix = parse_s3_uri(s3_uri_prefix)
     s3_keys        = collect(s3_list_keys(bucket, prefix))
+    @debug "Channel name: $channel_name, S3 URI: $s3_uri_prefix, S3 keys: $s3_keys, bucket: $bucket, prefix: $prefix, all bucket keys: $(collect(s3_list_keys(bucket)))"
     top_level      = is_s3_dir(prefix, s3_keys) ? prefix : dirname(prefix)
     top_level      = isempty(top_level) ? prefix : top_level
     found_item     = false
@@ -80,10 +81,12 @@ function download_input_data(config::AWSConfig, download_dir, input_data::Dict{S
     end
     for s3_key in s3_keys
         relative_key  = relpath(s3_key, top_level)
+        relative_key  = relative_key == "." ? basename(prefix) : relative_key
         download_path = joinpath(download_dir, channel_name, relative_key)
         if !endswith(s3_key, "/")
+            @debug "Getting file from S3: bucket $bucket, s3_key $s3_key, top level $top_level, relative_key $relative_key, download path $download_path"
             mkpath(dirname(download_path))
-            s3_get_file(config, bucket, s3_key, joinpath(download_path, s3_key))
+            s3_get_file(config, bucket, s3_key, download_path)
             found_item = true
         end
     end
@@ -94,26 +97,33 @@ end
 function copy_input_data_list(c::LocalJobContainer, args)
     haskey(args[:params], "inputDataConfig") || return false
     input_data_list = args[:params]["inputDataConfig"]
+    @debug "Input data list for copy: $input_data_list"
     mktempdir() do temp_dir
         foreach(input_data->download_input_data(c.config, temp_dir, input_data), input_data_list)
-        copy_to_container!(c, temp_dir, "/opt/ml/input/data/")
+        # add dot to copy temp_dir's CONTENTS
+        copy_to_container!(c, temp_dir * "/.", "/opt/ml/input/data/")
     end
     return !isempty(input_data_list)
 end
 
 function setup_container!(c::LocalJobContainer, create_job_args)
+    @debug "Setting up container..."
     c_name = c.container_name
     # create expected paths for a Braket job to run
+    @debug "Setting up container: creating expected paths"
     proc_out, proc_err, code = capture_docker_cmd(`docker exec $c_name mkdir -p /opt/ml/model`)
     local_path = create_job_args[:params]["checkpointConfig"]["localPath"]
     proc_out, proc_err, code = capture_docker_cmd(`docker exec $c_name mkdir -p $local_path`)
 
+    @debug "Setting up container: creating environment variables"
     env_vars = Dict{String, String}()
     merge!(env_vars, get_env_creds(c.config))
     script_mode = create_job_args[:algo_spec]["scriptModeConfig"]
     merge!(env_vars, get_env_script_mode_config(script_mode))
     merge!(env_vars, get_env_defaults(c.config, create_job_args))
+    @debug "Setting up container: copying hyperparameters"
     copy_hyperparameters(c, create_job_args) && merge!(env_vars, get_env_hyperparameters())
+    @debug "Setting up container: copying input data list"
     copy_input_data_list(c, create_job_args) && merge!(env_vars, get_env_input_data())
     c.env = env_vars
     return c
@@ -122,17 +132,19 @@ end
 function run_local_job!(c::LocalJobContainer)
     code_path = c.container_code_path
     c_name    = c.container_name
+    @debug "Running local job: capturing entry point command"
     entry_point_cmd = `docker exec $c_name printenv SAGEMAKER_PROGRAM`
     entry_program, err, code = capture_docker_cmd(entry_point_cmd)
     (isnothing(entry_program) || isempty(entry_program)) && throw(ErrorException("Start program not found. The specified container is not setup to run Braket Jobs. Please see setup instructions for creating your own containers."))
     env_list  = String.(reduce(vcat, ["-e", k*"="*v] for (k,v) in c.env))
     cmd  = Cmd(["docker", "exec", "-w", String(code_path), env_list..., String(c_name), "python", String(entry_program)])
+    @debug "Running local job: running full entry point command"
     proc_out, proc_err, code = capture_docker_cmd(cmd)
     if code == 0
         c.run_log *= proc_out 
     else
         err_str = "Run local job process exited with code: $code"
-        println(proc_err)
+        c.run_log *= proc_out 
         c.run_log *= err_str * proc_err
     end
     return c
@@ -179,6 +191,7 @@ end
 function start_container!(c::LocalJobContainer, force_update::Bool)
     image_uri = c.image_uri
     get_image_name(image_uri) = capture_docker_cmd(`docker images -q $image_uri`)[1]
+    @debug "Acquiring docker image for container start"
     image_name = get_image_name(image_uri)
     if isempty(image_name) || isnothing(image_name)
         try
@@ -196,6 +209,7 @@ function start_container!(c::LocalJobContainer, force_update::Bool)
             @warn "Unable to update $(c.image_uri) with error $e"
         end
     end
+    @debug "Launching container with docker run"
     container_name, err, code = capture_docker_cmd(`docker run -d --rm $image_name tail -f /dev/null`)
     code == 0 || throw(ErrorException(err))
     c.container_name = container_name
@@ -269,11 +283,43 @@ mutable struct LocalQuantumJob <: Job
     end
 end
 
+function LocalQuantumJob(
+    device::String,
+    source_module::String,
+    j_opts::JobsOptions;
+    force_update::Bool=false,
+    config::AWSConfig=global_aws_config()
+    )
+    image_uri = isempty(j_opts.image_uri) ? retrieve_image(BASE, config) : j_opts.image_uri
+    args      = prepare_quantum_job(device, source_module, j_opts)
+    algo_spec = args[:algo_spec]
+    job_name  = args[:job_name]
+    ispath(job_name) && throw(ErrorException("a local directory called $job_name already exists. Please use a different job name."))
+    image_uri = haskey(algo_spec, "containerImage") ? algo_spec["containerImage"]["uri"] : retrieve_image(BASE, config)
+
+    run_log = ""
+    let local_job_container=LocalJobContainer(image_uri, args, force_update=force_update)
+        local_job_container = run_local_job!(local_job_container)
+        # copy results out
+        copy_from_container!(local_job_container, "/opt/ml/model", job_name)
+        !ispath(job_name) && mkdir(job_name)
+        write(joinpath(job_name, "log.txt"), local_job_container.run_log)
+        if haskey(args, :params) && haskey(args[:params], "checkpointConfig") && haskey(args[:params]["checkpointConfig"], "localPath")
+            checkpoint_path = args[:params]["checkpointConfig"]["localPath"]
+            copy_from_container!(local_job_container, checkpoint_path, joinpath(job_name, "checkpoints"))
+        end
+        run_log = local_job_container.run_log
+        stop_container!(local_job_container)
+    end
+    return LocalQuantumJob("local:job/$job_name", run_log=run_log)
+end
+
 """
-    LocalQuantumJob(device::String, source_module::String; kwargs...)
+    LocalQuantumJob(device::Union{String, BraketDevice}, source_module::String; kwargs...)
 
 Create and launch a `LocalQuantumJob` which will use device `device` (a managed simulator, a QPU, or an [embedded simulator](https://docs.aws.amazon.com/braket/latest/developerguide/pennylane-embedded-simulators.html))
-and will run the code (either a single file, or a Julia package, or a Python module) located at `source_module`. A *local* job
+and will run the code (either a single file, or a Julia package, or a Python module) located at `source_module`. `device` can be either the device's ARN as a `String`, or a [`BraketDevice`](@ref). 
+A *local* job
 runs *locally* on your computational resource by launching the Job container locally using `docker`. The job will block
 until it completes, replicating the `wait_until_complete` behavior of [`AwsQuantumJob`](@ref).
 
@@ -311,52 +357,7 @@ The keyword arguments `kwargs` control the launch configuration of the job.
     The default is `CheckpointConfig("/opt/jobs/checkpoints", "s3://{default_bucket_name}/jobs/{job_name}/checkpoints")`.
   - `tags::Dict{String, String}` - specifies the key-value pairs for tagging this job.
 """
-function LocalQuantumJob(
-    device::String,
-    source_module::String;
-    entry_point::String="",
-    image_uri::String="",
-    job_name::String=_generate_default_job_name(image_uri),
-    code_location::String=construct_s3_uri(default_bucket(), "jobs", job_name, "script"),
-    role_arn::String="",
-    wait_until_complete::Bool=false,
-    hyperparameters::Dict{String, <:Any}=Dict{String, Any}(),
-    input_data::Union{String, Dict} = Dict(),
-    instance_config::InstanceConfig = InstanceConfig(),
-    distribution::String="",
-    stopping_condition::StoppingCondition = StoppingCondition(),
-    output_data_config::OutputDataConfig = OutputDataConfig(job_name=job_name),
-    copy_checkpoints_from_job::String="",
-    checkpoint_config::CheckpointConfig = CheckpointConfig(job_name),
-    tags::Dict{String, String}=Dict{String, String}(),
-    force_update::Bool=false,
-    config::AWSConfig=global_aws_config()
-    )
-    image_uri = isempty(image_uri) ? retrieve_image(BASE, config) : image_uri
-    args      = prepare_quantum_job(device, source_module, entry_point, image_uri, job_name, code_location,
-                                    role_arn, hyperparameters, input_data, instance_config, distribution,
-                                    stopping_condition, output_data_config, copy_checkpoints_from_job, checkpoint_config, tags)
-    algo_spec = args[:algo_spec]
-    job_name  = args[:job_name]
-    ispath(job_name) && throw(ErrorException("a local directory called $job_name already exists. Please use a different job name."))
-    image_uri = haskey(algo_spec, "containerImage") ? algo_spec["containerImage"]["uri"] : retrieve_image(BASE, config)
-
-    run_log = ""
-    let local_job_container=LocalJobContainer(image_uri, args, force_update=force_update)
-        local_job_container = run_local_job!(local_job_container)
-        # copy results out
-        copy_from_container!(local_job_container, "/opt/ml/model", job_name)
-        !ispath(job_name) && mkdir(job_name)
-        write(joinpath(job_name, "log.txt"), local_job_container.run_log)
-        if haskey(args, :params) && haskey(args[:params], "checkpointConfig") && haskey(args[:params]["checkpointConfig"], "localPath")
-            checkpoint_path = args[:params]["checkpointConfig"]["localPath"]
-            copy_from_container!(local_job_container, checkpoint_path, joinpath(job_name, "checkpoints"))
-        end
-        run_log = local_job_container.run_log
-        stop_container!(local_job_container)
-    end
-    return LocalQuantumJob("local:job/$job_name", run_log=run_log)
-end
+LocalQuantumJob(device::String, source_module::String; force_update::Bool=false, config::AWSConfig=global_aws_config(), kwargs...) = LocalQuantumJob(device, source_module, JobsOptions(; kwargs...); force_update=force_update, config=config)
 LocalQuantumJob(device::BraketDevice, source_module::String; kwargs...) = LocalQuantumJob(convert(String, device), source_module; kwargs...)
 
 """
@@ -417,7 +418,8 @@ Copy, extract, and deserialize the results of local job `j`.
 function result(j::LocalQuantumJob; kwargs...)
     try
         raw = read(joinpath(name(j), "results.json"), String)
-        persisted_data = parse_raw_schema(raw)
+        persisted_data    = parse_raw_schema(raw)
+        @debug "Persisted data format: $(persisted_data.dataFormat)"
         deserialized_data = deserialize_values(persisted_data.dataDictionary, persisted_data.dataFormat)
         return deserialized_data
     catch
