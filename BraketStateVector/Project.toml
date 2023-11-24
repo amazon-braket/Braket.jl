@@ -1,0 +1,15 @@
+name = "BraketStateVector"
+uuid = "4face768-c059-465f-83fa-0d546ea16c1e"
+authors = ["Katharine Hyatt <hyatkath@amazon.com>"]
+version = "0.1.0"
+
+[deps]
+Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
+[extras]
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
