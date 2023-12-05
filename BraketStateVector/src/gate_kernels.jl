@@ -9,6 +9,7 @@ matrix_rep(g::H)  = SMatrix{2, 2}(complex((1/√2)*[1. 1.; 1. -1.]))
 matrix_rep(g::X)  = SMatrix{2, 2}(complex([0. 1.; 1. 0.]))
 matrix_rep(g::Y)  = SMatrix{2, 2}(complex([0. -im; im 0.]))
 matrix_rep(g::Z)  = SMatrix{2, 2}(complex([1. 0.; 0. -1.]))
+matrix_rep(g::I)  = SMatrix{2, 2}(complex([1. 0.; 0. 1.]))
 matrix_rep(g::V)  = SMatrix{2, 2}(0.5*[1.0+im 1.0-im; 1.0-im 1.0+im])
 matrix_rep(g::Vi) = SMatrix{2, 2}(0.5*[1.0-im 1.0+im; 1.0+im 1.0-im])
 matrix_rep(g::S)  = SMatrix{2, 2}([1. 0.; 0. im])
@@ -28,7 +29,7 @@ matrix_rep(g::ZZ) = SMatrix{4, 4}(diagm([exp(-im*g.angle[1]/2.0), exp(im*g.angle
 matrix_rep(g::ECR) = SMatrix{4, 4}([0.0 0.0 1.0 im; 0.0 0.0 im 1.0; 1.0 -im 0.0 0.0; -im 1.0 0.0 0.0])
 matrix_rep(g::Unitary) = g.matrix
 
-apply_gate!(g::I, state_vec::StateVector{T}, qubit::Int) where {T} = return
+apply_gate!(g::I, state_vec::AbstractStateVector{T}, qubit::Int) where {T} = return
 
 for (G, g00, g10, g01, g11) in ((:X, matrix_rep(X())...),
                                 (:Y, matrix_rep(Y())...),
@@ -41,7 +42,7 @@ for (G, g00, g10, g01, g11) in ((:X, matrix_rep(X())...),
                                 (:T, matrix_rep(T())...),
                                 (:Ti, matrix_rep(Ti())...))
     @eval begin
-        function apply_gate!(g::$G, state_vec::StateVector{Ty}, qubit::Int) where {Ty}
+        function apply_gate!(g::$G, state_vec::AbstractStateVector{Ty}, qubit::Int) where {Ty}
             n_amps = length(state_vec)
             nq = Int(log2(n_amps))
             endian_qubit = nq-qubit-1
@@ -64,7 +65,7 @@ for (G, cos_g, sin_g, g00, g10, g01, g11) in ((:PhaseShift, :(cos(g.angle[1])), 
                                               (:Ry, :(cos(g.angle[1]/2.0)), :(sin(g.angle[1]/2.0)), :cos_g, :sin_g, :(-sin_g), :cos_g),
                                               (:Rz, :(cos(g.angle[1]/2.0)), :(sin(g.angle[1]/2.0)), :(cos_g-im*sin_g), 0.0, 0.0, :(cos_g+im*sin_g)))
     @eval begin
-        function apply_gate!(g::$G, state_vec::StateVector{T}, qubit::Int) where {T<:Complex}
+        function apply_gate!(g::$G, state_vec::AbstractStateVector{T}, qubit::Int) where {T<:Complex}
             n_amps = length(state_vec)
             nq = Int(log2(n_amps))
             endian_qubit = nq-qubit-1
@@ -83,7 +84,7 @@ for (G, cos_g, sin_g, g00, g10, g01, g11) in ((:PhaseShift, :(cos(g.angle[1])), 
         end
     end
 end
-function apply_gate!(g::Unitary, state_vec::StateVector{T}, qubit::Int) where {T<:Complex}
+function apply_gate!(g::Unitary, state_vec::AbstractStateVector{T}, qubit::Int) where {T<:Complex}
     n_amps = length(state_vec)
     nq = Int(log2(n_amps))
     endian_qubit = nq-qubit-1
@@ -100,7 +101,7 @@ function apply_gate!(g::Unitary, state_vec::StateVector{T}, qubit::Int) where {T
 end
 
 # two-qubit non controlled unitaries
-function apply_gate!(g::G, state_vec::StateVector{T}, t1::Int, t2::Int)::StateVector{T} where {T<:Complex, G<:Union{XX, YY, XY, ZZ, ECR, Unitary}}
+function apply_gate!(g::G, state_vec::AbstractStateVector{T}, t1::Int, t2::Int)::AbstractStateVector{T} where {T<:Complex, G<:Union{XX, YY, XY, ZZ, ECR, Unitary}}
     n_amps = length(state_vec)
     nq = Int(log2(n_amps))
     endian_t1 = nq-t1-1
@@ -122,7 +123,7 @@ end
 # controlled unitaries
 for (cph, ind) in ((:CPhaseShift, :ix_11), (:CPhaseShift00, :ix_00), (:CPhaseShift01, :ix_01), (:CPhaseShift10, :ix_10))
     @eval begin
-        function apply_gate!(g::$cph, state_vec::StateVector{T}, control::Int, target::Int)::StateVector{T} where {T<:Complex}
+        function apply_gate!(g::$cph, state_vec::AbstractStateVector{T}, control::Int, target::Int)::AbstractStateVector{T} where {T<:Complex}
             n_amps = length(state_vec)
             nq     = Int(log2(n_amps))
             endian_control = nq-control-1
@@ -143,7 +144,7 @@ end
 
 for (cp, mat, g00, g10, g01, g11) in ((:CNot, :X, matrix_rep(X())...), (:CY, :Y, matrix_rep(Y())...), (:CZ, :Z, matrix_rep(Z())...), (:CV, :V, matrix_rep(V())...))
     @eval begin
-        function apply_gate!(g::$cp, state_vec::StateVector{T}, control::Int, target::Int) where {T<:Complex}
+        function apply_gate!(g::$cp, state_vec::AbstractStateVector{T}, control::Int, target::Int) where {T<:Complex}
             n_amps = length(state_vec)
             nq = Int(log2(n_amps))
             endian_control = nq-control-1
@@ -168,7 +169,7 @@ end
 
 for (sw, factor) in ((:Swap, 1.0), (:ISwap, im)) 
     @eval begin
-        function apply_gate!(g::$sw, state_vec::StateVector{T}, t1::Int, t2::Int)::StateVector{T} where {T<:Complex}
+        function apply_gate!(g::$sw, state_vec::AbstractStateVector{T}, t1::Int, t2::Int)::AbstractStateVector{T} where {T<:Complex}
             n_amps = length(state_vec)
             nq = Int(log2(n_amps))
             endian_t1 = nq-t1-1
@@ -191,7 +192,7 @@ for (sw, factor) in ((:Swap, 1.0), (:ISwap, im))
     end
 end
 
-function apply_gate!(g::PSwap, state_vec::StateVector{T}, t1::Int, t2::Int)::StateVector{T} where {T<:Complex}
+function apply_gate!(g::PSwap, state_vec::AbstractStateVector{T}, t1::Int, t2::Int)::AbstractStateVector{T} where {T<:Complex}
     n_amps = length(state_vec)
     nq = Int(log2(n_amps))
     endian_t1 = nq-t1-1
@@ -213,7 +214,7 @@ function apply_gate!(g::PSwap, state_vec::StateVector{T}, t1::Int, t2::Int)::Sta
     return state_vec
 end
 
-function apply_gate!(g::CSwap, state_vec::StateVector{T}, control::Int, t1::Int, t2::Int)::StateVector{T} where {T<:Complex}
+function apply_gate!(g::CSwap, state_vec::AbstractStateVector{T}, control::Int, t1::Int, t2::Int)::AbstractStateVector{T} where {T<:Complex}
     n_amps = length(state_vec)
     nq = Int(log2(n_amps))
     endian_control = nq-control-1
@@ -238,7 +239,7 @@ function apply_gate!(g::CSwap, state_vec::StateVector{T}, control::Int, t1::Int,
 end
 
 # doubly controlled unitaries
-function apply_gate!(g::CCNot, state_vec::StateVector{T}, c1::Int, c2::Int, target::Int)::StateVector{T} where {T<:Complex}
+function apply_gate!(g::CCNot, state_vec::AbstractStateVector{T}, c1::Int, c2::Int, target::Int)::AbstractStateVector{T} where {T<:Complex}
     n_amps = length(state_vec)
     nq = Int(log2(n_amps))
     endian_c1 = nq-c1-1
@@ -259,4 +260,35 @@ function apply_gate!(g::CCNot, state_vec::StateVector{T}, c1::Int, c2::Int, targ
         state_vec[higher_ix] = lower_amp 
     end
     return state_vec
+end
+
+# arbitrary number of targets
+function apply_gate!(g::Unitary, state_vec::AbstractStateVector{T}, ts::Int...) where {T<:Complex}
+    n_amps = length(state_vec)
+    nq = Int(log2(n_amps))
+    endian_ts  = nq - 1 .- ts
+    g_mat = g.matrix
+    ordered_ts = sort(endian_ts)
+    flip_list  = map(0:2^length(ts)-1) do t
+        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:length(ts)-1]
+        return ordered_ts[f_vals]
+    end
+    Threads.@threads :static for ix in 0:div(n_amps, 2^length(ts))-1
+        padded_ix = ix
+        for t in ordered_ts
+            padded_ix = pad_bit(padded_ix, t)
+        end
+        ixs = map(flip_list) do f
+            flipped_ix = padded_ix
+            for f_val in f
+                flipped_ix = flip_bit(flipped_ix, f_val)
+            end
+            return flipped_ix + 1
+        end
+        @views begin
+            amps = state_vec[ixs[:]]
+            state_vec[ixs[:]] = g_mat * amps
+        end
+    end
+    return
 end

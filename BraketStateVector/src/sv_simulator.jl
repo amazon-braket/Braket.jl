@@ -28,7 +28,7 @@ for (gate, obs) in ((:X, :(Braket.Observables.X)), (:Y, :(Braket.Observables.Y))
             for target in targets
                 apply_gate!($gate(), sv_copy, target)
             end
-            return sv_copy 
+            return sv_copy
         end
     end
 end
