@@ -31,8 +31,8 @@ function evolve!(dms::DensityMatrixSimulator{T}, operations::Vector{Instruction}
     for op in operations
         if op.operator isa Gate
             reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
-            apply_gate!(op.operator, reshaped_dm, op.target...)
-            apply_gate_conj!(op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
+            apply_gate!(Val(false), op.operator, reshaped_dm, op.target...)
+            apply_gate!(Val(true), op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
         elseif op.operator isa Noise
             apply_noise!(op.operator, dms.density_matrix, op.target...)
         end
@@ -131,8 +131,8 @@ function apply_observables!(dms::DensityMatrixSimulator, observables)
     dms._density_matrix_after_observables = deepcopy(dms.density_matrix)
     reshaped_dm = reshape(dms._density_matrix_after_observables, length(dms.density_matrix))
     for op in operations
-        apply_gate!(op.operator, reshaped_dm, op.target...)
-        apply_gate_conj!(op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
+        apply_gate!(Val(false), op.operator, reshaped_dm, op.target...)
+        apply_gate!(Val(true), op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
     end
     return dms
 end
