@@ -176,6 +176,7 @@ function ir(ho::HermitianObservable, target::QubitSet, ::Val{:OpenQASM}; seriali
     return "hermitian($m) $t"
 end
 Base.:(*)(o::HermitianObservable, n::Real) = HermitianObservable(Float64(n) .* o.matrix)
+Base.show(io::IO, ho::HermitianObservable) = print(io, "HermitianObservable($(size(ho.matrix)))")
 ir(ho::HermitianObservable, target::Nothing, ::Val{:OpenQASM}; kwargs...) = ir(ho, QubitSet(), Val(:OpenQASM); kwargs...)
 chars(o::HermitianObservable) = ("Hermitian",)
 

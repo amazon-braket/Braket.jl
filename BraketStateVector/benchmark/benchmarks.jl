@@ -14,7 +14,7 @@ gate_operations = pyimport("braket.default_simulator.gate_operations")
 noise_operations = pyimport("braket.default_simulator.noise_operations")
 local_sv = pyimport("braket.default_simulator.state_vector_simulation")
 local_dm = pyimport("braket.default_simulator.density_matrix_simulation")
-for n_qubits in 4:2:24
+for n_qubits in 4:2:28
     n_amps = 2^n_qubits
     angle = π/3.5
     for (gate_str, gate, py_gate) in zip(["H", "X", "Y", "Z", "V", "Vi", "T", "Ti", "S", "Si"], [H(), X(), Y(), Z(), V(), Vi(), T(), Ti(), S(), Si()], [[gate_operations.Hadamard([0])], [gate_operations.PauliX([0])], [gate_operations.PauliY([0])], [gate_operations.PauliZ([0])], [gate_operations.V([0])], [gate_operations.Vi([0])], [gate_operations.T([0])], [gate_operations.Ti([0])], [gate_operations.S([0])], [gate_operations.Si([0])]])
@@ -57,5 +57,6 @@ for n_qubits in 2:2:14
     suite["noise"]["PauliChannel"][(string(n_qubits), string(0), "Python")] = @benchmarkable py_sv.evolve([noise_operations.PauliChannel(targets=[0], probX=$prob, probY=$gamma, probZ=0.)]) setup=(py_sv = local_dm.DensityMatrixSimulation($n_qubits, 0))
 end
 tune!(suite)
-results = run(suite)
+BenchmarkTools.save("params.json", params(suite));
+results = run(suite, verbose=true)
 BenchmarkTools.save("results.json", results)

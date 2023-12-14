@@ -1,31 +1,100 @@
-calculate(sv::Braket.StateVector,   sim::AbstractSimulator) = state_vector(sim)  
-calculate(dm::Braket.DensityMatrix, sim::AbstractSimulator, targets=[]) = density_matrix(sim, targets)
+calculate(sv::Braket.StateVector, sim::AbstractSimulator) = state_vector(sim)  
 function calculate(a::Braket.Amplitude, sim::AbstractSimulator)
-    state = state_vector(sim)
-    state_ints = [sum(tryparse(Int, string(amp_state[k]))*2^(k-1) for k=1:length(amp_state)) for amp_state in a.states]
+    state      = state_vector(sim)
+    rev_states = reverse.(a.states)
+    state_ints = [sum(tryparse(Int, string(amp_state[k]))*2^(k-1) for k=1:length(amp_state)) for amp_state in rev_states]
     return Dict(basis_state=>state[state_int+1] for (basis_state, state_int) in zip(a.states, state_ints))
 end
 
-function marginal_probability(probs::Vector, qubit_count::Int, targets)
+function marginal_probability(probs::Vector{Float64}, qubit_count::Int, targets)
     unused_qubits = setdiff(collect(0:qubit_count-1), targets)
-    probs_as_tensor = reshape(probs, fill(2, qubit_count)...)
-    # must fix endian-ness!
-    endian_unused = qubit_count .- unused_qubits 
-    summed = dropdims(mapslices(sum, probs_as_tensor; dims=endian_unused); dims=tuple(endian_unused...))
-    perm = indexin(sort(targets), collect(targets)) 
-    return vec(permutedims(summed, perm))
+    endian_unused = qubit_count .- unused_qubits .- 1
+    final_probs = zeros(Float64, 2^length(targets))
+    q_combos = vcat([Int[]], collect(combinations(endian_unused)))
+    Threads.@threads for ix in 0:2^length(targets)-1
+        padded_ix = ix
+        for pad_q in sort(endian_unused)
+            padded_ix = pad_bit(padded_ix, pad_q)
+        end
+        flipped_inds = Vector{Int64}(undef, length(q_combos))
+        for (c_ix, flipped_qs) in enumerate(q_combos)
+            flipped_ix = padded_ix
+            for flip_q in flipped_qs
+                flipped_ix = flip_bit(flipped_ix, flip_q)
+            end
+            flipped_inds[c_ix] = flipped_ix + 1
+        end
+        @views begin
+            @inbounds sum_val = sum(probs[flipped_inds])
+            final_probs[ix+1] = sum_val
+        end
+    end
+    return final_probs
 end
 
-function calculate(p::Braket.Probability, sim::AbstractSimulator, targets=[])
-    probs = probabilities(sim)
-    qc = qubit_count(sim)
+function calculate(p::Braket.Probability, sim::AbstractSimulator)
+    targets = p.targets
+    probs   = probabilities(sim)
+    qc      = qubit_count(sim)
     (isempty(targets) || targets == collect(0:qc-1)) && return probs
     return marginal_probability(probs, qc, targets)
 end
 
-calculate(ex::Braket.Expectation, sim::AbstractSimulator) = expectation(sim, ex.observable, ex.targets)
+function calculate(ex::Braket.Expectation, sim::AbstractSimulator)
+    obs     = ex.observable
+    targets = isnothing(ex.targets) ? collect(0:qubit_count(sim)-1) : ex.targets
+    obs_qc  = qubit_count(obs)
+    length(targets) == obs_qc && return expectation(sim, obs, targets...)
+    return [expectation(sim, obs, target) for target in targets]
+end
+expectation_op_squared(sim, obs::Braket.Observables.StandardObservable, target::Int) = 1.0
+expectation_op_squared(sim, obs::Braket.Observables.I, target::Int)                  = 1.0
+function expectation_op_squared(sim, obs::Braket.Observables.TensorProduct, targets::Int...)
+    all(f isa Braket.Observables.StandardObservable || f isa Braket.Observables.I for f in obs.factors) && return 1.0
+    sq_factors = map(obs.factors) do f
+        (f isa Braket.Observables.StandardObservable || f isa Braket.Observables.I) && return Braket.Observables.I()
+        f isa Braket.Observables.HermitianObservable && return Braket.Observables.HermitianObservable(f.matrix * f.matrix)
+    end
+    sq_tensor_prod = Braket.Observables.TensorProduct(sq_factors)
+    return expectation(sim, sq_tensor_prod, targets...)
+end
+function expectation_op_squared(sim, obs::Braket.Observables.HermitianObservable, targets::Int...)
+    return expectation(sim, Braket.Observables.HermitianObservable(obs.matrix*obs.matrix), targets...)
+end
+
+function apply_observable(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T}
+    sv_or_dm_copy = deepcopy(sv_or_dm)
+    target_ix = 1
+    for f in observable.factors
+        f_n_qubits = qubit_count(f)
+        f_targets  = f_n_qubits == 1 ? targets[target_ix] : targets[target_ix:target_ix+f_n_qubits-1]
+        target_ix += f_n_qubits
+        sv_or_dm_copy = apply_observable(f, sv_or_dm_copy, f_targets...)
+    end
+    return sv_or_dm_copy
+end
+
 function calculate(var::Braket.Variance, sim::AbstractSimulator)
-    var2 = expectation(sim, var.observable * var.observable, var.targets)
-    mean = expectation(sim, var.observable, var.targets)
-    return var2 - mean^2
+    obs     = var.observable
+    targets = isnothing(var.targets) ? collect(0:qubit_count(sim)-1) : var.targets
+    obs_qc  = qubit_count(obs)
+    if length(targets) == obs_qc 
+        var2 = expectation_op_squared(sim, obs, targets...)
+        mean = expectation(sim, obs, targets...)
+        return var2 - mean^2
+    else
+        return map(collect(targets)) do target
+            var2 = expectation_op_squared(sim, obs, target)
+            mean = expectation(sim, obs, target)
+            return var2 - mean^2
+        end
+    end 
+end
+
+function calculate(dm::Braket.DensityMatrix, sim::AbstractSimulator)
+    ρ = density_matrix(sim)
+    full_qubits = collect(0:sim.qubit_count-1)
+    sort(dm.targets) == full_qubits || isempty(dm.targets) && return ρ
+    # otherwise must compute a partial trace
+    return partial_trace(ρ, dm.targets)
 end

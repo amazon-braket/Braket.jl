@@ -1,7 +1,7 @@
 module Braket
 
 export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTaskBatch
-export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob
+export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator
 export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
@@ -68,6 +68,9 @@ const IRType = Ref{Symbol}()
 include("tracker.jl")
 const Prices = Ref{Pricing}()
 const GlobalTrackerContext = Ref{TrackerContext}()
+abstract type BraketSimulator end
+
+const _simulator_devices = Ref{Dict}()
 
 function __init__()
     downloader = Downloads.Downloader()
@@ -77,6 +80,7 @@ function __init__()
     IRType[] = :OpenQASM
     Prices[] = Pricing([])
     GlobalTrackerContext[] = TrackerContext()
+    _simulator_devices[] = Dict()
 end
 
 """
@@ -130,6 +134,7 @@ include("noise_model.jl")
 include("ahs.jl")
 include("queue_information.jl")
 include("device.jl")
+include("local_simulator.jl")
 include("gate_applicators.jl")
 include("noise_applicators.jl")
 include("jobs.jl")

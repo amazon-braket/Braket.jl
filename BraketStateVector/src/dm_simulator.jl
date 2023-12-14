@@ -11,14 +11,28 @@ mutable struct DensityMatrixSimulator{T} <: AbstractSimulator where {T}
 end
 DensityMatrixSimulator(::T, qubit_count::Int, shots::Int) where {T} = DensityMatrixSimulator{T}(qubit_count, shots)
 DensityMatrixSimulator(qubit_count::Int, shots::Int) = DensityMatrixSimulator{ComplexF64}(qubit_count, shots)
-Braket.qubit_count(svs::DensityMatrixSimulator) = svs.qubit_count
+Braket.qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
+Braket.properties(d::DensityMatrixSimulator) = dm_props
+device_id(dms::DensityMatrixSimulator) = "braket_dm"
+Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
+Base.show(io::IO, dms::DensityMatrixSimulator) = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots)")
+
+function reinit!(dms::DensityMatrixSimulator{T}, qubit_count::Int, shots::Int) where {T}
+    dm = zeros(complex(T), 2^qubit_count, 2^qubit_count)
+    dm[1,1] = complex(1.0)
+    dms.density_matrix = dm
+    dms.qubit_count = qubit_count
+    dms.shots = shots
+    dms._density_matrix_after_observables = zeros(complex(T), 0, 0)
+    return
+end
 
 function evolve!(dms::DensityMatrixSimulator{T}, operations::Vector{Instruction}) where {T<:Complex}
     for op in operations
         if op.operator isa Gate
             reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
             apply_gate!(op.operator, reshaped_dm, op.target...)
-            apply_gate!(op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
+            apply_gate_conj!(op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
         elseif op.operator isa Noise
             apply_noise!(op.operator, dms.density_matrix, op.target...)
         end
@@ -30,20 +44,77 @@ for (gate, obs) in ((:X, :(Braket.Observables.X)), (:Y, :(Braket.Observables.Y))
     @eval begin
         function apply_observable(observable::$obs, dm::DensityMatrix{T}, targets) where {T<:Complex}
             dm_copy = deepcopy(dm)
-            reshaped_dm = reshape(dm_copy, length(dms.density_matrix))
             nq = Int(log2(size(dm, 1)))
+            reshaped_dm = reshape(dm_copy, length(dm))
             for target in targets
-                apply_gate!($gate(), dm_copy, target)
-                apply_gate!($gate(), dm_copy, nq + target)
+                apply_gate!($gate(), reshaped_dm, target)
             end
             return dm_copy
         end
     end
 end
-function apply_observable(observable::Braket.Observables.TensorProduct, dm::DensityMatrix{T}, targets) where {T<:Complex}
+#=function apply_observable(observable::Braket.Observables.HermitianObservable, dm::DensityMatrix{T}, target::Int) where {T<:Complex}
     dm_copy = deepcopy(dm)
-    for (op, target) in zip(observable.factors, targets)
-        apply_observable(op, dm_copy, target)
+    nq = Int(log2(size(dm, 1)))
+    n_amps = 2^nq
+    reshaped_dm = reshape(dm_copy, length(dm))
+    endian_qubit = nq-target-1
+    Threads.@threads for ix in 0:div(n_amps, 2)-1
+        lower_ix  = pad_bit(ix, endian_qubit)
+        higher_ix = flip_bit(lower_ix, endian_qubit) + 1
+        lower_ix += 1
+        ρ_00 = dm_copy[lower_ix, lower_ix]
+        ρ_10 = dm_copy[lower_ix, higher_ix]
+        ρ_01 = dm_copy[higher_ix, lower_ix]
+        ρ_11 = dm_copy[higher_ix, higher_ix]
+        dm_copy[lower_ix, lower_ix]   = ρ_00 * observable.matrix[1,1] + ρ_01 * observable.matrix[2,1]
+        dm_copy[lower_ix, higher_ix]  = ρ_00 * observable.matrix[1,2] + ρ_01 * observable.matrix[2,2]
+        dm_copy[higher_ix, lower_ix]  = ρ_10 * observable.matrix[1,1] + ρ_11 * observable.matrix[2,1]
+        dm_copy[higher_ix, higher_ix] = ρ_10 * observable.matrix[1,2] + ρ_11 * observable.matrix[2,2]
+    end
+    return dm_copy
+end=#
+function apply_observable(observable::Braket.Observables.HermitianObservable, dm::DensityMatrix{T}, targets::Int...) where {T<:Complex}
+    dm_copy   = deepcopy(dm)
+    nq        = Int(log2(size(dm, 1)))
+    n_amps    = 2^nq
+    ts        = collect(targets) 
+    endian_ts = nq - 1 .- ts
+    o_mat     = transpose(observable.matrix)
+    
+    ordered_ts = sort(collect(endian_ts))
+    flip_list  = map(0:2^length(ts)-1) do t
+        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:length(ts)-1]
+        return ordered_ts[f_vals]
+    end
+    slim_size = div(n_amps, 2^length(ts))
+    Threads.@threads :static for raw_ix in 0:(slim_size^2)-1
+        ix = div(raw_ix, slim_size) 
+        jx = mod(raw_ix, slim_size) 
+        padded_ix = ix
+        padded_jx = jx
+        for t in ordered_ts
+            padded_ix = pad_bit(padded_ix, t)
+            padded_jx = pad_bit(padded_jx, t)
+        end
+        ixs = map(flip_list) do f
+            flipped_ix = padded_ix
+            for f_val in f
+                flipped_ix = flip_bit(flipped_ix, f_val)
+            end
+            return flipped_ix + 1
+        end
+        jxs = map(flip_list) do f
+            flipped_jx = padded_jx
+            for f_val in f
+                flipped_jx = flip_bit(flipped_jx, f_val)
+            end
+            return flipped_jx + 1
+        end
+        @views begin
+            elems = dm[jxs[:], ixs[:]]
+            dm_copy[jxs[:], ixs[:]] = o_mat * elems
+        end
     end
     return dm_copy
 end
@@ -61,11 +132,73 @@ function apply_observables!(dms::DensityMatrixSimulator, observables)
     reshaped_dm = reshape(dms._density_matrix_after_observables, length(dms.density_matrix))
     for op in operations
         apply_gate!(op.operator, reshaped_dm, op.target...)
-        apply_gate!(op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
+        apply_gate_conj!(op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
     end
     return dms
 end
+
+function expectation(dms::DensityMatrixSimulator, observable::Observables.Observable, targets::Int...)
+    dm_copy = apply_observable(observable, dms.density_matrix, targets...)
+    return real(sum(diag(dm_copy)))
+end
 state_vector(dms::DensityMatrixSimulator)   = isdiag(dms.density_matrix) ? diag(dms.density_matrix) : error("cannot express density matrix with off-diagonal elements as a pure state.") 
 density_matrix(dms::DensityMatrixSimulator) = dms.density_matrix
-probabilities(dms::DensityMatrixSimulator) = abs.(real.(diag(dms.density_matrix)))
+probabilities(dms::DensityMatrixSimulator) = real.(diag(dms.density_matrix))
 samples(dms::DensityMatrixSimulator) = sample(0:size(dms.density_matrix, 1)-1, Weights(probabilities(dms)), dms.shots)
+
+function swap_bits(ix::Int, qubit_map::Dict{Int, Int})
+    # only flip 01 and 10
+    for (in_q, out_q) in qubit_map
+        if in_q < out_q
+            in_val  = ((1 << in_q)  & ix) >> in_q
+            out_val = ((1 << out_q) & ix) >> out_q
+            if in_val != out_val
+                ix = flip_bit(flip_bit(ix, in_q), out_q)
+            end
+        end
+    end
+    return ix
+end
+
+function partial_trace(ρ::AbstractMatrix{ComplexF64}, output_qubits=collect(0:Int(log2(size(ρ, 1)))-1))
+    isempty(output_qubits) && return sum(diag(ρ))
+    n_amps = size(ρ, 1)
+    nq = Int(log2(n_amps))
+    length(unique(output_qubits)) == nq && return ρ
+    
+    qubits        = setdiff(collect(0:nq-1), output_qubits)
+    endian_qubits = sort(nq .- qubits .- 1)
+    q_combos      = vcat([Int[]], collect(combinations(endian_qubits)))
+    final_ρ       = zeros(ComplexF64, 2^(nq-length(qubits)), 2^(nq-length(qubits)))
+    # handle possibly permuted targets
+    needs_perm           = !issorted(output_qubits)
+    final_nq             = length(output_qubits)
+    output_qubit_mapping = needs_perm ? Dict(zip(final_nq.-output_qubits.-1, final_nq.-collect(0:final_nq-1).-1)) : Dict{Int, Int}()
+    for raw_ix in 0:length(final_ρ)-1
+        ix = div(raw_ix, size(final_ρ, 1))
+        jx = mod(raw_ix, size(final_ρ, 1))
+        padded_ix = ix
+        padded_jx = jx
+        for q in endian_qubits
+            padded_ix = pad_bit(padded_ix, q)
+            padded_jx = pad_bit(padded_jx, q)
+        end
+        flipped_inds = Vector{CartesianIndex{2}}(undef, length(q_combos))
+        for (c_ix, flipped_qs) in enumerate(q_combos)
+            flipped_ix = padded_ix
+            flipped_jx = padded_jx
+            for flip_q in flipped_qs
+                flipped_ix = flip_bit(flipped_ix, flip_q)
+                flipped_jx = flip_bit(flipped_jx, flip_q)
+            end
+            flipped_inds[c_ix] = CartesianIndex{2}(flipped_ix + 1, flipped_jx + 1)
+        end
+        out_ix = needs_perm ? swap_bits(ix, output_qubit_mapping) : ix
+        out_jx = needs_perm ? swap_bits(jx, output_qubit_mapping) : jx
+        @views begin
+            @inbounds trace_val = sum(ρ[flipped_inds])
+            final_ρ[out_ix+1, out_jx+1] = trace_val
+        end
+    end
+    return final_ρ
+end

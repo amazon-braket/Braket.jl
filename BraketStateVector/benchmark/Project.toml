@@ -1,0 +1,4 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+BraketStateVector = "4face768-c059-465f-83fa-0d546ea16c1e"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"

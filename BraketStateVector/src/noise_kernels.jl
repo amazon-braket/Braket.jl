@@ -195,7 +195,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, ts::Int...) where {T}
     n_amps = size(dm, 1)
     nq = Int(log2(n_amps))
     endian_ts  = nq - 1 .- ts
-    ordered_ts = sort(endian_ts)
+    ordered_ts = sort(collect(endian_ts))
     flip_list  = map(0:2^length(ts)-1) do t
         f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:length(ts)-1]
         return ordered_ts[f_vals]
