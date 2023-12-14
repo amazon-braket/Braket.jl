@@ -20,7 +20,7 @@ end
     Braket.IRType[] = :JAQCD 
     PURE_DEVICE     = LocalSimulator("braket_sv")
     NOISE_DEVICE    = LocalSimulator("braket_dm")
-    SHOT_LIST       = (0, 20_000)
+    SHOT_LIST       = (0, 8000)
 
     get_tol(shots::Int) = return (shots > 0 ? Dict("atol"=> 0.1, "rtol"=>0.15) : Dict("atol"=>0.01, "rtol"=>0))
 

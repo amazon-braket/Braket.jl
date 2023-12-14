@@ -1,6 +1,12 @@
 using Test
 
-include("braket_integration.jl")
-include("sv_simulator.jl")
-include("dm_simulator.jl")
-include("result_types.jl")
+@testset "BraketStateVector" begin
+    for test in ("sv_simulator",
+                 "dm_simulator",
+                 "result_types",
+                 "braket_integration")
+        @testset "$test" begin
+            include(test * ".jl")
+        end
+    end
+end

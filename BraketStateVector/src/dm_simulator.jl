@@ -32,7 +32,7 @@ function evolve!(dms::DensityMatrixSimulator{T}, operations::Vector{Instruction}
         if op.operator isa Gate
             reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
             apply_gate!(Val(false), op.operator, reshaped_dm, op.target...)
-            apply_gate!(Val(true), op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
+            apply_gate!(Val(true),  op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
         elseif op.operator isa Noise
             apply_noise!(op.operator, dms.density_matrix, op.target...)
         end
@@ -177,12 +177,8 @@ function partial_trace(ρ::AbstractMatrix{ComplexF64}, output_qubits=collect(0:I
     for raw_ix in 0:length(final_ρ)-1
         ix = div(raw_ix, size(final_ρ, 1))
         jx = mod(raw_ix, size(final_ρ, 1))
-        padded_ix = ix
-        padded_jx = jx
-        for q in endian_qubits
-            padded_ix = pad_bit(padded_ix, q)
-            padded_jx = pad_bit(padded_jx, q)
-        end
+        padded_ix = pad_bits(ix, endian_qubits) 
+        padded_jx = pad_bits(jx, endian_qubits) 
         flipped_inds = Vector{CartesianIndex{2}}(undef, length(q_combos))
         for (c_ix, flipped_qs) in enumerate(q_combos)
             flipped_ix = padded_ix
