@@ -42,51 +42,19 @@ function apply_noise!(n::PhaseFlip, dm::DensityMatrix{T}, qubit::Int) where {T}
     end
 end
 
-function apply_noise!(n::Depolarizing, dm::DensityMatrix{T}, qubit::Int) where {T}
-    # K₀ = √(1.0 - n.probability) * I
-    # K₁ = √(n.probability / 3.0) * X
-    # K₂ = √(n.probability / 3.0) * Y
-    # K₃ = √(n.probability / 3.0) * Z
-    # ρ = ∑ᵢ Kᵢ ρ Kᵢ\^†
-    k = Kraus([√(1.0-n.probability) * matrix_rep(I()), √(n.probability/3.0)*matrix_rep(X()), √(n.probability/3.0)*matrix_rep(Y()), √(n.probability/3.0)*matrix_rep(Z())])
-    apply_noise!(k, dm, qubit)
-end
+# K₀ = √(1.0 - n.probability) * I
+# K₁ = √(n.probability / 3.0) * X
+# K₂ = √(n.probability / 3.0) * Y
+# K₃ = √(n.probability / 3.0) * Z
+# ρ = ∑ᵢ Kᵢ ρ Kᵢ\^†
+kraus_rep(n::Depolarizing) = Kraus([√(1.0-n.probability) * matrix_rep(I()), √(n.probability/3.0)*matrix_rep(X()), √(n.probability/3.0)*matrix_rep(Y()), √(n.probability/3.0)*matrix_rep(Z())])
 
-function apply_noise!(n::PauliChannel, dm::DensityMatrix{T}, qubit::Int) where {T}
-    I = diagm(ones(ComplexF64, 2))
-    Z = diagm(ComplexF64[1.0; -1.0])
-    X = ComplexF64[0.0 1.0; 1.0 0.0]
-    Y = ComplexF64[0.0 -im; im 0.0]
-    K0 = √(1 - n.probX - n.probY - n.probZ) * ComplexF64[1.0 0.0; 0.0 1.0]
-    K1 = √n.probX * X
-    K2 = √n.probY * Y
-    K3 = √n.probZ * Z
-    apply_noise!(Kraus([K0, K1, K2, K3]), dm, qubit)
-end
+kraus_rep(n::PauliChannel) = Kraus([√(1 - n.probX - n.probY - n.probZ) * matrix_rep(I()), √n.probX * matrix_rep(X()), √n.probY * matrix_rep(Y()), √n.probZ * matrix_rep(Z())])
+kraus_rep(n::AmplitudeDamping) = Kraus([complex([1.0 0.0; 0.0 √(1.0-n.gamma)]), complex([0.0 √n.gamma; 0.0 0.0])])
+kraus_rep(n::GeneralizedAmplitudeDamping) = Kraus([√n.probability * [1.0 0.0; 0.0 √(1.0 - n.gamma)], √n.probability * [0.0 √n.gamma; 0.0 0.0], √(1.0 - n.probability) * [√(1.0 - n.gamma) 0.0; 0.0 1.0], √(1.0 - n.probability) * [0.0 0.0; √n.gamma 0.0]])
+kraus_rep(n::PhaseDamping) = Kraus([complex([1.0 0.0; 0.0 √(1.0-n.gamma)]), complex([0.0 0.0; 0.0 √n.gamma])])
 
-function apply_noise!(n::AmplitudeDamping, dm::DensityMatrix{T}, qubit::Int) where {T}
-    K_0 = complex([1.0 0.0; 0.0 √(1.0-n.gamma)])
-    K_1 = complex([0.0 √n.gamma; 0.0 0.0])
-    k   = Kraus([K_0, K_1])
-    apply_noise!(k, dm, qubit)
-end
-
-function apply_noise!(n::GeneralizedAmplitudeDamping, dm::DensityMatrix{T}, qubit::Int) where {T}
-    K0 = √n.probability * [1.0 0.0; 0.0 √(1.0 - n.gamma)]
-    K1 = √n.probability * [0.0 √n.gamma; 0.0 0.0]
-    K2 = √(1.0 - n.probability) * [√(1.0 - n.gamma) 0.0; 0.0 1.0]
-    K3 = √(1.0 - n.probability) * [0.0 0.0; √n.gamma 0.0]
-    apply_noise!(Kraus([K0, K1, K2, K3]), dm, qubit)
-end
-
-function apply_noise!(n::PhaseDamping, dm::DensityMatrix{T}, qubit::Int) where {T}
-    K_0 = complex([1.0 0.0; 0.0 √(1.0-n.gamma)])
-    K_1 = complex([0.0 0.0; 0.0 √n.gamma])
-    k   = Kraus([K_0, K_1])
-    apply_noise!(k, dm, qubit)
-end
-
-function apply_noise!(n::TwoQubitDepolarizing, dm::DensityMatrix{T}, t1::Int, t2::Int) where {T}
+function kraus_rep(n::TwoQubitDepolarizing)
     I = diagm(ones(ComplexF64, 2))
     Z = diagm(ComplexF64[1.0; -1.0])
     X = ComplexF64[0.0 1.0; 1.0 0.0]
@@ -96,10 +64,10 @@ function apply_noise!(n::TwoQubitDepolarizing, dm::DensityMatrix{T}, t1::Int, t2
     Ks = [kron(ki, kj) for ki in ks, kj in ks]
     Ks[1] .*= √(1.0 - n.probability)
     Ks[2:end] .*= fac
-    apply_noise!(Kraus(vec(Ks)), dm, t1, t2)
+    return Kraus(vec(Ks))
 end
 
-function apply_noise!(n::TwoQubitPauliChannel, dm::DensityMatrix{T}, t1::Int, t2::Int) where {T}
+function kraus_rep(n::TwoQubitPauliChannel)
     I = diagm(ones(ComplexF64, 2))
     Z = diagm(ComplexF64[1.0; -1.0])
     X = ComplexF64[0.0 1.0; 1.0 0.0]
@@ -110,10 +78,10 @@ function apply_noise!(n::TwoQubitPauliChannel, dm::DensityMatrix{T}, t1::Int, t2
     for (k, v) in n.probabilities
         k != "II" && push!(Ks, √v * kron(k_dict[k[1]], k_dict[k[2]]))
     end
-    apply_noise!(Kraus(Ks), dm, t1, t2)
+    return Kraus(Ks)
 end
 
-function apply_noise!(n::TwoQubitDephasing, dm::DensityMatrix{T}, t1::Int, t2::Int) where {T}
+function kraus_rep(n::TwoQubitDephasing)
     # K₀ = √(1.0 - n.probability) * II 
     # K₁ = √(n.probability / 3.0) * IZ
     # K₂ = √(n.probability / 3.0) * ZI
@@ -126,8 +94,10 @@ function apply_noise!(n::TwoQubitDephasing, dm::DensityMatrix{T}, t1::Int, t2::I
     ZI = kron(Z, I)
     ZZ = kron(Z, Z)
     Ks = [√(1.0 - n.probability) * II, √(n.probability/3.0) * IZ, √(n.probability/3.0) * ZI, √(n.probability/3.0) * ZZ]
-    apply_noise!(Kraus(Ks), dm, t1, t2)
+    return Kraus(Ks)
 end
+
+apply_noise!(n::N, dm::DensityMatrix{T}, qubits::Int...) where {T, N<:Noise} = apply_noise!(kraus_rep(n), dm, qubits...)
 
 function apply_noise!(n::Kraus, dm::DensityMatrix{T}, qubit::Int) where {T}
     k_mats      = ntuple(ix->SMatrix{2, 2, ComplexF64}(n.matrices[ix]), length(n.matrices))

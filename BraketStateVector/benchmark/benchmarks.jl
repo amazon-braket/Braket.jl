@@ -56,7 +56,8 @@ for n_qubits in 2:2:14
     suite["noise"]["PauliChannel"][(string(n_qubits), string(0), "Julia")]  = @benchmarkable BraketStateVector.apply_noise!(PauliChannel($prob, $gamma, 0.), dm, 0) setup=(dm = zeros(ComplexF64, $n_amps, $n_amps))
     suite["noise"]["PauliChannel"][(string(n_qubits), string(0), "Python")] = @benchmarkable py_sv.evolve([noise_operations.PauliChannel(targets=[0], probX=$prob, probY=$gamma, probZ=0.)]) setup=(py_sv = local_dm.DensityMatrixSimulation($n_qubits, 0))
 end
-tune!(suite)
-BenchmarkTools.save("params.json", params(suite));
+#tune!(suite)
+#BenchmarkTools.save("params.json", params(suite));
+loadparams!(suite, BenchmarkTools.load("params.json")[1], :evals, :samples);
 results = run(suite, verbose=true)
 BenchmarkTools.save("results.json", results)
