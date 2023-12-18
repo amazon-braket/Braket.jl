@@ -37,13 +37,14 @@ ks = tuple(:angles, keys(nt_dict)...)
 vs = Tuple{Union{Nothing, Vector{Float64}}, values(nt_dict)...}
 inst_typ = NamedTuple{ks, vs}
 StructTypes.lowertype(::Type{Instruction}) = inst_typ
+Instruction(x::Instruction) = x
 function Instruction(x)
     sts    = merge(StructTypes.subtypes(Gate), StructTypes.subtypes(Noise), StructTypes.subtypes(CompilerDirective))
     o_type = sts[Symbol(x[:type])]
     (o_type <: CompilerDirective) && return Instruction(o_type(), Int[])
     if o_type <: AngledGate{1}
-        o_fns  = (:angles, :angle) 
-        args   = (x[:angle],)
+        o_fns  = (:angles, :angle)
+        args   = (Float64(x[:angle]),)
         op     = o_type(args)
     elseif o_type <: AngledGate{3}
         o_fns  = (:angles, :angle1, :angle2, :angle3) 

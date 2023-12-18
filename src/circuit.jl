@@ -40,8 +40,8 @@ a vector of [`Result`](@ref)s, and a vector of basis rotation instructions.
 function Circuit(m::Moments, ixs::Vector, rts::Vector{Result}, bri::Vector)
     c = Circuit()
     c.moments = deepcopy(m)
-    c.instructions = deepcopy(ixs)
-    c.basis_rotation_instructions = deepcopy(bri)
+    c.instructions = Instruction.(deepcopy(ixs))
+    c.basis_rotation_instructions = Instruction.(deepcopy(bri))
     foreach(rt->add_result_type!(c, rt), rts)
     return c
 end
