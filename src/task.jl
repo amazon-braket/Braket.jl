@@ -360,26 +360,17 @@ Base.show(io::IO, r::PhotonicModelQuantumTaskResult) = println(io, "PhotonicMode
 Base.show(io::IO, r::AnnealingQuantumTaskResult) = println(io, "AnnealingQuantumTaskResult")
 Base.show(io::IO, r::AnalogHamiltonianSimulationQuantumTaskResult) = println(io, "AnalogHamiltonianSimulationQuantumTaskResult")
 
-function measurement_counts(measurements::Vector)
-    bitstrings = String[]
-    for j in 1:length(measurements)
-        push!(bitstrings, prod(string(qi) for qi in measurements[j]))
-    end
-    return counter(bitstrings)
-end
-
-function measurement_probabilities(measurement_counts::Accumulator)
-    shots = sum(values(measurement_counts))
-    probs = Dict{String, Float64}(key=>count/shots for (key, count) in measurement_counts)
-    return probs
-end
-
+measurement_counts(measurements::Vector{Vector{Int}}) = counter(mapreduce(string, *, m) for m in measurements)
+measurement_probabilities(measurement_counts::Accumulator, shots::Int) = Dict{String, Float64}(key=>count/shots for (key, count) in measurement_counts)
 function _measurements(probs::Dict{String, Float64}, shots::Int)
-    measurements = []
+    measurements = Vector{Vector{Int}}(undef, shots)
+    m_ix = 1
     for (bitstring, prob) in probs
-        int_list = [tryparse(Int, string(b)) for b in bitstring]
-        measurement = [int_list for ii in 1:convert(Int, round(prob*shots))]
-        append!(measurements, measurement)
+        int_list    = [tryparse(Int, string(b)) for b in bitstring]
+        n_shots     = convert(Int, round(prob*shots))
+        measurement = [int_list for ii in 1:n_shots]
+        measurements[m_ix:m_ix+shots-1] = measurement[:]
+        m_ix += shots
     end
     return measurements
 end
@@ -469,7 +460,7 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     if !isnothing(r.measurements)
         measurements = convert(Vector{Vector{Int}}, r.measurements)
         m_counts = measurement_counts(measurements)
-        m_probs  = measurement_probabilities(m_counts)
+        m_probs  = measurement_probabilities(m_counts, task_mtd.shots)
         measurements_copied_from_device = true
         m_counts_copied_from_device = true
         m_probs_copied_from_device = true
@@ -524,24 +515,24 @@ function format_result(r::AnnealingTaskResult)
     solutions = convert(Vector{Vector{Int}}, r.solutions)
     values    = convert(Vector{Float64}, r.values)
     solution_counts = isnothing(r.solutionCounts) ? ones(Int, length(solutions)) : convert(Vector{Int}, r.solutionCounts)
-    n_solutions = length(solutions)
-    n_variables = length(solutions[1])
+    n_solutions  = length(solutions)
+    n_variables  = length(solutions[1])
     record_array = AxisArray(hcat(solutions, values, solution_counts), 1:n_solutions, [:solution, :value, :solution_count])
     problem_type = JSON3.read("\"$(r.additionalMetadata.action.type)\"", ProblemType)
     return AnnealingQuantumTaskResult(record_array, n_variables, problem_type, r.taskMetadata, r.additionalMetadata) 
 end
 
 function format_result(r::PhotonicModelTaskResult)
-    task_mtd = r.taskMetadata
-    addi_mtd = r.additionalMetadata
+    task_mtd     = r.taskMetadata
+    addi_mtd     = r.additionalMetadata
     measurements = !isnothing(r.measurements) ? convert(Vector{Vector{Vector{Int}}}, r.measurements) : nothing
     return PhotonicModelQuantumTaskResult(task_mtd, addi_mtd, measurements)
 end
 
 function get_measurements(r::AnalogHamiltonianSimulationTaskResult)
     meas = map(r.measurements) do m
-        status = AnalogHamiltonianSimulationShotStatusDict[lowercase(m.shotMetadata.shotStatus)]
-        pre_sequence = !isnothing(m.shotResult.preSequence) ? convert(Array{Int}, m.shotResult.preSequence) : nothing
+        status        = AnalogHamiltonianSimulationShotStatusDict[lowercase(m.shotMetadata.shotStatus)]
+        pre_sequence  = !isnothing(m.shotResult.preSequence) ? convert(Array{Int}, m.shotResult.preSequence) : nothing
         post_sequence = !isnothing(m.shotResult.postSequence) ? convert(Array{Int}, m.shotResult.postSequence) : nothing
         return ShotResult(status, pre_sequence, post_sequence)
     end
