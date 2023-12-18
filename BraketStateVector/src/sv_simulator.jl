@@ -13,9 +13,12 @@ StateVectorSimulator(::T, qubit_count::Int, shots::Int) where {T} = StateVectorS
 StateVectorSimulator(qubit_count::Int, shots::Int) = StateVectorSimulator{ComplexF64}(qubit_count, shots)
 Braket.qubit_count(svs::StateVectorSimulator) = svs.qubit_count
 Braket.properties(svs::StateVectorSimulator) = sv_props
+supported_operations(svs::StateVectorSimulator)   = sv_props.action["braket.ir.openqasm.program"].supportedOperations
+supported_result_types(svs::StateVectorSimulator) = sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
 device_id(svs::StateVectorSimulator) = "braket_sv"
 Braket.name(svs::StateVectorSimulator) = "StateVectorSimulator"
 Base.show(io::IO, svs::StateVectorSimulator) = print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots)")
+Base.copy(svs::StateVectorSimulator{T}) where {T} = StateVectorSimulator{T}(svs.qubit_count, svs.shots)
 
 function reinit!(svs::StateVectorSimulator{T}, qubit_count::Int, shots::Int) where {T}
     sv = zeros(complex(T), 2^qubit_count)
@@ -28,39 +31,45 @@ function reinit!(svs::StateVectorSimulator{T}, qubit_count::Int, shots::Int) whe
 end
 
 function evolve!(svs::StateVectorSimulator{T}, operations::Vector{Instruction}) where {T<:Complex}
-    foreach(op->apply_gate!(op.operator, svs.state_vector, op.target...), operations)
+    for (oix, op) in enumerate(operations)
+        apply_gate!(op.operator, svs.state_vector, op.target...)
+    end
     return svs
 end
 
 state_vector(svs::StateVectorSimulator)   = svs.state_vector
 density_matrix(svs::StateVectorSimulator) = kron(svs.state_vector, adjoint(svs.state_vector))
 
-for (gate, obs) in ((:X, :(Braket.Observables.X)), (:Y, :(Braket.Observables.Y)), (:Z, :(Braket.Observables.Z)), (:I, :(Braket.Observables.I)), (:H, :(Braket.Observables.H)))
+apply_observable(observable::Braket.Observables.Observable, sv::StateVector{T}, target::Int...) where {T<:Complex} = apply_observable!(observable, deepcopy(sv), target...)
+for (gate, obs) in ((:X, :(Braket.Observables.X)),
+                    (:Y, :(Braket.Observables.Y)),
+                    (:Z, :(Braket.Observables.Z)),
+                    (:I, :(Braket.Observables.I)),
+                    (:H, :(Braket.Observables.H)))
     @eval begin
-        function apply_observable(observable::$obs, sv::StateVector{T}, target::Int) where {T<:Complex}
-            sv_copy = deepcopy(sv)
-            apply_gate!($gate(), sv_copy, target)
-            return sv_copy
+        function apply_observable!(observable::$obs, sv::StateVector{T}, target::Int) where {T<:Complex}
+            apply_gate!($gate(), sv, target)
+            return sv
         end
     end
 end
-function apply_observable(observable::Braket.Observables.HermitianObservable, sv::StateVector{T}, target::Int) where {T<:Complex}
+function apply_observable!(observable::Braket.Observables.HermitianObservable, sv::StateVector{T}, target::Int) where {T<:Complex}
     n_amps  = length(sv)
-    sv_copy = zeros(T, n_amps)
     mat     = observable.matrix
     nq      = Int(log2(n_amps))
     endian_qubit = nq-target-1
     Threads.@threads for ix in 0:div(n_amps, 2)-1
-        lower_ix  = pad_bit(ix, endian_qubit)
-        higher_ix = flip_bit(lower_ix, endian_qubit) 
-        ix_pair   = [lower_ix + 1, higher_ix + 1]
-        sv_copy[ix_pair] = mat * sv[ix_pair]
+        lower_ix   = pad_bit(ix, endian_qubit)
+        higher_ix  = flip_bit(lower_ix, endian_qubit) 
+        ix_pair    = [lower_ix + 1, higher_ix + 1]
+        @views begin
+            sv[ix_pair] = mat * sv[ix_pair]
+        end
     end
-    return sv_copy
+    return sv
 end
-function apply_observable(observable::Braket.Observables.HermitianObservable, sv::StateVector{T}, t1::Int, t2::Int) where {T<:Complex}
+function apply_observable!(observable::Braket.Observables.HermitianObservable, sv::StateVector{T}, t1::Int, t2::Int) where {T<:Complex}
     n_amps    = length(sv)
-    sv_copy   = zeros(T, n_amps)
     nq        = Int(log2(n_amps))
     endian_t1 = nq-1-t1
     endian_t2 = nq-1-t2
@@ -72,15 +81,16 @@ function apply_observable(observable::Braket.Observables.HermitianObservable, sv
         ix_10   = flip_bit(ix_00, endian_t2)
         ix_01   = flip_bit(ix_00, endian_t1)
         ix_11   = flip_bit(ix_10, endian_t1)
-        ind_vec = [ix_00+1, ix_10+1, ix_01+1, ix_11+1]
-        sv_copy[ind_vec] = mat * sv[ind_vec]
+        @views begin
+            ind_vec = SVector{Int, 4}(ix_00+1, ix_10+1, ix_01+1, ix_11+1)
+            sv[ind_vec] = mat * sv[ind_vec]
+        end
     end
-    return sv_copy
+    return sv
 end
 
-function apply_observable(observable::Braket.Observables.HermitianObservable, sv::StateVector{T}, t1::Int, t2::Int, targets::Int...) where {T<:Complex}
+function apply_observable!(observable::Braket.Observables.HermitianObservable, sv::StateVector{T}, t1::Int, t2::Int, targets::Int...) where {T<:Complex}
     n_amps    = length(sv)
-    sv_copy   = zeros(T, n_amps)
     nq        = Int(log2(n_amps))
     ts        = [t1, t2, targets...]
     endian_ts = nq - 1 .- ts
@@ -91,7 +101,7 @@ function apply_observable(observable::Braket.Observables.HermitianObservable, sv
         f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:length(ts)-1]
         return ordered_ts[f_vals]
     end
-    Threads.@threads :static for ix in 0:div(n_amps, 2^length(ts))-1
+    Threads.@threads for ix in 0:div(n_amps, 2^length(ts))-1
         padded_ix = ix
         for t in ordered_ts
             padded_ix = pad_bit(padded_ix, t)
@@ -105,10 +115,10 @@ function apply_observable(observable::Braket.Observables.HermitianObservable, sv
         end
         @views begin
             amps = sv[ixs[:]]
-            sv_copy[ixs[:]] = o_mat * amps
+            sv[ixs[:]] = o_mat * amps
         end
     end
-    return sv_copy
+    return sv
 end
 
 function expectation(svs::StateVectorSimulator, observable::Observables.Observable, targets::Int...)

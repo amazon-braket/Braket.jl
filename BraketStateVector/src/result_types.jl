@@ -69,7 +69,7 @@ function apply_observable(observable::Braket.Observables.TensorProduct, sv_or_dm
         f_n_qubits = qubit_count(f)
         f_targets  = f_n_qubits == 1 ? targets[target_ix] : targets[target_ix:target_ix+f_n_qubits-1]
         target_ix += f_n_qubits
-        sv_or_dm_copy = apply_observable(f, sv_or_dm_copy, f_targets...)
+        sv_or_dm_copy = apply_observable!(f, sv_or_dm_copy, f_targets...)
     end
     return sv_or_dm_copy
 end

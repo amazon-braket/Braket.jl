@@ -82,7 +82,7 @@ end
 
 function apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where {V, G<:Gate, T<:Complex}
     n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit) 
-    Threads.@threads :static for ix in 0:div(n_amps, 2)-1
+    Threads.@threads for ix in 0:div(n_amps, 2)-1
         lower_ix   = pad_bit(ix, endian_qubit)
         higher_ix  = flip_bit(lower_ix, endian_qubit) + 1
         lower_ix  += 1
@@ -130,7 +130,7 @@ end
 function apply_controlled_gate!(::Val{V}, ::Val{1}, g::G, tg::TG, state_vec::AbstractStateVector{T}, control::Int, target::Int) where {V, G<:Gate, TG<:Gate, T<:Complex}
     n_amps, (endian_control, endian_target) = get_amps_and_qubits(state_vec, control, target) 
     small_t, big_t = minmax(endian_control, endian_target)
-    Threads.@threads :static for ix in 0:div(n_amps, 4)-1
+    Threads.@threads for ix in 0:div(n_amps, 4)-1
         ix_00 = pad_bit(pad_bit(ix, small_t), big_t)
         ix_10 = flip_bit(ix_00, endian_control)
         ix_01 = flip_bit(ix_00, endian_target)
@@ -147,7 +147,7 @@ function apply_controlled_gate!(::Val{V}, ::Val{1}, g::G, tg::TG, state_vec::Abs
     tg_mat = matrix_rep(tg)
     n_amps, (endian_control, endian_t1, endian_t2) = get_amps_and_qubits(state_vec, control, t1, t2) 
     small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
-    Threads.@threads :static for ix in 0:div(n_amps, 8)-1
+    Threads.@threads for ix in 0:div(n_amps, 8)-1
         ix_00 = flip_bit(pad_bits(ix, [small_t, mid_t, big_t]), endian_control)
         ix_10 = flip_bit(ix_00, endian_t2)
         ix_01 = flip_bit(ix_00, endian_t1)
@@ -162,7 +162,7 @@ end
 function apply_controlled_gate!(::Val{V}, ::Val{2}, g::G, tg::TG, state_vec::AbstractStateVector{T}, c1::Int, c2::Int, t::Int) where {V, G<:Gate, TG<:Gate, T<:Complex}
     n_amps, (endian_c1, endian_c2, endian_target) = get_amps_and_qubits(state_vec, c1, c2, t) 
     small_t, mid_t, big_t = sort([endian_c1, endian_c2, endian_target])
-    Threads.@threads :static for ix in 0:div(n_amps, 8)-1
+    Threads.@threads for ix in 0:div(n_amps, 8)-1
         # insert 0 at c1, 0 at c2, 0 at target
         padded_ix  = pad_bits(ix, [small_t, mid_t, big_t])
         # flip c1 and c2
@@ -194,7 +194,7 @@ function apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, ts
         f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:nq-1]
         return ordered_ts[f_vals]
     end
-    Threads.@threads :static for ix in 0:div(n_amps, 2^nq)-1
+    Threads.@threads for ix in 0:div(n_amps, 2^nq)-1
         padded_ix = pad_bits(ix, ordered_ts)
         ixs = SVector{2^nq, Int}([flip_bits(padded_ix, f) + 1 for f in flip_list])
         @views begin 

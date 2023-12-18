@@ -7,7 +7,7 @@ function apply_noise!(n::BitFlip, dm::DensityMatrix{T}, qubit::Int) where {T}
     endian_qubit = nq-qubit-1
     k0_mat = SMatrix{2, 2, ComplexF64}(√(1.0 - n.probability), 0.0, 0.0, √(1.0 - n.probability))
     k1_mat = SMatrix{2, 2, ComplexF64}(0.0, √n.probability, √n.probability, 0.0)
-    Threads.@threads :static for ix in 0:div(n_amps, 2)-1
+    Threads.@threads for ix in 0:div(n_amps, 2)-1
         lower_ix   = pad_bit(ix, endian_qubit)
         higher_ix  = flip_bit(lower_ix, endian_qubit) + 1
         lower_ix  += 1
@@ -32,7 +32,7 @@ function apply_noise!(n::PhaseFlip, dm::DensityMatrix{T}, qubit::Int) where {T}
     n_amps = size(dm, 1)
     nq = Int(log2(n_amps))
     endian_qubit = nq-qubit-1
-    Threads.@threads :static for idx in 0:length(dm)-1
+    Threads.@threads for idx in 0:length(dm)-1
         ix    = mod(idx, n_amps)
         jx    = div(idx, n_amps)
         i_val = ((1 << endian_qubit) & ix) >> endian_qubit
@@ -106,7 +106,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, qubit::Int) where {T}
     n_amps = size(dm, 1)
     nq = Int(log2(n_amps))
     endian_qubit = nq-qubit-1
-    Threads.@threads :static for ix in 0:div(n_amps, 2)-1
+    Threads.@threads for ix in 0:div(n_amps, 2)-1
         # maybe not diagonal
         lower_ix   = pad_bit(ix, endian_qubit)
         higher_ix  = flip_bit(lower_ix, endian_qubit) + 1
@@ -138,7 +138,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, t1::Int, t2::Int) where {T
     endian_t1 = nq-t1-1
     endian_t2 = nq-t2-1
     small_t, big_t = minmax(endian_t1, endian_t2)
-    Threads.@threads :static for ix in 0:div(n_amps, 4)-1
+    Threads.@threads for ix in 0:div(n_amps, 4)-1
         # maybe not diagonal
         padded_ix  = pad_bit(pad_bit(ix, small_t), big_t)
         ix_00 = padded_ix + 1
@@ -170,7 +170,7 @@ function apply_noise!(n::Kraus, dm::DensityMatrix{T}, ts::Int...) where {T}
         f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:length(ts)-1]
         return ordered_ts[f_vals]
     end
-    Threads.@threads :static for ix in 0:div(n_amps, 2^length(ts))-1
+    Threads.@threads for ix in 0:div(n_amps, 2^length(ts))-1
         padded_ix = ix
         for t in ordered_ts
             padded_ix = pad_bit(padded_ix, t)

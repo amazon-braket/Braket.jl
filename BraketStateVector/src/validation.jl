@@ -70,8 +70,11 @@ function _validate_result_types_qubits_exist(result_types::Vector, qubit_count::
     return
 end
 
-function _validate_operation_qubits(operations)
-    all_targets = [collect(op.target) for op in operations]
+function _validate_operation_qubits(operations::Vector{Instruction})
+    all_targets = []
+    for op in operations
+        push!(all_targets, collect(op.target))
+    end
     qubits_referenced = unique(reduce(vcat, all_targets))
     maximum(qubits_referenced) >= length(qubits_referenced) && throw("Non-contiguous qubit indices supplied; qubit indices in a circuit must be contiguous.")
     return

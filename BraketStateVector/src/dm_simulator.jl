@@ -13,9 +13,12 @@ DensityMatrixSimulator(::T, qubit_count::Int, shots::Int) where {T} = DensityMat
 DensityMatrixSimulator(qubit_count::Int, shots::Int) = DensityMatrixSimulator{ComplexF64}(qubit_count, shots)
 Braket.qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
 Braket.properties(d::DensityMatrixSimulator) = dm_props
+supported_operations(d::DensityMatrixSimulator)   = dm_props.action["braket.ir.openqasm.program"].supportedOperations
+supported_result_types(d::DensityMatrixSimulator) = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
 device_id(dms::DensityMatrixSimulator) = "braket_dm"
 Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
 Base.show(io::IO, dms::DensityMatrixSimulator) = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots)")
+Base.copy(dms::DensityMatrixSimulator{T}) where {T} = DensityMatrixSimulator{T}(dms.qubit_count, dms.shots)
 
 function reinit!(dms::DensityMatrixSimulator{T}, qubit_count::Int, shots::Int) where {T}
     dm = zeros(complex(T), 2^qubit_count, 2^qubit_count)
@@ -88,7 +91,7 @@ function apply_observable(observable::Braket.Observables.HermitianObservable, dm
         return ordered_ts[f_vals]
     end
     slim_size = div(n_amps, 2^length(ts))
-    Threads.@threads :static for raw_ix in 0:(slim_size^2)-1
+    Threads.@threads for raw_ix in 0:(slim_size^2)-1
         ix = div(raw_ix, slim_size) 
         jx = mod(raw_ix, slim_size) 
         padded_ix = ix
