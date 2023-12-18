@@ -432,24 +432,51 @@ function _calculate_for_targets(measurements, measured_qubits, targets, ::Val{:p
     return probabilities
 end
 
+function _reconstruct_observable(obs::AbstractVector{String})
+    length(obs) == 1 && return _reconstruct_observable(String(obs[1]))
+    return Observables.TensorProduct([String(o) for o in obs])
+end
+
+function _reconstruct_observable(obs::String)
+    obs == "x" && return Observables.X()
+    obs == "y" && return Observables.Y()
+    obs == "z" && return Observables.Z()
+    obs == "i" && return Observables.I()
+    obs == "h" && return Observables.H()
+end
+function _reconstruct_observable(obs::AbstractVector{T}) where {T}
+    try
+        return Observables.HermitianObservable(convert(Vector{Vector{Vector{eltype(obs)}}}, obs))
+    catch
+        return Observables.TensorProduct([_reconstruct_observable(o) for o in obs])
+    end
+end
+
+_get_result_type(::Val{:expectation}) = IR.Expectation
+_get_result_type(::Val{:variance})    = IR.Variance
+_get_result_type(::Val{:sample})      = IR.Sample
+
 function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{Int})
-    result_types = ResultTypeValue[]
-    (!haskey(ir_obj, "results") || isnothing(ir_obj["results"])) && return result_types
-    for result_type in ir_obj["results"]
+    (!haskey(ir_obj, "results") || isnothing(ir_obj["results"])) && return ResultTypeValue[]
+    result_types = Vector{ResultTypeValue}(undef, length(ir_obj["results"]))
+    for (r_ix, result_type) in enumerate(ir_obj["results"])
         ir_obs = get(result_type, "observable", nothing)
-        rt     = JSON3.read(JSON3.write(result_type), AbstractProgramResult)
-        obs    = isnothing(ir_obs) ? nothing : StructTypes.constructfrom(Observables.Observable, rt.observable)
-        targs  = rt.targets
-        typ    = result_type["type"]
+        typ    = String(result_type["type"])
+        typ    ∉ ["probability", "sample", "expectation", "variance"] && throw(ErrorException("unknown result type $typ"))
+        targs  = [t for t in result_type["targets"]]
+        start  = time()
         if typ == "probability"
             val = _calculate_for_targets(measurements, measured_qubits, targs, Val(Symbol(typ)))
-            push!(result_types, ResultTypeValue(rt, val))
+            result_types[r_ix] = ResultTypeValue(IR.Probability(targs, "probability"), val)
         elseif typ ∈ ["sample", "expectation", "variance"]
-            val = _calculate_for_targets(measurements, measured_qubits, obs, targs, Val(Symbol(typ)))
-            push!(result_types, ResultTypeValue(rt, val))
-        else
-            throw(ErrorException("unknown result type $typ"))
+            obs    = _reconstruct_observable(result_type["observable"])
+            rt_typ = _get_result_type(Val(Symbol(typ)))
+            rt     = rt_typ(ir(obs, Val(:JAQCD)), targs, typ)
+            val    = _calculate_for_targets(measurements, measured_qubits, obs, targs, Val(Symbol(typ)))
+            result_types[r_ix] = ResultTypeValue(rt, val)
         end
+        stop = time()
+        @debug "\tTime to calculate result type $typ: $(stop-start)"
     end
     return result_types
 end
