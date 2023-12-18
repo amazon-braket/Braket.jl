@@ -457,27 +457,34 @@ end
 function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::GateModelTaskResult)
     task_mtd = r.taskMetadata
     addl_mtd = r.additionalMetadata
+    start = time()
     if !isnothing(r.measurements)
         measurements = convert(Vector{Vector{Int}}, r.measurements)
         m_counts = measurement_counts(measurements)
         m_probs  = measurement_probabilities(m_counts, task_mtd.shots)
         measurements_copied_from_device = true
-        m_counts_copied_from_device = true
-        m_probs_copied_from_device = true
+        m_counts_copied_from_device     = true
+        m_probs_copied_from_device      = true
     elseif !isnothing(r.measurementProbabilities)
-        shots = task_mtd.shots
-        m_probs  = r.measurementProbabilities
+        shots        = task_mtd.shots
+        m_probs      = r.measurementProbabilities
         measurements = _measurements(m_probs, shots)
-        m_counts = measurement_counts(measurements) 
+        m_counts     = measurement_counts(measurements)
         measurements_copied_from_device = false
-        m_counts_copied_from_device = false
-        m_probs_copied_from_device = true
+        m_counts_copied_from_device     = false
+        m_probs_copied_from_device      = true
     else
         throw(ErrorException("One of `measurements` or `measurementProbabilities` must be populated in the result object."))
     end
+    stop = time()
+    @debug "Time to fill in measurements and probabilities: $(stop-start)."
     measured_qubits = r.measuredQubits
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
-        result_types = calculate_result_types(JSON3.read(JSON3.write(addl_mtd.action)), measurements, measured_qubits)
+        act = JSON3.read(JSON3.write(addl_mtd.action))
+        start = time()
+        result_types = calculate_result_types(act, measurements, measured_qubits)
+        stop = time()
+        @debug "Time to calculate result types: $(stop-start)."
     else
         if !isempty(r.resultTypes) && !isnothing(r.resultTypes[1])
             json_ = Dict("results"=>[rt.type for rt in r.resultTypes])
