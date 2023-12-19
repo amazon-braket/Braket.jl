@@ -59,7 +59,6 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
 end
 
 function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
-    #simulator = d._delegate
     #=if haskey(properties(simulator).action, "braket.ir.openqasm.program")
         validate_circuit_and_shots(circuit, shots)
         program = ir(circuit, Val(:OpenQASM))
@@ -72,15 +71,8 @@ function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, input
         validate_circuit_and_shots(circuit, shots) 
         program = ir(circuit, Val(:JAQCD))
         qubits  = qubit_count(circuit)
-        start   = time()
         r       = simulator(program, qubits, args...; shots=shots, kwargs...)
-        stop = time()
-        #@info "(Thread $(Threads.threadid())): Simulation duration $(stop-start)"
-        start = time()
-        fr = format_result(r)
-        stop = time()
-        @debug "Time to format result: $(stop-start)"
-        return fr
+        return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
@@ -89,16 +81,16 @@ function _run_internal(simulator, circuit::Program, args...; shots::Int=0, input
     if haskey(properties(simulator).action, "braket.ir.jaqcd.program")
         program = circuit
         qubits  = qubit_count(circuit)
-        start   = time()
         r       = simulator(program, qubits, args...; shots=shots, kwargs...)
-        stop    = time()
-        #@info "(Thread $(Threads.threadid())): Simulation duration $(stop-start)"
-        start = time()
-        fr = format_result(r)
-        stop = time()
-        @debug "Time to format result: $(stop-start)"
-        return fr
+        return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
+end
+
+function _run_internal(simulator, circuit, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
+    program = circuit
+    qubits  = kwargs[:qubit_count] 
+    r       = simulator(circuit, qubits, args...; shots=shots, kwargs...)
+    return format_result(r)
 end

@@ -464,7 +464,6 @@ function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{In
         typ    = String(result_type["type"])
         typ    ∉ ["probability", "sample", "expectation", "variance"] && throw(ErrorException("unknown result type $typ"))
         targs  = [t for t in result_type["targets"]]
-        start  = time()
         if typ == "probability"
             val = _calculate_for_targets(measurements, measured_qubits, targs, Val(Symbol(typ)))
             result_types[r_ix] = ResultTypeValue(IR.Probability(targs, "probability"), val)
@@ -475,8 +474,6 @@ function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{In
             val    = _calculate_for_targets(measurements, measured_qubits, obs, targs, Val(Symbol(typ)))
             result_types[r_ix] = ResultTypeValue(rt, val)
         end
-        stop = time()
-        @debug "\tTime to calculate result type $typ: $(stop-start)"
     end
     return result_types
 end
@@ -484,7 +481,6 @@ end
 function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::GateModelTaskResult)
     task_mtd = r.taskMetadata
     addl_mtd = r.additionalMetadata
-    start = time()
     if !isnothing(r.measurements)
         measurements = convert(Vector{Vector{Int}}, r.measurements)
         m_counts = measurement_counts(measurements)
@@ -503,8 +499,6 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     else
         throw(ErrorException("One of `measurements` or `measurementProbabilities` must be populated in the result object."))
     end
-    stop = time()
-    @debug "Time to fill in measurements and probabilities: $(stop-start)."
     measured_qubits = r.measuredQubits
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
         act = JSON3.read(JSON3.write(addl_mtd.action))

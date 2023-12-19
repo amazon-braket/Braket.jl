@@ -85,20 +85,14 @@ function (d::AbstractSimulator)(circuit_ir::Program, qubit_count::Int, args...; 
     _validate_operation_qubits(operations)
      
     reinit!(d, qubit_count, shots)
-    start = time()
     d = evolve!(d, operations)
-    stop  = time()
-    #@info "(Thread $(Threads.threadid())): evolution complete in $(stop-start)μs."
     results = Braket.ResultTypeValue[]
     if shots == 0 && !isempty(circuit_ir.results)
         result_types = _translate_result_types(circuit_ir.results, qubit_count)
         _validate_result_types_qubits_exist(result_types, qubit_count)
         results = _generate_results(circuit_ir.results, result_types, d)
     end
-    start = time()
     r     = _bundle_results(results, circuit_ir, d)
-    stop  = time()
-    #@info "(Thread $(Threads.threadid())): bundling results took $(stop - start)μs."
     return r 
 end
 
