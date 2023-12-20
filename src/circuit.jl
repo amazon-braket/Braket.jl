@@ -264,7 +264,8 @@ julia> qubits(c)
 QubitSet(0, 1)
 ```
 """
-qubits(c::Circuit)      = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
+qubits(c::Circuit) = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
+qubits(p::Program) = union(mapreduce(ix->ix.target, union, p.instructions), mapreduce(ix->hasproperty(ix, :target) ? ix.target : Set{Int}(), union, p.results))
 """
     qubit_count(c::Circuit) -> Int
 
@@ -283,7 +284,7 @@ julia> qubit_count(c)
 ```
 """
 qubit_count(c::Circuit) = length(qubits(c))
-qubit_count(p::Program) = length(mapreduce(ix->ix.target, union, p.instructions))
+qubit_count(p::Program) = length(qubits(p))
 
 (rt::Result)(c::Circuit) = add_result_type!(c, rt)
 

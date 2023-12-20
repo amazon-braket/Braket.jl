@@ -25,12 +25,13 @@ function _formatted_measurements(d::D) where {D<:AbstractSimulator}
     return formatted
 end
 
-_get_measured_qubits(qubit_count::Int) = collect(0:qubit_count-1)
+_get_measured_qubits(qc::Int) = collect(0:qc-1)
 function _bundle_results(results::Vector{Braket.ResultTypeValue}, circuit_ir::Union{Program, OpenQasmProgram}, d::D) where {D<:AbstractSimulator}
     task_mtd = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], string(uuid4()), d.shots, device_id(d), nothing, nothing, nothing, nothing, nothing)
     addl_mtd = Braket.AdditionalMetadata(circuit_ir, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     formatted_samples = _formatted_measurements(d)
-    return Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult], formatted_samples, nothing, results, _get_measured_qubits(qubit_count(d)), task_mtd, addl_mtd)
+    measured_qubits   = _get_measured_qubits(qubit_count(circuit_ir))
+    return Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult], formatted_samples, nothing, results, measured_qubits, task_mtd, addl_mtd)
 end
 
 function _generate_results(results::Vector{<:Braket.AbstractProgramResult}, result_types::Vector, d::D) where {D<:AbstractSimulator}
@@ -73,23 +74,24 @@ function (d::AbstractSimulator)(circuit_ir::OpenQasmProgram, args...; shots::Int
     return _bundle_results(results, circuit_ir, d)
 end
 
-function (d::AbstractSimulator)(circuit_ir::Program, qubit_count::Int, args...; shots::Int=0, kwargs...)
+function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwargs...)
+    qc = qubit_count(circuit_ir) 
     _validate_ir_results_compatibility(d, circuit_ir.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(d, circuit_ir, Val(:JAQCD))
-    _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
+    _validate_shots_and_ir_results(shots, circuit_ir.results, qc)
     operations = circuit_ir.instructions
     if shots > 0 && !isempty(circuit_ir.basis_rotation_instructions)
         operations = vcat(operations, circuit_ir.basis_rotation_instructions)
     end
     operations = [Instruction(op) for op in operations]
     _validate_operation_qubits(operations)
-     
-    reinit!(d, qubit_count, shots)
-    d = evolve!(d, operations)
+
+    reinit!(d, qc, shots)
+    d       = evolve!(d, operations)
     results = Braket.ResultTypeValue[]
     if shots == 0 && !isempty(circuit_ir.results)
-        result_types = _translate_result_types(circuit_ir.results, qubit_count)
-        _validate_result_types_qubits_exist(result_types, qubit_count)
+        result_types = _translate_result_types(circuit_ir.results, qc)
+        _validate_result_types_qubits_exist(result_types, qc)
         results = _generate_results(circuit_ir.results, result_types, d)
     end
     r     = _bundle_results(results, circuit_ir, d)

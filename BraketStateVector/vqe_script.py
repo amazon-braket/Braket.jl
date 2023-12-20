@@ -1,4 +1,5 @@
 import time
+import datetime
 import gc
 import socket
 import copy
@@ -172,7 +173,8 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         return t 
    
     def batch_execute(self, circuits, **run_kwargs):
-        gc.disable()
+        print(f"\tEntering Julia segment at: {datetime.datetime.now()}.", flush=True)
+        print(f"\tComputing batch with {len(circuits)} elements.", flush=True)
         if not self._parallel:
             return super().batch_execute(circuits)
 
@@ -181,88 +183,21 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
 
         for circuit in circuits:
             self.check_validity(circuit.operations, circuit.observables)
-        braket_circuits = [self._pl_to_braket_circuit(circuit, **run_kwargs) for circuit in circuits]
         
-        jl_start = time.time()
-        #print("Begin Julia segment.", flush=True)
-        start = time.time()
-        jaqcd_progs     = [braket_circuit._to_jaqcd() for braket_circuit in braket_circuits]
-        jaqcd_irs       = [jaqcd_prog.json() for jaqcd_prog in jaqcd_progs]
-        stop = time.time()
-        print(f"\tTranslation to JAQCD in: {stop-start}.", flush=True)
-
-        start = time.time()
-        braket_circuits = [Main.Braket.parse_raw_schema(jaqcd_ir) for jaqcd_ir in jaqcd_irs]
-        stop = time.time()
-        print(f"\tReload back to Julia complete in: {stop-start}.", flush=True)
-
         batch_shots = 0 if self.analytic else self.shots
+        print("\tBegin Julia processing.")
+        to_pass = tuple((c.operations, c.measurements) for c in circuits)
         start = time.time()
-        braket_jl_results_batch = Main.results(self._device(braket_circuits, shots=batch_shots))
+        jl_results = self._device(to_pass, shots=batch_shots)
+        pl_results = []
+        for (circ, jl_r) in zip(circuits, jl_results):
+            if len(circ.measurements) == 1:
+                pl_results.append(np.array(jl_r).squeeze())
+            else:
+                pl_results.append(tuple(np.array(r).squeeze() for r in jl_r))
         stop = time.time()
-        print(f"\tJulia time to compute batch: {stop-start}.", flush=True) 
-        start = time.time()
-        measurements_time = 0.0
-        tmtd_time = 0.0
-        amtd_time = 0.0
-        rtv_time  = 0.0
-        val_time  = 0.0
-        gtm_time  = 0.0
-        braket_py_results_batch = []
-        for (j_ix, jl_r) in enumerate(braket_jl_results_batch):
-            r_start = time.time()
-            task_mtd     = TaskMetadata(id=str(jl_r.task_metadata.id), shots=jl_r.task_metadata.shots, deviceId=str(jl_r.task_metadata.deviceId))
-            r_stop = time.time()
-            tmtd_time += r_stop - r_start
-            #print(f"\tTime to translate task_metadata: {r_stop-r_start}.", flush=True)
-            r_start = time.time()
-            addl_mtd = AdditionalMetadata(action=jaqcd_progs[j_ix])
-            r_stop = time.time()
-            amtd_time += r_stop - r_start
-            #print(f"\tTime to translate additional metadata: {r_stop-r_start}.", flush=True)
-            r_start = time.time()
-            # PROBLEM IS HERE
-            result_types = [ResultTypeValue(type=_translate_rt(rtv.type), value=_translate_value(rtv.value)) for rtv in jl_r.result_types] 
-            r_stop = time.time()
-            #print(f"\tTime to translate result types: {r_stop-r_start}.", flush=True)
-            rtv_time += r_stop - r_start
-            
-            r_start = time.time()
-            #py_m = [[m_i for m_i in m] for m in jl_r.measurements]
-            r_stop = time.time()
-            #measurements_time += r_stop - r_start
-            r_start = time.time()
-            #values = [v for v in jl_r.values] 
-            values = [_translate_value(jl_v) for jl_v in jl_r.values]
-            r_stop = time.time()
-            val_time += r_stop - r_start
-            r_start = time.time()
-            py_r = GateModelQuantumTaskResult(task_metadata=task_mtd,
-                                              additional_metadata=addl_mtd,
-                                              result_types=result_types,
-                                              values = values,
-                                              measured_qubits=list(jl_r.measured_qubits),
-                                              #measurements=py_m,
-                                              )
-            r_stop = time.time()
-            gtm_time += r_stop - r_start
-            braket_py_results_batch.append(py_r)
-        
-        braket_results_batch = braket_py_results_batch
-        stop = time.time()
-        print(f"\tJulia time to translate batch results: {stop-start}.", flush=True)
-        print(f"\tJulia time to translate measurements: {measurements_time}.", flush=True)
-        print(f"\tJulia time to translate task_metadata: {tmtd_time}.", flush=True)
-        print(f"\tJulia time to translate additional_metadata: {amtd_time}.", flush=True)
-        print(f"\tJulia time to translate result types: {rtv_time}.", flush=True)
-        print(f"\tJulia time to translate values: {val_time}.", flush=True)
-        print(f"\tJulia time to build GateModelQuantumTaskResults: {gtm_time}.", flush=True)
-        jl_stop = time.time()
-        print(f"All around Julia time: {jl_stop-jl_start}.", flush=True)
-        start = time.time()
-        pl_results = [self._braket_to_pl_result(braket_result, circuit) for braket_result, circuit in zip(braket_results_batch, circuits)]
-        stop = time.time()
-        print(f"Time to translate results back to PL: {stop-start}.", flush=True)
+        print(f"\tJulia time to compute batch: {stop-start}.", flush=True)
+        print(f"\tExiting Julia segment at: {datetime.datetime.now()}.", flush=True)
         return pl_results 
 
 def noise_model():
@@ -317,12 +252,13 @@ def run_adapt(
         params = [0.0]*len(excitation_pool)
         start = time.time()
         print(f"Compute gradients for {key} at iter {adapt_iter}", flush=True)
-        ex_grad = [0.0]*len(excitation_pool)
-        for ix in range(len(excitation_pool)):
-            g_start = time.time()
-            ex_grad[ix] = gradient_circ([params[ix]], [excitation_pool[ix]], selected_params, selected_excitations)
-            g_stop = time.time()
-            print(f"Done computing {ix}-th gradient. Duration: {g_stop-g_start}.", flush=True)
+        ex_grad = gradient_circ(params, excitation_pool, selected_params, selected_excitations)
+        #ex_grad = [0.0]*len(excitation_pool)
+        #for ix in range(len(excitation_pool)):
+        #    g_start = time.time()
+        #    ex_grad[ix] = gradient_circ([params[ix]], [excitation_pool[ix]], selected_params, selected_excitations)
+        #    g_stop = time.time()
+        #    print(f"Done computing {ix}-th gradient. Duration: {g_stop-g_start}.", flush=True)
         stop = time.time()
         print(f"Done computing gradients. Duration: {stop-start}.", flush=True)
         grads = [
@@ -382,14 +318,14 @@ def run_adapt(
 Main = init_julia()
 #juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path="/Users/hyatkath/.julia/dev/Braket")
 #juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path="/Users/hyatkath/.julia/dev/Braket/BraketStateVector")
-#Main.seval('using Pkg; Pkg.activate("."); Pkg.resolve(); Pkg.instantiate()')
-Main.seval('using Braket, BraketStateVector, JSON3')
+Main.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
+Main.seval('using Braket, BraketStateVector, JSON3, PythonCall')
 Main.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
 parser.add_argument("--protocol", type=str, default="qwc")
-parser.add_argument("--mol", type=str, default="H8")
+parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")

@@ -87,10 +87,3 @@ function _run_internal(simulator, circuit::Program, args...; shots::Int=0, input
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
 end
-
-function _run_internal(simulator, circuit, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
-    program = circuit
-    qubits  = kwargs[:qubit_count] 
-    r       = simulator(circuit, qubits, args...; shots=shots, kwargs...)
-    return format_result(r)
-end

@@ -378,6 +378,7 @@ end
 function _selected_measurements(measurements::Matrix{Int}, measured_qubits, targets)
     (isnothing(targets) || targets == measured_qubits) && return measurements
     cols = [findfirst(q->q==t, measured_qubits) for t in targets]
+    any(isnothing, cols) && throw(ErrorException("measured_qubits ($measured_qubits) and targets ($targets) are non-overlapping!"))
     return @view measurements[:, cols]
 end
 _selected_measurements(measurements::Vector{Vector{Int}}, measured_qubits, targets) = _selected_measurements(mapreduce(permutedims, vcat, measurements), measured_qubits, targets)

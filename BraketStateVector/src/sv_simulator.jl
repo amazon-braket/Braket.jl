@@ -143,4 +143,4 @@ function apply_observables!(svs::StateVectorSimulator, observables)
     return svs
 end
 probabilities(svs::StateVectorSimulator) = abs2.(svs.state_vector)
-samples(svs::StateVectorSimulator)       = sample(0:length(svs.state_vector)-1, Weights(probabilities(svs)), svs.shots)
+samples(svs::StateVectorSimulator) = sample(0:(2^svs.qubit_count-1), Weights(probabilities(svs)), svs.shots)

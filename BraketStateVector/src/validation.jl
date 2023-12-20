@@ -71,11 +71,8 @@ function _validate_result_types_qubits_exist(result_types::Vector, qubit_count::
 end
 
 function _validate_operation_qubits(operations::Vector{Instruction})
-    all_targets = []
-    for op in operations
-        push!(all_targets, collect(op.target))
-    end
+    all_targets       = [collect(op.target) for op in operations]
     qubits_referenced = unique(reduce(vcat, all_targets))
-    maximum(qubits_referenced) >= length(qubits_referenced) && throw("Non-contiguous qubit indices supplied; qubit indices in a circuit must be contiguous.")
+    maximum(qubits_referenced) >= length(qubits_referenced) && throw("Non-contiguous qubit indices supplied; qubit indices in a circuit must be contiguous. Qubits referenced: $qubits_referenced")
     return
 end
