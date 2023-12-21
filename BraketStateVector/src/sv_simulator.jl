@@ -40,7 +40,6 @@ end
 state_vector(svs::StateVectorSimulator)   = svs.state_vector
 density_matrix(svs::StateVectorSimulator) = kron(svs.state_vector, adjoint(svs.state_vector))
 
-apply_observable(observable::Braket.Observables.Observable, sv::StateVector{T}, target::Int...) where {T<:Complex} = apply_observable!(observable, deepcopy(sv), target...)
 for (gate, obs) in ((:X, :(Braket.Observables.X)),
                     (:Y, :(Braket.Observables.Y)),
                     (:Z, :(Braket.Observables.Z)),
@@ -82,7 +81,7 @@ function apply_observable!(observable::Braket.Observables.HermitianObservable, s
         ix_01   = flip_bit(ix_00, endian_t1)
         ix_11   = flip_bit(ix_10, endian_t1)
         @views begin
-            ind_vec = SVector{Int, 4}(ix_00+1, ix_10+1, ix_01+1, ix_11+1)
+            ind_vec = SVector{4, Int}(ix_00+1, ix_10+1, ix_01+1, ix_11+1)
             sv[ind_vec] = mat * sv[ind_vec]
         end
     end

@@ -45,40 +45,17 @@ end
 
 for (gate, obs) in ((:X, :(Braket.Observables.X)), (:Y, :(Braket.Observables.Y)), (:Z, :(Braket.Observables.Z)), (:I, :(Braket.Observables.I)), (:H, :(Braket.Observables.H)))
     @eval begin
-        function apply_observable(observable::$obs, dm::DensityMatrix{T}, targets) where {T<:Complex}
-            dm_copy = deepcopy(dm)
+        function apply_observable!(observable::$obs, dm::DensityMatrix{T}, targets) where {T<:Complex}
             nq = Int(log2(size(dm, 1)))
-            reshaped_dm = reshape(dm_copy, length(dm))
+            reshaped_dm = reshape(dm, length(dm))
             for target in targets
                 apply_gate!($gate(), reshaped_dm, target)
             end
-            return dm_copy
+            return dm
         end
     end
 end
-#=function apply_observable(observable::Braket.Observables.HermitianObservable, dm::DensityMatrix{T}, target::Int) where {T<:Complex}
-    dm_copy = deepcopy(dm)
-    nq = Int(log2(size(dm, 1)))
-    n_amps = 2^nq
-    reshaped_dm = reshape(dm_copy, length(dm))
-    endian_qubit = nq-target-1
-    Threads.@threads for ix in 0:div(n_amps, 2)-1
-        lower_ix  = pad_bit(ix, endian_qubit)
-        higher_ix = flip_bit(lower_ix, endian_qubit) + 1
-        lower_ix += 1
-        ρ_00 = dm_copy[lower_ix, lower_ix]
-        ρ_10 = dm_copy[lower_ix, higher_ix]
-        ρ_01 = dm_copy[higher_ix, lower_ix]
-        ρ_11 = dm_copy[higher_ix, higher_ix]
-        dm_copy[lower_ix, lower_ix]   = ρ_00 * observable.matrix[1,1] + ρ_01 * observable.matrix[2,1]
-        dm_copy[lower_ix, higher_ix]  = ρ_00 * observable.matrix[1,2] + ρ_01 * observable.matrix[2,2]
-        dm_copy[higher_ix, lower_ix]  = ρ_10 * observable.matrix[1,1] + ρ_11 * observable.matrix[2,1]
-        dm_copy[higher_ix, higher_ix] = ρ_10 * observable.matrix[1,2] + ρ_11 * observable.matrix[2,2]
-    end
-    return dm_copy
-end=#
-function apply_observable(observable::Braket.Observables.HermitianObservable, dm::DensityMatrix{T}, targets::Int...) where {T<:Complex}
-    dm_copy   = deepcopy(dm)
+function apply_observable!(observable::Braket.Observables.HermitianObservable, dm::DensityMatrix{T}, targets::Int...) where {T<:Complex}
     nq        = Int(log2(size(dm, 1)))
     n_amps    = 2^nq
     ts        = collect(targets) 
@@ -116,10 +93,10 @@ function apply_observable(observable::Braket.Observables.HermitianObservable, dm
         end
         @views begin
             elems = dm[jxs[:], ixs[:]]
-            dm_copy[jxs[:], ixs[:]] = o_mat * elems
+            dm[jxs[:], ixs[:]] = o_mat * elems
         end
     end
-    return dm_copy
+    return dm
 end
 
 function state_with_observables(dms::DensityMatrixSimulator)

@@ -390,21 +390,21 @@ end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.StandardObservable, targets::Vector{Int}, ::Val{:sample})
     measurements = _selected_measurements(measurements, measured_qubits, targets)
-    return (-2.0 * measurements) .+ 1.0
+    return vec((-2.0 * measurements) .+ 1.0)
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.TensorProduct, targets::Vector{Int}, ::Val{:sample})
     measurements = _selected_measurements(measurements, measured_qubits, targets)
     ixs = _measurements_base_10(measurements) .+ 1
     evs = eigvals(observable)
-    return real(evs[ixs])
+    return vec(real(evs[ixs]))
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.Observable, targets::Vector{Int}, ::Val{:sample})
     measurements = _selected_measurements(measurements, measured_qubits, targets)
     ixs = _measurements_base_10(measurements) .+ 1
     evs = eigvals(observable)
-    return real(evs[ixs])
+    return vec(real(evs[ixs]))
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.Observable, targets::Vector{Int}, ::Val{:variance})

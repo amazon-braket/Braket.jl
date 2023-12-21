@@ -62,7 +62,7 @@ function expectation_op_squared(sim, obs::Braket.Observables.HermitianObservable
     return expectation(sim, Braket.Observables.HermitianObservable(obs.matrix*obs.matrix), targets...)
 end
 
-function apply_observable(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T}
+function apply_observable(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T<:VecOrMat{<:Complex}}
     sv_or_dm_copy = deepcopy(sv_or_dm)
     target_ix = 1
     for f in observable.factors
@@ -73,6 +73,7 @@ function apply_observable(observable::Braket.Observables.TensorProduct, sv_or_dm
     end
     return sv_or_dm_copy
 end
+apply_observable(observable::O, sv_or_dm::T, target::Int...) where {O<:Braket.Observables.Observable, T<:VecOrMat{<:Complex}} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
 
 function calculate(var::Braket.Variance, sim::AbstractSimulator)
     obs     = var.observable
