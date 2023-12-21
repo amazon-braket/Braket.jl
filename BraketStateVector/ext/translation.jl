@@ -24,6 +24,7 @@ end
 for (qml_type, braket_type) in ((Val{:RX}, :Rx),
                                 (Val{:RY}, :Ry),
                                 (Val{:RZ}, :Rz),
+                                (Val{:QubitUnitary}, :Unitary),
                                 (Val{:IsingXX}, :XX),
                                 (Val{:IsingXY}, :XY),
                                 (Val{:IsingYY}, :YY),
@@ -77,6 +78,7 @@ _translate_observable(::Val{:PauliY})   = "y"
 _translate_observable(::Val{:PauliZ})   = "z"
 _translate_observable(::Val{:Hadamard}) = "h"
 _translate_observable(::Val{:Identity}) = "i"
+_translate_observable(mat::Matrix{ComplexF64}, ::Val{:Hermitian}) = BraketStateVector.Braket.complex_matrix_to_ir(mat)
 
 function _translate_observable(obs::Py)
     if pyisinstance(obs, pennylane.Hamiltonian)
@@ -87,7 +89,8 @@ function _translate_observable(obs::Py)
         qubits  = reduce(vcat, [op[2] for op in raw_ops])
         return [(ops, qubits)]
     elseif pyisinstance(obs, pennylane.Hermitian)
-        throw(MethodError("not implemented yet!"))
+        jl_mat = pyconvert(Matrix{ComplexF64}, pennylane.matrix(obs))
+        return [(_translate_observable(jl_mat, Val(:Hermitian)), pyconvert(Vector{Int}, obs.wires))]
     else
         return [(_translate_observable(Val(pytype_to_symbol(obs))), pyconvert(Vector{Int}, obs.wires))]
     end

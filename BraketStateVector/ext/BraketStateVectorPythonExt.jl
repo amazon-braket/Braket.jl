@@ -39,7 +39,6 @@ function _build_programs_from_args(raw_task_specs)
         for q in missing_qubits
             push!(instructions, Instruction(Braket.I(), q))
         end
-        #@show instr_qubits, missing_qubits
         BraketStateVector._validate_operation_qubits(instructions)
         jl_specs[ix]   = BraketStateVector.Braket.IR.Program(BraketStateVector.Braket.header_dict[BraketStateVector.Braket.IR.Program], instructions, results_list, Instruction[])
     end
@@ -47,15 +46,8 @@ function _build_programs_from_args(raw_task_specs)
 end
 
 function (d::LocalSimulator)(task_specs::NTuple{N, T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {N, T}
-    is_single_task  = N == 1
-    is_single_input = inputs isa Dict{String, Float64}
-    !is_single_task && !is_single_input && N != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($N)) must be equal."))
-    is_single_input && (inputs = is_single_task ? [inputs] : fill(inputs, length(task_specs)))
     start = time()
-    raw_jl_specs = Vector{NamedTuple}(undef, N)
-    for ix in 1:N
-        raw_jl_specs[ix] = _translate_from_python(task_specs[ix], d._delegate)
-    end
+    raw_jl_specs = map(spec->_translate_from_python(spec, d._delegate), task_specs)
     stop = time()
     @info "Time to translate circuits to args: $(stop-start)."
     start = time()
@@ -64,27 +56,16 @@ function (d::LocalSimulator)(task_specs::NTuple{N, T}, args...; shots::Int=0, ma
     stop = time()
     @info "Time to build programs: $(stop-start)."
     flush(stdout)
-    tasks_and_inputs = zip(1:N, jl_specs, inputs)
 
     start = time()
-    raw_results = Vector{GateModelTaskResult}(undef, N)
-    Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
-        sim = copy(d._delegate)
-        raw_results[ix] = sim(spec, qubit_count(spec), args...; inputs=input, shots=shots, kwargs...)
-    end
+    jl_results = results(d(jl_specs, args...; shots=shots, max_parallel=max_parallel, inputs=inputs, kwargs...))
     stop = time()
+
     @info "Time to simulate batch: $(stop-start)."
     flush(stdout)
-    start = time()
-    results = Vector{GateModelQuantumTaskResult}(undef, N)
-    Threads.@threads for ix in 1:length(raw_results)
-        results[ix] = format_result(raw_results[ix])
-    end
     PythonCall.GC.enable()
-    stop = time()
-    @info "Time to format results: $(stop-start)."
     start = time()
-    py_res = [py_results(task_spec[2], d._delegate, result) for (task_spec, result) in zip(task_specs, results)]
+    py_res = [py_results(task_spec[2], d._delegate, result) for (task_spec, result) in zip(task_specs, jl_results)]
     stop = time()
     @info "Time to convert results back to Python: $(stop-start)."
     return py_res
