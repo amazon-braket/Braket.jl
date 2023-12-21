@@ -30,7 +30,8 @@ function _bundle_results(results::Vector{Braket.ResultTypeValue}, circuit_ir::Un
     task_mtd = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], string(uuid4()), d.shots, device_id(d), nothing, nothing, nothing, nothing, nothing)
     addl_mtd = Braket.AdditionalMetadata(circuit_ir, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     formatted_samples = _formatted_measurements(d)
-    measured_qubits   = _get_measured_qubits(qubit_count(circuit_ir))
+    #measured_qubits   = _get_measured_qubits(qubit_count(circuit_ir))
+    measured_qubits   = sort(collect(qubits(circuit_ir)))
     return Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult], formatted_samples, nothing, results, measured_qubits, task_mtd, addl_mtd)
 end
 
@@ -94,8 +95,7 @@ function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwar
         _validate_result_types_qubits_exist(result_types, qc)
         results = _generate_results(circuit_ir.results, result_types, d)
     end
-    r     = _bundle_results(results, circuit_ir, d)
-    return r 
+    return _bundle_results(results, circuit_ir, d) 
 end
 
 include("gate_kernels.jl")

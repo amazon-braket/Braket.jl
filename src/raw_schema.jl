@@ -167,6 +167,8 @@ const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}
 Base.convert(::Type{IRObservable}, v::Vector{String}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
 Base.convert(::Type{IRObservable}, s::String)         = s
 Base.convert(::Type{IRObservable}, v::Vector{Vector{Vector{Vector{Float64}}}}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
+Base.:(==)(s::String, iro::IRObservable) = all(iro .== s)
+Base.:(==)(iro::IRObservable, s::String) = all(iro .== s)
 
 abstract type CompilerDirective <: AbstractIR end
 StructTypes.StructType(::Type{CompilerDirective}) = StructTypes.AbstractType()

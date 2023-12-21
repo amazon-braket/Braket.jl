@@ -32,13 +32,16 @@ function _build_programs_from_args(raw_task_specs)
         Threads.@threads for res_ix in 1:length(results_args)
             results_list[res_ix] = _translate_result(results_args[res_ix]...)
         end
-        jl_specs[ix]   = BraketStateVector.Braket.IR.Program(BraketStateVector.Braket.header_dict[BraketStateVector.Braket.IR.Program], instructions, results_list, Instruction[])
-        spec_qubits    = qubits(jl_specs[ix])
-        result_qubits  = union([r.targets for r in results_list]...) 
-        missing_qubits = setdiff(0:maximum(spec_qubits), spec_qubits)
+        instr_qubits   = mapreduce(ix->ix.target, union, instructions)
+        result_qubits  = mapreduce(ix->hasproperty(ix, :targets) ? ix.targets : Set{Int}(), union, results_list)
+        all_qubits     = union(result_qubits, instr_qubits) 
+        missing_qubits = union(setdiff(result_qubits, instr_qubits), setdiff(0:maximum(all_qubits), instr_qubits))
         for q in missing_qubits
-            push!(jl_specs[ix].instructions, Instruction(Braket.I(), q))
+            push!(instructions, Instruction(Braket.I(), q))
         end
+        #@show instr_qubits, missing_qubits
+        BraketStateVector._validate_operation_qubits(instructions)
+        jl_specs[ix]   = BraketStateVector.Braket.IR.Program(BraketStateVector.Braket.header_dict[BraketStateVector.Braket.IR.Program], instructions, results_list, Instruction[])
     end
     return jl_specs
 end

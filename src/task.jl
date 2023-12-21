@@ -384,27 +384,27 @@ end
 _selected_measurements(measurements::Vector{Vector{Int}}, measured_qubits, targets) = _selected_measurements(mapreduce(permutedims, vcat, measurements), measured_qubits, targets)
 
 function _measurements_base_10(measurements)
-    two_powers = [2^i for i in reverse(0:size(measurements)[end]-1)]
+    two_powers = [2^i for i in reverse(0:size(measurements, 2)-1)]
     return measurements * two_powers
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.StandardObservable, targets::Vector{Int}, ::Val{:sample})
     measurements = _selected_measurements(measurements, measured_qubits, targets)
-    return (-2.0 .* vec(measurements)) .+ 1.0
+    return (-2.0 * measurements) .+ 1.0
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.TensorProduct, targets::Vector{Int}, ::Val{:sample})
     measurements = _selected_measurements(measurements, measured_qubits, targets)
     ixs = _measurements_base_10(measurements) .+ 1
     evs = eigvals(observable)
-    return real.(evs[ixs])
+    return real(evs[ixs])
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.Observable, targets::Vector{Int}, ::Val{:sample})
     measurements = _selected_measurements(measurements, measured_qubits, targets)
     ixs = _measurements_base_10(measurements) .+ 1
     evs = eigvals(observable)
-    return real.(evs[ixs])
+    return real(evs[ixs])
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.Observable, targets::Vector{Int}, ::Val{:variance})
@@ -418,7 +418,7 @@ function _calculate_for_targets(measurements, measured_qubits, observable::Obser
 end
 
 function _calculate_for_targets(measurements, measured_qubits, observable::Observables.Observable, targets, ::Val{V}) where {V}
-    return [_calculate_for_targets(measurements, measured_qubits, observable::Observables.Observable, [q], Val(V)) for q in measured_qubits]
+    return [_calculate_for_targets(measurements, measured_qubits, observable, [q], Val(V)) for q in measured_qubits]
 end
 
 function _calculate_for_targets(measurements, measured_qubits, targets, ::Val{:probability})
@@ -433,48 +433,22 @@ function _calculate_for_targets(measurements, measured_qubits, targets, ::Val{:p
     return probabilities
 end
 
-function _reconstruct_observable(obs::AbstractVector{String})
-    length(obs) == 1 && return _reconstruct_observable(String(obs[1]))
-    return Observables.TensorProduct([String(o) for o in obs])
+function _reconstruct_and_compute_value(rt::IR.Probability, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int})
+    val = _calculate_for_targets(measurements, measured_qubits, rt.targets, Val(Symbol(rt.type)))
+    return ResultTypeValue(rt, val)
 end
 
-function _reconstruct_observable(obs::String)
-    obs == "x" && return Observables.X()
-    obs == "y" && return Observables.Y()
-    obs == "z" && return Observables.Z()
-    obs == "i" && return Observables.I()
-    obs == "h" && return Observables.H()
-end
-function _reconstruct_observable(obs::AbstractVector{T}) where {T}
-    try
-        return Observables.HermitianObservable(convert(Vector{Vector{Vector{eltype(obs)}}}, obs))
-    catch
-        return Observables.TensorProduct([_reconstruct_observable(o) for o in obs])
-    end
+function _reconstruct_and_compute_value(rt::T, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int}) where {T<:Union{IR.Expectation, IR.Variance, IR.Sample}}
+    obs = StructTypes.constructfrom(Observables.Observable, rt.observable)
+    val = _calculate_for_targets(measurements, measured_qubits, obs, rt.targets, Val(Symbol(rt.type)))
+    return ResultTypeValue(rt, val)
 end
 
-_get_result_type(::Val{:expectation}) = IR.Expectation
-_get_result_type(::Val{:variance})    = IR.Variance
-_get_result_type(::Val{:sample})      = IR.Sample
-
-function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{Int})
-    (!haskey(ir_obj, "results") || isnothing(ir_obj["results"])) && return ResultTypeValue[]
-    result_types = Vector{ResultTypeValue}(undef, length(ir_obj["results"]))
-    for (r_ix, result_type) in enumerate(ir_obj["results"])
-        ir_obs = get(result_type, "observable", nothing)
-        typ    = String(result_type["type"])
-        typ    ∉ ["probability", "sample", "expectation", "variance"] && throw(ErrorException("unknown result type $typ"))
-        targs  = [t for t in result_type["targets"]]
-        if typ == "probability"
-            val = _calculate_for_targets(measurements, measured_qubits, targs, Val(Symbol(typ)))
-            result_types[r_ix] = ResultTypeValue(IR.Probability(targs, "probability"), val)
-        elseif typ ∈ ["sample", "expectation", "variance"]
-            obs    = _reconstruct_observable(result_type["observable"])
-            rt_typ = _get_result_type(Val(Symbol(typ)))
-            rt     = rt_typ(ir(obs, Val(:JAQCD)), targs, typ)
-            val    = _calculate_for_targets(measurements, measured_qubits, obs, targs, Val(Symbol(typ)))
-            result_types[r_ix] = ResultTypeValue(rt, val)
-        end
+function calculate_result_types(action, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int})
+    (!hasproperty(action, :results) || isnothing(action.results)) && return ResultTypeValue[]
+    any(rt.type ∉ ["probability", "sample", "expectation", "variance"] for rt in action.results) && throw(ErrorException("unknown result type."))
+    result_types = map(action.results) do result_type
+        return _reconstruct_and_compute_value(result_type, measurements, measured_qubits)
     end
     return result_types
 end
@@ -484,8 +458,8 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     addl_mtd = r.additionalMetadata
     if !isnothing(r.measurements)
         measurements = convert(Vector{Vector{Int}}, r.measurements)
-        m_counts = measurement_counts(measurements)
-        m_probs  = measurement_probabilities(m_counts, task_mtd.shots)
+        m_counts     = measurement_counts(measurements)
+        m_probs      = measurement_probabilities(m_counts, task_mtd.shots)
         measurements_copied_from_device = true
         m_counts_copied_from_device     = true
         m_probs_copied_from_device      = true
@@ -502,15 +476,11 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     end
     measured_qubits = r.measuredQubits
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
-        act = JSON3.read(JSON3.write(addl_mtd.action))
-        start = time()
-        result_types = calculate_result_types(act, measurements, measured_qubits)
-        stop = time()
-        @debug "Time to calculate result types: $(stop-start)."
+        result_types = calculate_result_types(addl_mtd.action, measurements, measured_qubits)
     else
         if !isempty(r.resultTypes) && !isnothing(r.resultTypes[1])
-            json_ = Dict("results"=>[rt.type for rt in r.resultTypes])
-            result_types = calculate_result_types(JSON3.read(JSON3.write(json_)), measurements, measured_qubits)
+            false_action = (results=[rt.type for rt in r.resultTypes],)
+            result_types = calculate_result_types(false_action, measurements, measured_qubits)
         else
             result_types = r.resultTypes
         end
