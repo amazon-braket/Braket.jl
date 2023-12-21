@@ -1,10 +1,10 @@
 module BraketStateVector
 
-using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3
+using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random
 
 import Braket: Instruction, X, Y, Z, I, PhaseShift, CNot, CY, CZ, XX, XY, YY, ZZ, CPhaseShift, CCNot, Swap, Rz, Ry, Rx, Ti, T, Vi, V, H, BraketSimulator, Program, OpenQasmProgram
 
-export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!
+export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow
 
 const StateVector{T}   = Vector{T}
 const DensityMatrix{T} = Matrix{T}
@@ -14,6 +14,8 @@ abstract type AbstractSimulator <: Braket.BraketSimulator end
 Braket.name(s::AbstractSimulator) = device_id(s)
 
 include("validation.jl")
+    
+const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 
 function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulator}
 
@@ -54,6 +56,30 @@ function _translate_result_types(results::Vector{Braket.AbstractProgramResult}, 
     return translated_results
 end
 
+function classical_shadow(d::LocalSimulator, obs_qubits::Vector{Int}, circuit::Program, shots::Int, seed::Int)
+    n_qubits    = length(obs_qubits)
+    n_snapshots = shots
+    recipes     = rand(Xoshiro(seed), 0:2, (n_snapshots, n_qubits))
+    outcomes    = compute_shadows(d._delegate, circuit, recipes, obs_qubits)
+    return outcomes, recipes
+end
+function classical_shadow(d::LocalSimulator, obs_qubits::Vector{Vector{Int}}, circuits::Vector{Program}, shots::Int, seed::Vector{Int})
+    all_outcomes = [zeros(Float64, (shots, length(obs_qubits[ix]))) for ix in 1:length(circuits)]
+    all_recipes  = [zeros(Int, (shots, length(obs_qubits[ix]))) for ix in 1:length(circuits)]
+    Threads.@threads for ix in 1:length(circuits)
+        start = time()
+        outcomes, recipes = classical_shadow(d, obs_qubits[ix], circuits[ix], shots, seed[ix])
+        stop = time()
+        @info "(Thread $(Threads.threadid())): Computed classical shadows for circuit $ix/$(length(circuits)) in $(stop-start)."
+        @views begin
+            all_outcomes[ix] .= outcomes
+            all_recipes[ix] .= recipes
+        end
+        flush(stdout)
+    end
+    return all_outcomes, all_recipes
+end
+
 function (d::AbstractSimulator)(circuit_ir::OpenQasmProgram, args...; shots::Int=0, kwargs...)
     circuit, qubit_count = parse_program(circuit_ir)
     _validate_ir_results_compatibility(d, circuit.results, Val(:OpenQASM))
@@ -73,6 +99,32 @@ function (d::AbstractSimulator)(circuit_ir::OpenQasmProgram, args...; shots::Int
         d = evolve!(d, circuit.basis_rotation_instructions)
     end
     return _bundle_results(results, circuit_ir, d)
+end
+
+function compute_shadows(d::AbstractSimulator, circuit_ir::Program, recipes, obs_qubits; kwargs...)
+    qc = qubit_count(circuit_ir)
+    _validate_ir_instructions_compatibility(d, circuit_ir, Val(:JAQCD))
+    operations = circuit_ir.instructions
+    operations = [Instruction(op) for op in operations]
+    _validate_operation_qubits(operations)
+
+    n_snapshots  = size(recipes, 1)
+    n_qubits     = size(recipes, 2)
+    reinit!(d, qc, n_snapshots)
+    d            = evolve!(d, operations)
+    snapshot_d   = similar(d, shots=1)
+    qubit_inds   = [findfirst(q->q==oq, 0:qubit_count(circuit_ir)-1) for oq in obs_qubits]
+    measurements = Matrix{Int}(undef, n_snapshots, n_qubits)
+    for s_ix in 1:n_snapshots
+        copyto!(snapshot_d, d)
+        
+        snapshot_rotations = reduce(vcat, [diagonalizing_gates(OBS_LIST[recipes[s_ix, wire_idx] + 1], [wire]) for (wire_idx, wire) in enumerate(obs_qubits)])
+        snapshot_d         = evolve!(snapshot_d, snapshot_rotations)
+        @views begin
+            measurements[s_ix, :] .= _formatted_measurements(snapshot_d)[1][qubit_inds]
+        end
+    end
+    return measurements
 end
 
 function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwargs...)

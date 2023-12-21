@@ -3,6 +3,9 @@ mutable struct StateVectorSimulator{T} <: AbstractSimulator where {T}
     qubit_count::Int
     shots::Int
     _state_vector_after_observables::StateVector{T}
+    function StateVectorSimulator{T}(state_vector::StateVector{T}, qubit_count::Int, shots::Int) where {T}
+        return new(state_vector, qubit_count, shots, zeros(complex(T), 0))
+    end
     function StateVectorSimulator{T}(qubit_count::Int, shots::Int) where {T}
         sv    = zeros(complex(T), 2^qubit_count)
         sv[1] = complex(1.0)
@@ -18,7 +21,12 @@ supported_result_types(svs::StateVectorSimulator) = sv_props.action["braket.ir.o
 device_id(svs::StateVectorSimulator) = "braket_sv"
 Braket.name(svs::StateVectorSimulator) = "StateVectorSimulator"
 Base.show(io::IO, svs::StateVectorSimulator) = print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots)")
-Base.copy(svs::StateVectorSimulator{T}) where {T} = StateVectorSimulator{T}(svs.qubit_count, svs.shots)
+Base.similar(svs::StateVectorSimulator{T}; shots::Int=svs.shots) where {T} = StateVectorSimulator{T}(svs.qubit_count, shots)
+Base.copy(svs::StateVectorSimulator{T}) where {T} = StateVectorSimulator{T}(deepcopy(svs.state_vector), svs.qubit_count, svs.shots)
+function Base.copyto!(dst::StateVectorSimulator{T}, src::StateVectorSimulator{T}) where {T}
+    copyto!(dst.state_vector, src.state_vector)
+    return dst
+end
 
 function reinit!(svs::StateVectorSimulator{T}, qubit_count::Int, shots::Int) where {T}
     sv = zeros(complex(T), 2^qubit_count)

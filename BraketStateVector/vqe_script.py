@@ -105,6 +105,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         shots: Union[int, None] = 0,
         parallel: bool = True,
         noise_model: Optional[NoiseModel] = None,
+        parametrize_differentiable: bool = True,
         **run_kwargs,
     ):
         self._wires = range(wires) if isinstance(wires, int) else wires
@@ -118,15 +119,13 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         self._run_kwargs = run_kwargs
         self._circuit = None
         self._task = None
+        self._parametrize_differentiable = parametrize_differentiable
         self._parallel = parallel
         self.custom_expand_fn = None
         self._run_kwargs = run_kwargs
-        ls = LocalSimulator(device)
-        self._supported_ops = supported_operations(ls) 
-        #[str(op) for op in Main.BraketStateVector.supported_operations(self._device._delegate)]
+        self._supported_ops = supported_operations(LocalSimulator(device)) 
         self._check_supported_result_types()
         self._verbatim = False
-        self._parametrize_differentiable = False
 
     @property
     def parallel(self):
@@ -135,16 +134,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
     @property
     def operations(self):
         return self._supported_ops
-    
-    def _run_snapshots(self, snapshot_circuits, n_qubits, mapped_wires):
-        n_snapshots = len(snapshot_circuits)
-        outcomes = np.zeros((n_snapshots, n_qubits))
-        for t in range(n_snapshots):
-            c = snapshot_circuits[t]
-            task_result = run_circuit_nonremote(c, self._device, 1, self._noise_model)
-            outcomes[t] = np.array(task_result.measurements[0])[mapped_wires]
-        return outcomes
-    
+
     def _check_supported_result_types(self):
         supported_result_types = Main.properties(self._device._delegate).action[
             "braket.ir.openqasm.program"
@@ -153,25 +143,61 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
             result_type.name for result_type in supported_result_types
         )
     
-    def _run_task(self, circuit, inputs=None):
-        task_start = time.time()
-        jaqcd_ir   = circuit._to_jaqcd().json()
-        jl_circ    = Main.Circuit(Main.Braket.parse_raw_schema(jaqcd_ir))
-        shot_count = 0 if self.analytic else self.shots
-        jl_r = Main.result(self._device(jl_circ, shots=shot_count))
-        task_mtd = TaskMetadata.parse_raw(Main.JSON3.write(jl_r.task_mtetadata))
-        addl_mtd = AdditionalMetadata(simulatorMetadata=SimulatorMetadata(executionDuration=0))
-        result_types = [ResultTypeValue.parse_raw(Main.JSON3.write(rtv)) for rtv in jl_r.result_types]
-        py_r = GateModelQuantumTaskResult(task_metadata=task_mtd,
-                                          additional_metadata=addl_mtd,
-                                          result_types=result_types,
-                                          #values=list(jl_r.values),
-                                          measurements=[list(m) for m in jl_r.measurements],
-                                          measured_qubits=list(jl_r.measured_qubits))
-        t = LocalQuantumTask(GateModelQuantumTaskResult.from_object(py_r))
-        task_stop = time.time()
-        return t 
+    def classical_shadow(self, obs, circuit):
+        if circuit is None:  # pragma: no cover
+            raise ValueError("Circuit must be provided when measuring classical shadows")
+        mapped_wires = np.array(self.map_wires(obs.wires))
+        to_pass = (circuit.operations, [])
+        outcomes, recipes = Main.classical_shadow(self._device, mapped_wires, to_pass, self.shots, obs.seed)
+        return self._cast(self._stack([outcomes, recipes]), dtype=np.int8)
+    
+    def classical_shadow_batch(self, circuits):
+        for circuit in circuits:
+            if circuit is None:  # pragma: no cover
+                raise ValueError("Circuit must be provided when measuring classical shadows")
+        mapped_wires = [np.array(self.map_wires(circuit.observables[0].wires)) for circuit in circuits]
+        to_pass = tuple((circuit.operations, []) for circuit in circuits)
+        all_outcomes, all_recipes = Main.classical_shadow(self._device, mapped_wires, to_pass, self.shots, [circuit.observables[0].seed for circuit in circuits])
+        return [self._cast(self._stack([outcomes, recipes]), dtype=np.int8) for (outcomes, recipes) in zip(all_outcomes, all_recipes)]
+
+    def execute(self, circuit: QuantumTape, compute_gradient=False, **run_kwargs) -> np.ndarray:
+        self.check_validity(circuit.operations, circuit.observables)
+        trainable = (
+            BraketQubitDevice._get_trainable_parameters(circuit)
+            if compute_gradient or self._parametrize_differentiable
+            else {}
+        )
+
+        if not isinstance(circuit.measurements[0], MeasurementTransform):
+            to_pass = (circuit.operations, circuit.measurements)
+            shots = 0 if self.analytic else self.shots
+            result = self._device(to_pass, shots=shots, inputs={f"p_{k}": v for k, v in trainable.items()})
+            if self.tracker.active:
+                tracking_data = self._tracking_data(self._task)
+                self.tracker.update(executions=1, shots=self.shots, **tracking_data)
+                self.tracker.record()
+            if len(circuit.measurements) == 1:
+                return np.array(result).squeeze()
+            return tuple(np.array(r).squeeze() for r in result)
+        
+        elif isinstance(circuit.measurements[0], ShadowExpvalMP):
+            if len(circuit.observables) > 1:
+                raise ValueError(
+                    "A circuit with a ShadowExpvalMP observable must "
+                    "have that as its only result type."
+                )
+            return [self.shadow_expval(circuit.measurements[0], circuit)]
+        raise RuntimeError("The circuit has an unsupported MeasurementTransform.")
    
+    def shadow_expval_batch(self, circuits):
+        all_results = self.classical_shadow_batch(circuits)
+        all_expvals = []
+        for (circuit, (bits, recipes)) in zip(circuits, all_results):
+            obs = circuit.measurements[0]
+            shadow = qml.shadows.ClassicalShadow(bits, recipes, wire_map=obs.wires.tolist())
+            all_expvals.append(shadow.expval(obs.H, obs.k))
+        return all_expvals 
+
     def batch_execute(self, circuits, **run_kwargs):
         print(f"\tEntering Julia segment at: {datetime.datetime.now()}.", flush=True)
         print(f"\tComputing batch with {len(circuits)} elements.", flush=True)
@@ -179,16 +205,25 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
             return super().batch_execute(circuits)
 
         if all(isinstance(circuit.observables[0], ShadowExpvalMP) for circuit in circuits):
-            return [self.shadow_expval(circuit.observables[0], circuit) for circuit in circuits]
+            return self.shadow_expval_batch(circuits)
 
         for circuit in circuits:
             self.check_validity(circuit.operations, circuit.observables)
         
+        all_trainable = []
+        for circuit in circuits:
+            trainable = (
+                BraketQubitDevice._get_trainable_parameters(circuit)
+                if self._parametrize_differentiable
+                else {}
+            )
+            all_trainable.append(trainable)
+
         batch_shots = 0 if self.analytic else self.shots
         print("\tBegin Julia processing.")
         to_pass = tuple((c.operations, c.measurements) for c in circuits)
         start = time.time()
-        jl_results = self._device(to_pass, shots=batch_shots)
+        jl_results = self._device(to_pass, shots=batch_shots, inputs=[{f"p_{k}": v for k, v in trainable.items()} for trainable in all_trainable])
         pl_results = []
         for (circ, jl_r) in zip(circuits, jl_results):
             if len(circ.measurements) == 1:
@@ -324,7 +359,7 @@ Main.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="qwc")
+parser.add_argument("--protocol", type=str, default="shadows")
 parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')

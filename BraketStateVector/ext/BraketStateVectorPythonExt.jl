@@ -3,7 +3,7 @@ module BraketStateVectorPythonExt
 using BraketStateVector, BraketStateVector.Braket, PythonCall
 
 import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program
-import BraketStateVector: AbstractSimulator
+import BraketStateVector: AbstractSimulator, classical_shadow
 
 const pennylane = PythonCall.pynew()
 const braket    = PythonCall.pynew()
@@ -33,7 +33,7 @@ function _build_programs_from_args(raw_task_specs)
             results_list[res_ix] = _translate_result(results_args[res_ix]...)
         end
         instr_qubits   = mapreduce(ix->ix.target, union, instructions)
-        result_qubits  = mapreduce(ix->hasproperty(ix, :targets) ? ix.targets : Set{Int}(), union, results_list)
+        result_qubits  = mapreduce(ix->hasproperty(ix, :targets) ? ix.targets : Set{Int}(), union, results_list, init=Set{Int}())
         all_qubits     = union(result_qubits, instr_qubits) 
         missing_qubits = union(setdiff(result_qubits, instr_qubits), setdiff(0:maximum(all_qubits), instr_qubits))
         for q in missing_qubits
@@ -45,7 +45,59 @@ function _build_programs_from_args(raw_task_specs)
     return jl_specs
 end
 
-function (d::LocalSimulator)(task_specs::NTuple{N, T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {N, T}
+function classical_shadow(d::LocalSimulator, obs_qubits, circuit::Tuple{PyList, PyList}, shots::Int, seed::Int)
+    raw_jl_spec = _translate_from_python(circuit, d._delegate)
+    PythonCall.GC.disable()
+    jl_spec = _build_programs_from_args((raw_jl_spec,))[1]
+    shadow = classical_shadow(d, pyconvert(Vector{Int}, obs_qubits), jl_spec, shots, seed)
+    PythonCall.GC.enable()
+    return shadow
+end
+
+function classical_shadow(d::LocalSimulator, obs_qubits, circuits::NTuple{N, Tuple{PyList, PyList}}, shots::Int, seed::PyList) where {N}
+    raw_jl_specs  = [_translate_from_python(circuit, d._delegate) for circuit in circuits]
+    jl_obs_qubits = pyconvert(Vector{Vector{Int}}, obs_qubits)
+    jl_seed       = pyconvert(Vector{Int}, seed)
+    PythonCall.GC.disable()
+    jl_specs      = _build_programs_from_args(raw_jl_specs)
+    shadow        = classical_shadow(d, jl_obs_qubits, jl_specs, shots, jl_seed)
+    PythonCall.GC.enable()
+    return shadow 
+end
+function (d::LocalSimulator)(task_spec::Tuple{PyList, PyList}, args...; shots::Int=0, inputs::PyDict{Any, Any} = PyDict{Any, Any}(), kwargs...)
+    jl_inputs = pyconvert(Dict{String, Float64}, inputs)
+    start = time()
+    raw_jl_spec = _translate_from_python(task_spec, d._delegate)
+    stop = time()
+    @info "Time to translate circuit to args: $(stop-start)."
+    start = time()
+    PythonCall.GC.disable()
+    jl_spec = _build_programs_from_args((raw_jl_spec,))[1]
+    stop = time()
+    @info "Time to build programs: $(stop-start)."
+    flush(stdout)
+
+    start = time()
+    jl_result = result(d(jl_spec, args...; shots=shots, inputs=jl_inputs, kwargs...))
+    stop = time()
+
+    @info "Time to simulate circuit: $(stop-start)."
+    flush(stdout)
+    PythonCall.GC.enable()
+    start = time()
+    py_res = py_results(task_spec[2], d._delegate, jl_result)
+    stop = time()
+    @info "Time to convert results back to Python: $(stop-start)."
+    return py_res
+end
+
+function (d::LocalSimulator)(task_specs::NTuple{N, Tuple{PyList, PyList}}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{PyList{PyDict{Any, Any}}, PyDict{Any, Any}} = PyDict{Any, Any}(), kwargs...) where {N}
+    # handle inputs
+    if inputs isa PyDict{Any, Any}
+        jl_inputs = pyconvert(Dict{String, Float64}, inputs)
+    else
+        jl_inputs = [pyconvert(Dict{String, Float64}, py_inputs) for py_inputs in inputs]
+    end
     start = time()
     raw_jl_specs = map(spec->_translate_from_python(spec, d._delegate), task_specs)
     stop = time()
@@ -58,7 +110,7 @@ function (d::LocalSimulator)(task_specs::NTuple{N, T}, args...; shots::Int=0, ma
     flush(stdout)
 
     start = time()
-    jl_results = results(d(jl_specs, args...; shots=shots, max_parallel=max_parallel, inputs=inputs, kwargs...))
+    jl_results = results(d(jl_specs, args...; shots=shots, max_parallel=max_parallel, inputs=jl_inputs, kwargs...))
     stop = time()
 
     @info "Time to simulate batch: $(stop-start)."

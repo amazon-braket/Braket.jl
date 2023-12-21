@@ -8,6 +8,9 @@ mutable struct DensityMatrixSimulator{T} <: AbstractSimulator where {T}
         dm[1,1] = complex(1.0)
         return new(dm, qubit_count, shots, zeros(complex(T), 0, 0))
     end
+    function DensityMatrixSimulator{T}(density_matrix::DensityMatrix{T}, qubit_count::Int, shots::Int) where {T}
+        return new(density_matrix, qubit_count, shots, zeros(complex(T), 0, 0))
+    end
 end
 DensityMatrixSimulator(::T, qubit_count::Int, shots::Int) where {T} = DensityMatrixSimulator{T}(qubit_count, shots)
 DensityMatrixSimulator(qubit_count::Int, shots::Int) = DensityMatrixSimulator{ComplexF64}(qubit_count, shots)
@@ -18,7 +21,12 @@ supported_result_types(d::DensityMatrixSimulator) = dm_props.action["braket.ir.o
 device_id(dms::DensityMatrixSimulator) = "braket_dm"
 Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
 Base.show(io::IO, dms::DensityMatrixSimulator) = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots)")
-Base.copy(dms::DensityMatrixSimulator{T}) where {T} = DensityMatrixSimulator{T}(dms.qubit_count, dms.shots)
+Base.similar(dms::DensityMatrixSimulator{T}; shots::Int=dms.shots) where {T} = DensityMatrixSimulator{T}(dms.qubit_count, shots)
+Base.copy(dms::DensityMatrixSimulator{T}) where {T} = DensityMatrixSimulator{T}(deepcopy(dms.density_matrix), dms.qubit_count, dms.shots)
+function Base.copyto!(dst::DensityMatrixSimulator{T}, src::DensityMatrixSimulator{T}) where {T}
+    copyto!(dst.density_matrix, src.density_matrix)
+    return dst
+end
 
 function reinit!(dms::DensityMatrixSimulator{T}, qubit_count::Int, shots::Int) where {T}
     dm = zeros(complex(T), 2^qubit_count, 2^qubit_count)
