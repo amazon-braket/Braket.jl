@@ -133,7 +133,8 @@ end
 
 for (ir_typ, conv_fn, braket_name) in ((:(BraketStateVector.Braket.IR.Expectation), :pennylane_convert_ExpectationMP, "expectation"),
                                        (:(BraketStateVector.Braket.IR.Variance), :pennylane_convert_VarianceMP, "variance"),
-                                       (:(BraketStateVector.Braket.IR.Sample), :pennylane_convert_SampleMP, "sample"),) 
+                                       (:(BraketStateVector.Braket.IR.Sample), :pennylane_convert_SampleMP, "sample"),
+                                      )
     @eval begin
         function $conv_fn(::Type{AbstractProgramResult}, o::Py)
             ir_obs, ir_qubits = pyconvert(Tuple{IRObservable, Vector{Int}}, o.obs)

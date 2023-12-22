@@ -16,7 +16,7 @@ import pennylane.numpy as pnp
 import json
 import os
 from pennylane import QueuingManager, QuantumFunctionError, QubitDevice
-from pennylane.tape import QuantumTape
+from pennylane.tape import QuantumTape, QuantumScript
 from pennylane.measurements import (
     Expectation,
     MeasurementTransform,
@@ -226,7 +226,8 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         if circuit is None:  # pragma: no cover
             raise ValueError("Circuit must be provided when measuring classical shadows")
         mapped_wires = np.array(self.map_wires(obs.wires))
-        outcomes, recipes = Main.classical_shadow(self._device, mapped_wires, circuit, self.shots, obs.seed)
+        to_pass = QuantumScript(ops=circuit.operations)
+        outcomes, recipes = Main.classical_shadow(self._device, mapped_wires, to_pass, self.shots, obs.seed)
         return self._cast(self._stack([outcomes, recipes]), dtype=np.int8)
     
     def classical_shadow_batch(self, circuits):
@@ -234,7 +235,8 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
             if circuit is None:  # pragma: no cover
                 raise ValueError("Circuit must be provided when measuring classical shadows")
         mapped_wires = [np.array(self.map_wires(circuit.observables[0].wires)) for circuit in circuits]
-        all_outcomes, all_recipes = Main.classical_shadow(self._device, mapped_wires, circuits, self.shots, [circuit.observables[0].seed for circuit in circuits])
+        to_pass = [QuantumScript(ops=c.operations) for c in circuits]
+        all_outcomes, all_recipes = Main.classical_shadow(self._device, mapped_wires, to_pass, self.shots, [circuit.observables[0].seed for circuit in circuits])
         return [self._cast(self._stack([outcomes, recipes]), dtype=np.int8) for (outcomes, recipes) in zip(all_outcomes, all_recipes)]
 
     def execute(self, circuit: QuantumTape, compute_gradient=False, **run_kwargs) -> np.ndarray:
@@ -438,7 +440,7 @@ Main.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="qwc")
+parser.add_argument("--protocol", type=str, default="shadows")
 parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')

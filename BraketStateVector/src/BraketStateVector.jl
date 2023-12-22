@@ -113,11 +113,12 @@ function compute_shadows(d::AbstractSimulator, circuit_ir::Program, recipes, obs
     reinit!(d, qc, n_snapshots)
     d            = evolve!(d, operations)
     snapshot_d   = similar(d, shots=1)
-    qubit_inds   = [findfirst(q->q==oq, 0:qubit_count(circuit_ir)-1) for oq in obs_qubits]
+    qubit_inds   = [findfirst(q->q==oq, 0:maximum(qubits(circuit_ir))) for oq in obs_qubits]
+    any(isnothing, qubit_inds) && throw(ErrorException("one of obs_qubits ($obs_qubits) not present in circuit with qubits $(sort(collect(qubits(circuit_ir))))."))
     measurements = Matrix{Int}(undef, n_snapshots, n_qubits)
     for s_ix in 1:n_snapshots
         copyto!(snapshot_d, d)
-        
+
         snapshot_rotations = reduce(vcat, [diagonalizing_gates(OBS_LIST[recipes[s_ix, wire_idx] + 1], [wire]) for (wire_idx, wire) in enumerate(obs_qubits)])
         snapshot_d         = evolve!(snapshot_d, snapshot_rotations)
         @views begin

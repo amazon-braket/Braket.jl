@@ -5,16 +5,16 @@ using BraketStateVector, BraketStateVector.Braket, PythonCall
 import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program, Gate, AngledGate, IRObservable
 import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit
 
-const pennylane = PythonCall.pynew()
-const braket    = PythonCall.pynew()
+const pennylane = Ref{Py}()
+const braket    = Ref{Py}()
 
 include("custom_gates.jl")
 include("translation.jl")
 
 function __init__()
     # must set these when this code is actually loaded
-    PythonCall.pycopy!(braket,    pyimport("braket"))
-    PythonCall.pycopy!(pennylane, pyimport("pennylane"))
+    braket[]    = pyimport("braket")
+    pennylane[] = pyimport("pennylane")
     PythonCall.pyconvert_add_rule("pennylane.ops.op_math:Adjoint", Instruction, pennylane_convert_Adjoint)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.non_parametric_ops:PauliX", Instruction, pennylane_convert_X)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.non_parametric_ops:PauliY", Instruction, pennylane_convert_Y)
@@ -67,44 +67,24 @@ function __init__()
     PythonCall.pyconvert_add_rule("pennylane.measurements.expval:ExpectationMP", BraketStateVector.Braket.IR.AbstractProgramResult, pennylane_convert_ExpectationMP)
     PythonCall.pyconvert_add_rule("pennylane.measurements.var:VarianceMP", BraketStateVector.Braket.IR.AbstractProgramResult, pennylane_convert_VarianceMP)
     PythonCall.pyconvert_add_rule("pennylane.measurements.sample:SampleMP", BraketStateVector.Braket.IR.AbstractProgramResult, pennylane_convert_SampleMP)
-    #PythonCall.pyconvert_add_rule("pennylane.tape.qscript:QuantumScript", Any, pennylane_convert_QuantumScript)
     PythonCall.pyconvert_add_rule("pennylane.tape.qscript:QuantumScript", BraketStateVector.Braket.IR.Program, pennylane_convert_QuantumScript)
 end
 BraketStateVector.Braket.qubit_count(o::Py) = pyisinstance(o, pennylane.tape.QuantumTape) ? length(o.wires) : o.qubit_count
-
-function _build_programs_from_args(raw_task_specs)
-    N = length(raw_task_specs)
-    jl_specs = Vector{Program}(undef, N)
-    Threads.@threads for ix in 1:N
-        instructions   = raw_task_specs[ix][1]
-        results_list   = raw_task_specs[ix][2]
-        instr_qubits   = mapreduce(ix->ix.target, union, instructions)
-        result_qubits  = mapreduce(ix->hasproperty(ix, :targets) ? ix.targets : Set{Int}(), union, results_list, init=Set{Int}())
-        all_qubits     = union(result_qubits, instr_qubits) 
-        missing_qubits = union(setdiff(result_qubits, instr_qubits), setdiff(0:maximum(all_qubits), instr_qubits))
-        for q in missing_qubits
-            push!(instructions, Instruction(Braket.I(), q))
-        end
-        BraketStateVector._validate_operation_qubits(instructions)
-        jl_specs[ix]   = BraketStateVector.Braket.IR.Program(BraketStateVector.Braket.header_dict[BraketStateVector.Braket.IR.Program], instructions, results_list, Instruction[])
-    end
-    return jl_specs
-end
 
 function classical_shadow(d::LocalSimulator, obs_qubits, circuit, shots::Int, seed::Int)
     raw_jl_spec = _translate_from_python(circuit, d._delegate)
     PythonCall.GC.disable()
     jl_spec = pyconvert(Program, circuit)
-    shadow = classical_shadow(d, pyconvert(Vector{Int}, obs_qubits), jl_spec, shots, seed)
+    shadow  = classical_shadow(d, pyconvert(Vector{Int}, obs_qubits), jl_spec, shots, seed)
     PythonCall.GC.enable()
     return shadow
 end
 
-function classical_shadow(d::LocalSimulator, obs_qubits, circuits::NTuple{N, T}, shots::Int, seed::PyList) where {N, T}
+function classical_shadow(d::LocalSimulator, obs_qubits, circuits::PyList{Any}, shots::Int, seed::PyList)
     jl_obs_qubits = pyconvert(Vector{Vector{Int}}, obs_qubits)
     jl_seed       = pyconvert(Vector{Int}, seed)
-    PythonCall.GC.disable()
     jl_specs      = [pyconvert(Program, circuit) for circuit in circuits]
+    PythonCall.GC.disable()
     shadow        = classical_shadow(d, jl_obs_qubits, jl_specs, shots, jl_seed)
     PythonCall.GC.enable()
     return shadow 
@@ -118,28 +98,8 @@ function (d::LocalSimulator)(task_specs::PyList{Any}, inputs::Union{PyList{Any},
         jl_inputs = [pyconvert(Dict{String, Float64}, py_inputs) for py_inputs in inputs]
     end
     jl_specs   = [pyconvert(Program, spec) for spec in task_specs]
-    jl_results = results(d(jl_specs, args...; inputs=jl_inputs, kwargs...))
-    #py_res     = [py_results(task_spec[2], d._delegate, result) for (task_spec, result) in zip(task_specs, jl_results)]
-    #return py_res
-    return jl_results
+    return results(d(jl_specs, args...; inputs=jl_inputs, kwargs...))
 end
-
 Py(r::GateModelQuantumTaskResult) = Py(r.values)
-#=
 
-function _get_result_value(mp::Py, d::AbstractSimulator, braket_results::GateModelQuantumTaskResult)
-    jl_mp = [BraketStateVector.Braket.StructTypes.constructfrom(BraketStateVector.Braket.Result, _translate_result(args...)) for args in _translate_result(mp, d)]
-    if pyisinstance(mp.obs, pennylane.Hamiltonian)
-        coeffs, _ = mp.obs.terms()
-        H_exp = sum(pyconvert(Float64, coeff) * braket_results[rt] for (coeff, rt) in zip(coeffs, jl_mp))
-        return Py(H_exp)
-    else
-        return Py(braket_results[jl_mp[1]])
-    end
-end
-
-function py_results(py_measurements::PyList, d::AbstractSimulator, braket_results::GateModelQuantumTaskResult)
-    return map(op->_get_result_value(op, d, braket_results), py_measurements)
-end
-=#
 end
