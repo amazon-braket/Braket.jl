@@ -6,8 +6,8 @@ import Braket: Instruction, X, Y, Z, I, PhaseShift, CNot, CY, CZ, XX, XY, YY, ZZ
 
 export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow
 
-const StateVector{T}   = Vector{T}
-const DensityMatrix{T} = Matrix{T}
+const StateVector{T}         = Vector{T}
+const DensityMatrix{T}       = Matrix{T}
 const AbstractStateVector{T} = AbstractVector{T}
 
 abstract type AbstractSimulator <: Braket.BraketSimulator end
@@ -155,6 +155,8 @@ include("noise_kernels.jl")
 include("observables.jl")
 include("result_types.jl")
 include("properties.jl")
+include("derivative_gates.jl")
+include("inverted_gates.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
 

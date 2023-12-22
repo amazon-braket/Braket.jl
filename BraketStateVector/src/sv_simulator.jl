@@ -151,3 +151,61 @@ function apply_observables!(svs::StateVectorSimulator, observables)
 end
 probabilities(svs::StateVectorSimulator) = abs2.(svs.state_vector)
 samples(svs::StateVectorSimulator) = sample(0:(2^svs.qubit_count-1), Weights(probabilities(svs)), svs.shots)
+
+
+function _apply_ag_Hamiltonian(sv::StateVector{T}, H::Sum, targets) where {T<:Complex}
+    bra     = similar(sv)
+    temp_sv = similar(sv)
+    for (op, op_target) in zip(H.summands, targets)
+        # don't conj here because H⁺ == H and sv will
+        # be conj'd in dot
+        copyto!(temp_sv, sv)
+        apply_observable!(op, temp_sv, targets...)
+        Threads.@threads for ix in 1:length(sv)
+            bra[ix] += temp_sv[ix]
+        end
+    end
+    return bra
+end
+
+function _get_params_and_angles(g::AngledGate{N}) where {N}
+    params_and_angles = Dict{String, Int}()
+    for (a_ix, angle) in enumerate(g.angle)
+        angle isa FreeParameter && (params_and_angles[name(param)] = a_ix)
+    end
+    return params_and_angles
+end
+_get_params_and_angles(g::Gate) = Dict{String, Int}()
+
+function calculate(ag::Braket.AdjointGradient, instructions::Vector{Instruction}, params_list::Vector{String}, svs::StateVectorSimulator{T}) where {T<:Complex}
+    svs.shots != 0 && throw(ArgumentError("state vector simulator initiated with non-zero shots $(svs.shots). Adjoint gradient only supported for shots=0."))
+    # apply Hamiltonian to ket_svs
+    H            = ag.observable
+    targets      = ag.targets
+    bra_sv       = _apply_ag_Hamiltonian(sv.state_vector, H, targets)
+    ket_sv       = deepcopy(svs.state_vector)
+    initial_ev   = dot(bra_sv, ket_sv)
+    rev_insts    = Iterators.reverse(instructions)
+    param_derivs = Dict{String, Float64}(zip(params_list, zeros(Float64, length(params_list))))
+    # try to reuse this and avoid thrashing GC
+    temp_ket_sv  = deepcopy(svs.state_vector)
+    for (ix, inst) in enumerate(rev_insts)
+        params_and_angles          = _get_params_and_angles(inst.operator)
+        inv_gate                   = inverted_gate(inst.operator)
+        apply_gate!(ket_sv, inv_gate, inst.target...)
+        for (param, angle) in params_and_angles
+            copyto!(temp_ket_sv, ket_sv)
+            deriv_coeff, deriv_gate_fn = derivative_gate(Val(angle), inst.operator, inst.target...)
+            p_ix        = findfirst(name(p) == param for p in params_list)
+            temp_ket_sv = deriv_gate_fn(temp_ket_sv)
+
+            dot_prod    = 2.0 * real(deriv_coeff * dot(bra_sv, temp_ket_sv))
+            param_derivs[param] += dot_prod 
+        end
+        if ix < length(instructions)
+            # be careful about conjs here...
+            apply_gate!(inv_gate, bra_sv, inst.target...)
+        end
+    end
+    return initial_ev, param_derivs
+end

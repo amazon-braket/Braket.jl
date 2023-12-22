@@ -35,6 +35,8 @@ for (qml_type, braket_type) in ((Val{:RX}, :Rx),
                                 (Val{:CPhaseShift00}, :CPhaseShift00),
                                 (Val{:CPhaseShift01}, :CPhaseShift01),
                                 (Val{:CPhaseShift10}, :CPhaseShift10),
+                                (Val{:DoubleExcitation}, :DoubleExcitation),
+                                (Val{:SingleExcitation}, :SingleExcitation),
                                )
     @eval begin
         _translate_operation(parameters, qubits, d::AbstractSimulator, ::$qml_type) = Instruction($braket_type(parameters[1]), [qubits...])
@@ -43,7 +45,7 @@ end
 
 function pytype_to_symbol(o::Py)
     o_name = pyconvert(String, pytype(o).__name__)
-    o_name == "AdjointOperation" && (o_name = "Adj"*pyconvert(String, pytype(o.base).__name__))
+    occursin("Adjoint", o_name) && (o_name = "Adj"*pyconvert(String, pytype(o.base).__name__))
     return Symbol(o_name)
 end
 

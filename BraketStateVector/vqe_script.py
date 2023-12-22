@@ -97,6 +97,71 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
     version = "0.0.1" 
     author = "Amazon Web Services"
 
+    supported_ops = {
+        "Identity",
+        "BasisState",
+        "QubitStateVector",
+        "StatePrep",
+        "QubitUnitary",
+        "ControlledQubitUnitary",
+        "MultiControlledX",
+        "DiagonalQubitUnitary",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "MultiRZ",
+        "Hadamard",
+        "S",
+        "Adjoint(S)",
+        "T",
+        "Adjoint(T)",
+        "SX",
+        "Adjoint(SX)",
+        "CNOT",
+        "SWAP",
+        "ISWAP",
+        "PSWAP",
+        "CSWAP",
+        "Toffoli",
+        "CY",
+        "CZ",
+        "PhaseShift",
+        "ControlledPhaseShift",
+        "CPhase",
+        "RX",
+        "RY",
+        "RZ",
+        "Rot",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "C(PauliX)",
+        "C(PauliY)",
+        "C(PauliZ)",
+        "C(Hadamard)",
+        "C(S)",
+        "C(T)",
+        "C(PhaseShift)",
+        "C(RX)",
+        "C(RY)",
+        "C(RZ)",
+        "C(SWAP)",
+        "C(IsingXX)",
+        "C(IsingXY)",
+        "C(IsingYY)",
+        "C(IsingZZ)",
+        "C(SingleExcitation)",
+        "C(DoubleExcitation)",
+        "CRot",
+        "IsingXX",
+        "IsingYY",
+        "IsingZZ",
+        "IsingXY",
+        "SingleExcitation",
+        "DoubleExcitation",
+        "ECR",
+    } 
+
     def __init__(
         self,
         wires: Union[int, Iterable],
@@ -123,7 +188,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         self._parallel = parallel
         self.custom_expand_fn = None
         self._run_kwargs = run_kwargs
-        self._supported_ops = supported_operations(LocalSimulator(device)) 
+        #self._supported_ops = supported_operations(LocalSimulator(device)) 
         self._check_supported_result_types()
         self._verbatim = False
 
@@ -133,7 +198,21 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
 
     @property
     def operations(self):
-        return self._supported_ops
+        return self.supported_ops
+
+    @property
+    def stopping_condition(self):
+
+        def accepts_obj(obj):
+            if obj.name == "QFT" and len(obj.wires) < 10:
+                return True
+            if obj.name == "GroverOperator" and len(obj.wires) < 13:
+                return True
+            return (not isinstance(obj, qml.tape.QuantumTape)) and getattr(
+                self, "supports_operation", lambda name: False
+            )(obj.name)
+
+        return qml.BooleanFn(accepts_obj)
 
     def _check_supported_result_types(self):
         supported_result_types = Main.properties(self._device._delegate).action[
@@ -254,6 +333,9 @@ def get_python_device(n_wires: int, shots, noise: bool = False):
 
     return qml.device("braket.local.qubit", backend=default_dev, wires=n_wires, shots=shots, noise_model=nm)
 
+def get_lightning_device(n_wires: int, shots, noise: bool = False):
+    return qml.device("lightning.qubit", wires=n_wires, shots=shots)
+
 def get_touched_qubits(ex):
     return set().union(ex)
 
@@ -359,7 +441,7 @@ Main.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="shadows")
+parser.add_argument("--protocol", type=str, default="qwc")
 parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
@@ -438,7 +520,8 @@ else: # figure out how many groups there are and scale shots
 print("FCI energy:", dset.fci_energy, " VQE energy: ", dset.vqe_energy)
 print(f"Number of qubits: {qubits}, number of groups: {n_groups}, number of excitations: {len(all_exs)}")
 print(f"Running with protocol {protocol}, encoding {encoding}, molecule {mol}, shots {scaled_shot}, noise {noise}, n_qubits {qubits}:", flush=True)
-dev = get_python_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+#dev = get_python_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+dev = get_lightning_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
 opt = qml.SPSAOptimizer(maxiter=n_iter)
                 
 @qml.qnode(dev, diff_method=diff_method)

@@ -2,8 +2,8 @@ module BraketStateVectorPythonExt
 
 using BraketStateVector, BraketStateVector.Braket, PythonCall
 
-import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program
-import BraketStateVector: AbstractSimulator, classical_shadow
+import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program, Gate, AngledGate
+import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit
 
 const pennylane = PythonCall.pynew()
 const braket    = PythonCall.pynew()
@@ -16,6 +16,7 @@ end
 
 BraketStateVector.Braket.qubit_count(o::Py) = pyisinstance(o, pennylane.tape.QuantumTape) ? length(o.wires) : o.qubit_count
 
+include("custom_gates.jl")
 include("translation.jl")
 
 function _build_programs_from_args(raw_task_specs)
@@ -91,7 +92,7 @@ function (d::LocalSimulator)(task_spec::Tuple{PyList, PyList}, args...; shots::I
     return py_res
 end
 
-function (d::LocalSimulator)(task_specs::NTuple{N, Tuple{PyList, PyList}}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{PyList{PyDict{Any, Any}}, PyDict{Any, Any}} = PyDict{Any, Any}(), kwargs...) where {N}
+function (d::LocalSimulator)(task_specs::NTuple{N, Tuple{PyList, PyList}}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{PyList{Any}, PyDict{Any, Any}} = PyDict{Any, Any}(), kwargs...) where {N}
     # handle inputs
     if inputs isa PyDict{Any, Any}
         jl_inputs = pyconvert(Dict{String, Float64}, inputs)

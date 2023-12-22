@@ -62,16 +62,15 @@ function expectation_op_squared(sim, obs::Braket.Observables.HermitianObservable
     return expectation(sim, Braket.Observables.HermitianObservable(obs.matrix*obs.matrix), targets...)
 end
 
-function apply_observable(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T<:VecOrMat{<:Complex}}
-    sv_or_dm_copy = deepcopy(sv_or_dm)
+function apply_observable!(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T<:VecOrMat{<:Complex}}
     target_ix = 1
     for f in observable.factors
         f_n_qubits = qubit_count(f)
         f_targets  = f_n_qubits == 1 ? targets[target_ix] : targets[target_ix:target_ix+f_n_qubits-1]
         target_ix += f_n_qubits
-        sv_or_dm_copy = apply_observable!(f, sv_or_dm_copy, f_targets...)
+        sv_or_dm = apply_observable!(f, sv_or_dm, f_targets...)
     end
-    return sv_or_dm_copy
+    return sv_or_dm
 end
 apply_observable(observable::O, sv_or_dm::T, target::Int...) where {O<:Braket.Observables.Observable, T<:VecOrMat{<:Complex}} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
 
