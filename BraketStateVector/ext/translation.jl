@@ -1,52 +1,88 @@
-for (qml_type, braket_type) in ((Val{:Identity}, :I),
-                                (Val{:PauliX}, :X),
-                                (Val{:PauliY}, :Y),
-                                (Val{:PauliZ}, :Z),
-                                (Val{:Hadamard}, :H),
-                                (Val{:ECR}, :ECR),
-                                (Val{:S}, :S),
-                                (Val{:AdjS}, :Si),
-                                (Val{:T}, :T),
-                                (Val{:AdjT}, :Ti),
-                                (Val{:SX}, :V),
-                                (Val{:AdjSX}, :Vi),
-                                (Val{:CNOT}, :CNot),
-                                (Val{:CY}, :CY),
-                                (Val{:CZ}, :CZ),
-                                (Val{:SWAP}, :Swap),
-                                (Val{:ISWAP}, :ISwap),
-                                (Val{:Toffoli}, :CCNot),
-                               )
+pennylane_convert_parameters(::Type{Float64}, x::Py) = PythonCall.pyconvert_return(pyconvert(Float64, x[0]))
+pennylane_convert_parameters(::Type{FreeParameter}, x::Py) = PythonCall.pyconvert_return(FreeParameter(pyconvert(String, x[0])))
+
+pennylane_convert_inputs(::Type{Dict{String, Float64}}, x::Py) = PythonCall.pyconvert_return(pyconvert(Dict{String, Float64}, x))
+pennylane_convert_inputs(::Type{Vector{Dict{String, Float64}}}, x::Py) = PythonCall.pyconvert_return([pyconvert(Dict{String, Float64}, x_) for x_ in x])
+for (conv_fn, jl_typ) in ((:pennylane_convert_X, :X),
+                          (:pennylane_convert_Y, :Y),
+                          (:pennylane_convert_Z, :Z),
+                          (:pennylane_convert_I, :I),
+                          (:pennylane_convert_H, :H),
+                          (:pennylane_convert_S, :S),
+                          (:pennylane_convert_T, :T),
+                          (:pennylane_convert_V, :V),
+                         )
     @eval begin
-        _translate_operation(parameters, qubits, d::AbstractSimulator, ::$qml_type) = Instruction($braket_type(), [qubits...])
-    end
-end
-for (qml_type, braket_type) in ((Val{:RX}, :Rx),
-                                (Val{:RY}, :Ry),
-                                (Val{:RZ}, :Rz),
-                                (Val{:QubitUnitary}, :Unitary),
-                                (Val{:IsingXX}, :XX),
-                                (Val{:IsingXY}, :XY),
-                                (Val{:IsingYY}, :YY),
-                                (Val{:IsingZZ}, :ZZ),
-                                (Val{:PSWAP}, :PSwap),
-                                (Val{:PhaseShift}, :PhaseShift),
-                                (Val{:ControlledPhaseShift}, :CPhaseShift),
-                                (Val{:CPhaseShift00}, :CPhaseShift00),
-                                (Val{:CPhaseShift01}, :CPhaseShift01),
-                                (Val{:CPhaseShift10}, :CPhaseShift10),
-                                (Val{:DoubleExcitation}, :DoubleExcitation),
-                                (Val{:SingleExcitation}, :SingleExcitation),
-                               )
-    @eval begin
-        _translate_operation(parameters, qubits, d::AbstractSimulator, ::$qml_type) = Instruction($braket_type(parameters[1]), [qubits...])
+        function $conv_fn(::Type{Instruction}, x::Py)
+            return PythonCall.pyconvert_return(Instruction($jl_typ(), pyconvert(Int, x.wires[0])))
+        end
     end
 end
 
-function pytype_to_symbol(o::Py)
-    o_name = pyconvert(String, pytype(o).__name__)
-    occursin("Adjoint", o_name) && (o_name = "Adj"*pyconvert(String, pytype(o.base).__name__))
-    return Symbol(o_name)
+for (conv_fn, jl_typ) in ((:pennylane_convert_RX, :Rx),
+                          (:pennylane_convert_RY, :Ry),
+                          (:pennylane_convert_RZ, :Rz),
+                          (:pennylane_convert_PhaseShift, :PhaseShift),
+                         )
+    @eval begin
+        function $conv_fn(::Type{Instruction}, x::Py)
+            angle = pyconvert(Union{Float64, FreeParameter}, x.parameters)
+            return PythonCall.pyconvert_return(Instruction($jl_typ(angle), pyconvert(Int, x.wires[0])))
+        end
+    end
+end
+
+for (conv_fn, jl_typ) in ((:pennylane_convert_IsingXX, :XX),
+                          (:pennylane_convert_IsingYY, :YY),
+                          (:pennylane_convert_IsingZZ, :ZZ),
+                          (:pennylane_convert_IsingXY, :XY),
+                          (:pennylane_convert_PSWAP, :PSwap),
+                          (:pennylane_convert_ControlledPhaseShift, :CPhaseShift),
+                          (:pennylane_convert_CPhaseShift00, :CPhaseShift00),
+                          (:pennylane_convert_CPhaseShift01, :CPhaseShift01),
+                          (:pennylane_convert_CPhaseShift10, :CPhaseShift10),
+                          (:pennylane_convert_DoubleExcitation, :DoubleExcitation),
+                          (:pennylane_convert_SingleExcitation, :SingleExcitation),
+                         )
+    @eval begin
+        function $conv_fn(::Type{Instruction}, x::Py)
+            angle = pyconvert(Union{Float64, FreeParameter}, x.parameters)
+            return PythonCall.pyconvert_return(Instruction($jl_typ(angle), pyconvert(Vector{Int}, x.wires)))
+        end
+    end
+end
+
+for (conv_fn, jl_typ) in ((:pennylane_convert_CNOT, :CNot),
+                          (:pennylane_convert_CY, :CY),
+                          (:pennylane_convert_CZ, :CZ),
+                          (:pennylane_convert_SWAP, :Swap),
+                          (:pennylane_convert_ISWAP, :ISwap),
+                          (:pennylane_convert_CSWAP, :CSwap),
+                          (:pennylane_convert_ECR, :ECR),
+                          (:pennylane_convert_Toffoli, :CCNot),
+                         )
+    @eval begin
+        function $conv_fn(::Type{Instruction}, x::Py)
+            return PythonCall.pyconvert_return(Instruction($jl_typ(), pyconvert(Vector{Int}, x.wires)))
+        end
+    end
+end
+function pennylane_convert_QubitUnitary(::Type{Instruction}, x::Py)
+    mat = pyconvert(Matrix{ComplexF64}, x.parameters[0])
+    return PythonCall.pyconvert_return(Instruction(Unitary(mat), pyconvert(Int, x.wires)))
+end
+
+for (typ, adj_typ) in ((:S, :Si), (:T, :Ti), (:V, :Vi))
+    @eval begin
+        adjoint_type(::Type{$typ}) = $adj_typ
+        adjoint_type(g::$typ) = $adj_typ()
+    end
+end
+
+function pennylane_convert_Adjoint(::Type{Instruction}, x::Py)
+    un_adjointed_instruction = pyconvert(Instruction, x.base)
+    raw_gate = un_adjointed_instruction.operator
+    return PythonCall.pyconvert_return(Instruction(adjoint_type(raw_gate), un_adjointed_instruction.target))
 end
 
 function _translate_parameters(py_params, parameter_names::Vector{String}, ::Val{true})
@@ -66,48 +102,60 @@ function _translate_parameters(py_params, parameter_names::Vector{String}, ::Val
     return parameters
 end
 
-function _translate_parameters(py_params, parameter_names::Vector{String}, ::Val{false})
-    return [pyisinstance(p, pennylane.numpy.tensor) ? pyconvert(Array, p.numpy()) : pyconvert(Float64, p) for p in py_params]
-end
-
-function translate_operation(op::Py, qubits::NTuple{N, Int}, d::AbstractSimulator; use_unique_parameters::Bool=false, parameter_names::Vector{String}=String[]) where {N}
-    jl_params = _translate_parameters(op.parameters, parameter_names, Val(use_unique_parameters))
-    return (jl_params, qubits, d, Val(pytype_to_symbol(op)))
-end
-
-_translate_observable(::Val{:PauliX})   = "x"
-_translate_observable(::Val{:PauliY})   = "y"
-_translate_observable(::Val{:PauliZ})   = "z"
-_translate_observable(::Val{:Hadamard}) = "h"
-_translate_observable(::Val{:Identity}) = "i"
-_translate_observable(mat::Matrix{ComplexF64}, ::Val{:Hermitian}) = BraketStateVector.Braket.complex_matrix_to_ir(mat)
-
-function _translate_observable(obs::Py)
-    if pyisinstance(obs, pennylane.Hamiltonian)
-        return [(_translate_observable(term), pyconvert(Vector{Int}, term.wires)) for term in obs.ops]
-    elseif pyisinstance(obs, pennylane.operation.Tensor)
-        raw_ops = reduce(vcat, [_translate_observable(term) for term in obs.obs])
-        ops     = [op[1] for op in raw_ops]
-        qubits  = reduce(vcat, [op[2] for op in raw_ops])
-        return [(ops, qubits)]
-    elseif pyisinstance(obs, pennylane.Hermitian)
-        jl_mat = pyconvert(Matrix{ComplexF64}, pennylane.matrix(obs))
-        return [(_translate_observable(jl_mat, Val(:Hermitian)), pyconvert(Vector{Int}, obs.wires))]
-    else
-        return [(_translate_observable(Val(pytype_to_symbol(obs))), pyconvert(Vector{Int}, obs.wires))]
-    end
-end
-
-for (ir_typ, pl_mp, braket_symbol, braket_name) in ((:(BraketStateVector.Braket.IR.Expectation), Val{:ExpectationMP}, Val{:expectation}, "expectation"),
-                                                    (:(BraketStateVector.Braket.IR.Variance), Val{:VarianceMP}, Val{:variance}, "variance"),
-                                                    (:(BraketStateVector.Braket.IR.Sample), Val{:SampleMP}, Val{:sample}, "sample"),) 
+for (conv_fn, jl_typ, str) in ((:pennylane_convert_X, :(Observables.X), "x"),
+                               (:pennylane_convert_Y, :(Observables.Y), "y"),
+                               (:pennylane_convert_Z, :(Observables.Z), "z"),
+                               (:pennylane_convert_I, :(Observables.I), "i"),
+                               (:pennylane_convert_H, :(Observables.H), "h"),
+                              )
     @eval begin
-        _translate_result(obs, qubits, ::$braket_symbol) = $ir_typ(obs, qubits, $braket_name)
-        _translate_result(op::Py, d::AbstractSimulator, ::$pl_mp) = [tuple(jl_obs..., $braket_symbol()) for jl_obs in _translate_observable(op.obs)]
+        $conv_fn(::Type{Observables.Observable}, x::Py) = PythonCall.pyconvert_return($jl_typ())
+        $conv_fn(::Type{Tuple{IRObservable, Vector{Int}}}, x::Py) = PythonCall.pyconvert_return(($str, pyconvert(Vector{Int}, x.wires)))
+    end
+end
+function pennylane_convert_Hermitian(::Type{Observables.Observable}, o::Py)
+    return PythonCall.pyconvert_return(BraketStateVector.Braket.Observables.HermitianObservable(pyconvert(Matrix{ComplexF64}, o.parameters[0])))
+end
+function pennylane_convert_Hermitian(::Type{Tuple{IRObservable, Vector{Int}}}, o::Py)
+    mat = BraketStateVector.Braket.complex_matrix_to_ir(pyconvert(Matrix{ComplexF64}, o.parameters[0]))
+    return PythonCall.pyconvert_return((mat, pyconvert(Vector{Int}, o.wires)))
+end
+
+function pennylane_convert_Tensor(::Type{Observables.Observable}, o::Py)
+    return PythonCall.pyconvert_return(Observables.TensorProduct([pyconvert(Observables.Observable, o.obs)]))
+end
+function pennylane_convert_Tensor(::Type{Tuple{IRObservable, Vector{Int}}}, o::Py)
+    raw_obs       = [ pyconvert(Tuple{IRObservable, Vector{Int}}, f) for f in o.obs ]
+    tensor_ops    = convert(IRObservable, reduce(vcat, [o[1] for o in raw_obs]))
+    tensor_qubits = reduce(vcat, [o[2] for o in raw_obs])
+    return PythonCall.pyconvert_return((tensor_ops, tensor_qubits))
+end
+
+for (ir_typ, conv_fn, braket_name) in ((:(BraketStateVector.Braket.IR.Expectation), :pennylane_convert_ExpectationMP, "expectation"),
+                                       (:(BraketStateVector.Braket.IR.Variance), :pennylane_convert_VarianceMP, "variance"),
+                                       (:(BraketStateVector.Braket.IR.Sample), :pennylane_convert_SampleMP, "sample"),) 
+    @eval begin
+        function $conv_fn(::Type{AbstractProgramResult}, o::Py)
+            ir_obs, ir_qubits = pyconvert(Tuple{IRObservable, Vector{Int}}, o.obs)
+            return PythonCall.pyconvert_return($ir_typ(ir_obs, ir_qubits, $braket_name))  
+        end
     end
 end
 
-_translate_result(op::Py, d::AbstractSimulator) = _translate_result(op, d, Val(pytype_to_symbol(op)))
+function pennylane_convert_QuantumScript(::Type{Program}, o)
+    instructions   = [pyconvert(Instruction, i) for i in o.operations]
+    results_list   = [pyconvert(AbstractProgramResult, i) for i in o.measurements]
+    instr_qubits   = mapreduce(ix->ix.target, union, instructions)
+    result_qubits  = mapreduce(ix->hasproperty(ix, :targets) ? ix.targets : Set{Int}(), union, results_list, init=Set{Int}())
+    all_qubits     = union(result_qubits, instr_qubits) 
+    missing_qubits = union(setdiff(result_qubits, instr_qubits), setdiff(0:maximum(all_qubits), instr_qubits))
+    for q in missing_qubits
+        push!(instructions, Instruction(Braket.I(), q))
+    end
+    prog         = Program(BraketStateVector.Braket.header_dict[Program], instructions, results_list, [])
+    return PythonCall.pyconvert_return(prog)
+end
+
 function _translate_parameter_names(n_params::Int, param_index::Int, trainable_indices::Set{Int}, use_unique_parameters::Bool, ::Val{false})
     n_params == 0 && return String[], param_index
     parameter_names = fill("", n_params)
@@ -124,58 +172,4 @@ end
 
 function _translate_parameter_names(n_params::Int, param_index::Int, trainable_indices::Set{Int}, use_unique_parameters::Bool, ::Val{true})
     return fill("", n_params), param_index + n_params
-end
-
-function _translate_from_python(circuit::Tuple{PyList, PyList}, d::D, ::Val{:pennylane}) where {D<:AbstractSimulator}
-    # circuit noise and gates
-    use_unique_params  = false
-    trainable_indices  = Set{Int}()
-    param_index        = 1
-    time_in_params     = 0.0
-    time_in_ops        = 0.0
-    time_in_rts        = 0.0
-    py_instructions    = circuit[1]
-    py_measurements    = circuit[2]
-    translate_ops_args = Vector{Tuple}(undef, length(py_instructions))
-    translate_rts_args = []
-    use_unique_parameters = (isempty(trainable_indices) || use_unique_params)
-    for (ix, op) in enumerate(py_instructions)
-        start = time()
-        n_params   = pyconvert(Int, op.num_params)
-        is_channel = pyisinstance(op, pennylane.operation.Channel)
-        parameter_names, param_index = _translate_parameter_names(n_params, param_index, trainable_indices, use_unique_params, Val(is_channel))
-        stop = time()
-        time_in_params += stop-start
-
-        start = time()
-        dev_wires = tuple((pyconvert(Int, wire) for wire in op.wires)...)
-        translate_ops_args[ix] = translate_operation(op, dev_wires, d, use_unique_parameters=use_unique_parameters, parameter_names=parameter_names)
-        stop = time()
-
-        time_in_ops += stop-start
-    end
-    for (ix, op) in enumerate(py_measurements)
-        start = time()
-        rt    = _translate_result(op, d)
-        append!(translate_rts_args, rt)
-        stop  = time()
-        time_in_rts += stop-start
-    end
-    #@info "\tTime to translate parameter names: $time_in_params"
-    #@info "\tTime to translate operations: $time_in_ops"
-    #@info "\tTime to translate result types: $time_in_rts"
-    return (instructions_args=translate_ops_args, results_args=translate_rts_args) 
-end
-
-function _translate_from_python(circuit::Py, d::AbstractSimulator, ::Val{:braket})
-    throw(MethodError("not implemented yet!"))
-end
-
-function _translate_from_python(circuit::Tuple{PyList, PyList}, d::AbstractSimulator)
-    # first detect if circuit is Braket or PennyLane
-    is_pennylane = true #pyisinstance(circuit, pennylane.tape.qscript.QuantumScript)
-    is_pennylane && return _translate_from_python(circuit, d, Val(:pennylane))
-    is_braket    = pyisinstance(circuit, braket.circuits.Circuit)
-    is_braket    && return _translate_from_python(circuit, d, Val(:braket))
-    throw(ArgumentError("Python circuit is of untranslateable type! Must be either a PennyLane QuantumTape or a Braket Circuit."))
 end

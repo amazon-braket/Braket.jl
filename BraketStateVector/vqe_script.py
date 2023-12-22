@@ -170,7 +170,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         shots: Union[int, None] = 0,
         parallel: bool = True,
         noise_model: Optional[NoiseModel] = None,
-        parametrize_differentiable: bool = True,
+        parametrize_differentiable: bool = False,
         **run_kwargs,
     ):
         self._wires = range(wires) if isinstance(wires, int) else wires
@@ -226,8 +226,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         if circuit is None:  # pragma: no cover
             raise ValueError("Circuit must be provided when measuring classical shadows")
         mapped_wires = np.array(self.map_wires(obs.wires))
-        to_pass = (circuit.operations, [])
-        outcomes, recipes = Main.classical_shadow(self._device, mapped_wires, to_pass, self.shots, obs.seed)
+        outcomes, recipes = Main.classical_shadow(self._device, mapped_wires, circuit, self.shots, obs.seed)
         return self._cast(self._stack([outcomes, recipes]), dtype=np.int8)
     
     def classical_shadow_batch(self, circuits):
@@ -235,8 +234,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
             if circuit is None:  # pragma: no cover
                 raise ValueError("Circuit must be provided when measuring classical shadows")
         mapped_wires = [np.array(self.map_wires(circuit.observables[0].wires)) for circuit in circuits]
-        to_pass = tuple((circuit.operations, []) for circuit in circuits)
-        all_outcomes, all_recipes = Main.classical_shadow(self._device, mapped_wires, to_pass, self.shots, [circuit.observables[0].seed for circuit in circuits])
+        all_outcomes, all_recipes = Main.classical_shadow(self._device, mapped_wires, circuits, self.shots, [circuit.observables[0].seed for circuit in circuits])
         return [self._cast(self._stack([outcomes, recipes]), dtype=np.int8) for (outcomes, recipes) in zip(all_outcomes, all_recipes)]
 
     def execute(self, circuit: QuantumTape, compute_gradient=False, **run_kwargs) -> np.ndarray:
@@ -248,9 +246,8 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         )
 
         if not isinstance(circuit.measurements[0], MeasurementTransform):
-            to_pass = (circuit.operations, circuit.measurements)
             shots = 0 if self.analytic else self.shots
-            result = self._device(to_pass, shots=shots, inputs={f"p_{k}": v for k, v in trainable.items()})
+            result = self._device(circuit, {f"p_{k}": v for k, v in trainable.items()}, shots=shots)
             if self.tracker.active:
                 tracking_data = self._tracking_data(self._task)
                 self.tracker.update(executions=1, shots=self.shots, **tracking_data)
@@ -300,9 +297,9 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
 
         batch_shots = 0 if self.analytic else self.shots
         print("\tBegin Julia processing.")
-        to_pass = tuple((c.operations, c.measurements) for c in circuits)
         start = time.time()
-        jl_results = self._device(to_pass, shots=batch_shots, inputs=[{f"p_{k}": v for k, v in trainable.items()} for trainable in all_trainable])
+        inputs = [{f"p_{k}": v for k, v in trainable.items()} for trainable in all_trainable]
+        jl_results = self._device(circuits, inputs, shots=batch_shots)
         pl_results = []
         for (circ, jl_r) in zip(circuits, jl_results):
             if len(circ.measurements) == 1:
