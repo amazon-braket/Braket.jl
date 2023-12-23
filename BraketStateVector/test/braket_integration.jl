@@ -45,7 +45,7 @@ end
     end
 
     @testset "Local Braket Simulator" begin
-        @testset for (backend, device_name) in [#("default", "StateVectorSimulator"),
+        @testset for (backend, device_name) in [("default", "StateVectorSimulator"),
                                                 ("braket_sv", "StateVectorSimulator"),
                                                 ("braket_dm", "DensityMatrixSimulator")]
             local_simulator_device = LocalSimulator(backend)

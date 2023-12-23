@@ -2,7 +2,7 @@ module BraketStateVector
 
 using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random
 
-import Braket: Instruction, X, Y, Z, I, PhaseShift, CNot, CY, CZ, XX, XY, YY, ZZ, CPhaseShift, CCNot, Swap, Rz, Ry, Rx, Ti, T, Vi, V, H, BraketSimulator, Program, OpenQasmProgram
+import Braket: Instruction, BraketSimulator, Program, OpenQasmProgram, apply_gate!, apply_noise!, I, device_id
 
 export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow
 
@@ -160,6 +160,7 @@ include("derivative_gates.jl")
 include("inverted_gates.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
+include("precompile.jl")
 
 function __init__()
     Braket._simulator_devices[]["braket_dm"] = DensityMatrixSimulator{ComplexF64}

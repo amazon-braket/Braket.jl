@@ -16,13 +16,14 @@ struct LocalSimulator <: Device
     backend::String
     _delegate::BraketSimulator
     function LocalSimulator(backend::Union{String, BraketSimulator})
-        backend_name = String(backend)
+        backend_name = device_id(backend)
         haskey(_simulator_devices[], backend_name) && return new(backend_name, _simulator_devices[][backend_name](0,0))
         !isdefined(Main, Symbol(backend_name)) && throw(ArgumentError("no local simulator with name $backend_name is loaded!"))
         return new(backend_name, Symbol(backend_name)(0, 0))
     end
 end
 name(s::LocalSimulator) = name(s._delegate)
+device_id(s::String) = s
 
 function (d::LocalSimulator)(task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
     sim = copy(d._delegate)
