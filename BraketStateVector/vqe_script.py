@@ -188,7 +188,6 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         self._parallel = parallel
         self.custom_expand_fn = None
         self._run_kwargs = run_kwargs
-        #self._supported_ops = supported_operations(LocalSimulator(device)) 
         self._check_supported_result_types()
         self._verbatim = False
 
@@ -204,10 +203,6 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
     def stopping_condition(self):
 
         def accepts_obj(obj):
-            if obj.name == "QFT" and len(obj.wires) < 10:
-                return True
-            if obj.name == "GroverOperator" and len(obj.wires) < 13:
-                return True
             return (not isinstance(obj, qml.tape.QuantumTape)) and getattr(
                 self, "supports_operation", lambda name: False
             )(obj.name)
@@ -285,9 +280,13 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         if all(isinstance(circuit.observables[0], ShadowExpvalMP) for circuit in circuits):
             return self.shadow_expval_batch(circuits)
 
+        start = time.time()
         for circuit in circuits:
             self.check_validity(circuit.operations, circuit.observables)
+        stop = time.time()
+        print(f"\tTime to check validity: {stop-start}.")
         
+        start = time.time()
         all_trainable = []
         for circuit in circuits:
             trainable = (
@@ -296,12 +295,17 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
                 else {}
             )
             all_trainable.append(trainable)
+        stop = time.time()
+        print(f"\tTime to get all trainable indicies: {stop-start}.")
 
         batch_shots = 0 if self.analytic else self.shots
+        inputs = [{f"p_{k}": v for k, v in trainable.items()} for trainable in all_trainable]
         print("\tBegin Julia processing.")
         start = time.time()
-        inputs = [{f"p_{k}": v for k, v in trainable.items()} for trainable in all_trainable]
+        jl_start = time.time()
         jl_results = self._device(circuits, inputs, shots=batch_shots)
+        jl_stop = time.time()
+        print(f"\tJulia time to compute batch: {jl_stop-jl_start}.", flush=True)
         pl_results = []
         for (circ, jl_r) in zip(circuits, jl_results):
             if len(circ.measurements) == 1:
@@ -309,7 +313,7 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
             else:
                 pl_results.append(tuple(np.array(r).squeeze() for r in jl_r))
         stop = time.time()
-        print(f"\tJulia time to compute batch: {stop-start}.", flush=True)
+        print(f"\tTotal time to compute batch: {stop-start}.", flush=True)
         print(f"\tExiting Julia segment at: {datetime.datetime.now()}.", flush=True)
         return pl_results 
 
@@ -441,7 +445,7 @@ Main.seval('Braket.IRType[] = :JAQCD')
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
 parser.add_argument("--protocol", type=str, default="qwc")
-parser.add_argument("--mol", type=str, default="H4")
+parser.add_argument("--mol", type=str, default="H8")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")

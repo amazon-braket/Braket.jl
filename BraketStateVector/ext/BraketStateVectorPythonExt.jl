@@ -6,6 +6,7 @@ import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Ins
 import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit
 
 const pennylane = Ref{Py}()
+const numpy     = Ref{Py}()
 const braket    = Ref{Py}()
 
 include("custom_gates.jl")
@@ -15,6 +16,7 @@ function __init__()
     # must set these when this code is actually loaded
     braket[]    = pyimport("braket")
     pennylane[] = pyimport("pennylane")
+    numpy[]     = pyimport("numpy")
     PythonCall.pyconvert_add_rule("pennylane.ops.op_math:Adjoint", Instruction, pennylane_convert_Adjoint)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.non_parametric_ops:PauliX", Instruction, pennylane_convert_X)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.non_parametric_ops:PauliY", Instruction, pennylane_convert_Y)
@@ -100,6 +102,8 @@ function (d::LocalSimulator)(task_specs::PyList{Any}, inputs::Union{PyList{Any},
     jl_specs   = [pyconvert(Program, spec) for spec in task_specs]
     return results(d(jl_specs, args...; inputs=jl_inputs, kwargs...))
 end
-Py(r::GateModelQuantumTaskResult) = Py(r.values)
+function Py(r::GateModelQuantumTaskResult)
+    return pylist([numpy[].array(v).squeeze() for v in r.values])
+end
 
 end
