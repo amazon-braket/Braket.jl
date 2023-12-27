@@ -69,7 +69,7 @@ for (G, g_mat) in ((:X, matrix_rep(X())),
         gate_kernel(::Val{$is_conj}, g::$G, lower_amp::Tv, higher_amp::Tv) where {Tv<:Complex} = $g00 * lower_amp + $g01 * higher_amp, $g10 * lower_amp + $g11 * higher_amp
     end
 end
-    gate_kernel(::Val{V}, g::Unitary, lower_amp::Tv, higher_amp::Tv) where {V, Tv<:Complex} = gate_kernel(Val(V), SMatrix{2, 2, ComplexF64}(g.matrix), SVector{2, ComplexF64}(lower_amp, higher_amp))
+gate_kernel(::Val{V}, g::Unitary, lower_amp::Tv, higher_amp::Tv) where {V, Tv<:Complex} = gate_kernel(Val(V), SMatrix{2, 2, ComplexF64}(g.matrix), SVector{2, ComplexF64}(lower_amp, higher_amp))
 
 for (G, cos_g, sin_g, g_mat, c_g_mat) in ((:PhaseShift, :(cos(g.angle[1])), :(sin(g.angle[1])), (1.0, 0.0, 0.0, :(cos_g + im*sin_g)), (1.0, 0.0, 0.0, :(cos_g - im*sin_g))),
                                           (:Rx,         :(cos(g.angle[1]/2.0)), :(sin(g.angle[1]/2.0)), (:cos_g, :(-im*sin_g), :(-im*sin_g), :cos_g), (:cos_g, :(im*sin_g), :(im*sin_g), :cos_g)),
@@ -80,7 +80,9 @@ for (G, cos_g, sin_g, g_mat, c_g_mat) in ((:PhaseShift, :(cos(g.angle[1])), :(si
     end
 end
 
-function apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where {V, G<:Gate, T<:Complex}
+# single target
+# use this to avoid hitting generalized Unitary
+function apply_gate_single_target!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where {V, G<:Gate, T<:Complex}
     n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit) 
     Threads.@threads for ix in 0:div(n_amps, 2)-1
         lower_ix   = pad_bit(ix, endian_qubit)
@@ -91,6 +93,8 @@ function apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::I
         state_vec[lower_ix], state_vec[higher_ix] = gate_kernel(Val(V), g, lower_amp, higher_amp)
     end
 end
+apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where {V, G<:Gate, T<:Complex} = apply_gate_single_target!(Val(V), g, state_vec, qubit)
+apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, qubit::Int) where {V, T<:Complex} = apply_gate_single_target!(Val(V), g, state_vec, qubit)
 
 # generic two-qubit non controlled unitaries
 function apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, t1::Int, t2::Int) where {V, G<:Gate, T<:Complex}
@@ -196,7 +200,7 @@ function apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, ts
     end
     Threads.@threads for ix in 0:div(n_amps, 2^nq)-1
         padded_ix = pad_bits(ix, ordered_ts)
-        ixs = SVector{2^nq, Int}([flip_bits(padded_ix, f) + 1 for f in flip_list])
+        ixs = SVector{2^nq, Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
         @views begin 
             amps = state_vec[ixs]
             new_amps = gate_kernel(Val(V), g_mat, amps)

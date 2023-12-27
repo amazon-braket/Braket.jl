@@ -187,7 +187,7 @@ function ir(ag::AdjointGradient, ::Val{:OpenQASM}; serialization_properties::Ser
 end
 StructTypes.StructType(::Type{AdjointGradient}) = StructTypes.CustomStruct()
 function StructTypes.lower(x::AdjointGradient)
-    lowered_obs = ir(x.observable, Val(:JAQCD))
+    lowered_obs     = StructTypes.lower(x.observable)
     lowered_targets = (isempty(x.targets) ? nothing : convert(Vector{Vector{Int}}, x.targets))
     Braket.IR.AdjointGradient(x.parameters, lowered_obs, lowered_targets, "adjoint_gradient")
 end
@@ -196,7 +196,7 @@ function AdjointGradient(x::@NamedTuple{parameters::Union{Nothing, Vector{String
     params = isnothing(x.parameters) || isempty(x.parameters) ? ["all"] : x.parameters
     obs = StructTypes.constructfrom(Observables.Observable, x.observable)
     targets = isnothing(x.targets) || isempty(x.targets) ? QubitSet[] : [QubitSet(t) for t in x.targets]
-    return AdjointGradient(obs, targets, parameters)
+    return AdjointGradient(obs, targets, params)
 end
 chars(x::AdjointGradient) = ("AdjointGradient(H)",) 
 
@@ -259,7 +259,7 @@ StateVector(x::@NamedTuple{type::String}) = StateVector()
 ir(r::Result, ::Val{:JAQCD}; kwargs...) = StructTypes.lower(r)
 ir(r::Result; kwargs...) = ir(r, Val(IRType[]); kwargs...)
 StructTypes.StructType(::Type{Result}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{Result}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, statevector=StateVector, variance=Variance, sample=Sample, densitymatrix=DensityMatrix)
+StructTypes.subtypes(::Type{Result}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, statevector=StateVector, variance=Variance, sample=Sample, densitymatrix=DensityMatrix, adjoint_gradient=AdjointGradient)
 
 function StructTypes.constructfrom(::Type{R}, obj) where {R<:Result}
     return R((getproperty(obj, fn) for fn in fieldnames(R))...)

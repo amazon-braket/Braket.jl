@@ -65,6 +65,9 @@ function _validate_result_types_qubits_exist(result_types::Vector, qubit_count::
     for rt in result_types
         (!hasfield(typeof(rt), :targets) || isnothing(rt.targets) || isempty(rt.targets)) && continue
         targets = rt.targets
+        if rt isa AdjointGradient
+            targets = reduce(vcat, targets)
+        end
         !isempty(targets) && maximum(targets) > qubit_count && throw("Result type $rt references invalid qubits $targets. Maximum qubit number is $(qubit_count-1).")
     end
     return

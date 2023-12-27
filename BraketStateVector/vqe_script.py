@@ -263,12 +263,15 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
         raise RuntimeError("The circuit has an unsupported MeasurementTransform.")
    
     def shadow_expval_batch(self, circuits):
+        start = time.time()
         all_results = self.classical_shadow_batch(circuits)
         all_expvals = []
         for (circuit, (bits, recipes)) in zip(circuits, all_results):
-            obs = circuit.measurements[0]
+            obs    = circuit.measurements[0]
             shadow = qml.shadows.ClassicalShadow(bits, recipes, wire_map=obs.wires.tolist())
             all_expvals.append(shadow.expval(obs.H, obs.k))
+        stop = time.time()
+        print(f"\tTime to compute shadow expal batch for {len(circuits)} circuits: {stop-start}.")
         return all_expvals 
 
     def batch_execute(self, circuits, **run_kwargs):
@@ -444,7 +447,7 @@ Main.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="qwc")
+parser.add_argument("--protocol", type=str, default="shadows")
 parser.add_argument("--mol", type=str, default="H8")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')

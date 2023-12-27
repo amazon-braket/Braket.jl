@@ -237,6 +237,7 @@ function Base.show(io::IO, s::Sum)
     print(io, ")")
     return
 end
+StructTypes.lower(s::Sum) = [StructTypes.lower(summand) for summand in s.summands]
 ir(s::Sum, target::Vector{QubitSet}, ::Val{:JAQCD}; kwargs...) = throw(ErrorException("Sum observables are not supported in JAQCD."))
 ir(s::Sum, target::Vector{<:IntOrQubit}, ::Val{:JAQCD}; kwargs...) = throw(ErrorException("Sum observables are not supported in JAQCD."))
 function ir(s::Sum, target::Vector{QubitSet}, ::Val{:OpenQASM}; kwargs...)

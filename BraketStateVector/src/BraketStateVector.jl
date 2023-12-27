@@ -2,7 +2,7 @@ module BraketStateVector
 
 using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random
 
-import Braket: Instruction, BraketSimulator, Program, OpenQasmProgram, apply_gate!, apply_noise!, I, device_id
+import Braket: Instruction, BraketSimulator, Program, OpenQasmProgram, apply_gate!, apply_noise!, I, device_id, bind_value!
 
 export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, classical_shadow
 
@@ -32,7 +32,6 @@ function _bundle_results(results::Vector{Braket.ResultTypeValue}, circuit_ir::Un
     task_mtd = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], string(uuid4()), d.shots, device_id(d), nothing, nothing, nothing, nothing, nothing)
     addl_mtd = Braket.AdditionalMetadata(circuit_ir, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     formatted_samples = _formatted_measurements(d)
-    #measured_qubits   = _get_measured_qubits(qubit_count(circuit_ir))
     measured_qubits   = sort(collect(qubits(circuit_ir)))
     return Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult], formatted_samples, nothing, results, measured_qubits, task_mtd, addl_mtd)
 end
@@ -52,7 +51,8 @@ function _translate_result_types(results::Vector{Braket.AbstractProgramResult}, 
             raw_results[ri] = replace(rr, "\"targets\":null"=>"\"targets\":$(repr(collect(0:qubit_count-1)))")
         end
     end
-    translated_results = [JSON3.read(r, Braket.Result) for r in raw_results]
+    is_ag = results[1] isa Braket.IR.AdjointGradient
+    translated_results = is_ag ? [JSON3.read(r, Braket.AdjointGradient) for r in raw_results] : [JSON3.read(r, Braket.Result) for r in raw_results]
     return translated_results
 end
 
@@ -70,12 +70,10 @@ function classical_shadow(d::LocalSimulator, obs_qubits::Vector{Vector{Int}}, ci
         start = time()
         outcomes, recipes = classical_shadow(d, obs_qubits[ix], circuits[ix], shots, seed[ix])
         stop = time()
-        @info "(Thread $(Threads.threadid())): Computed classical shadows for circuit $ix/$(length(circuits)) in $(stop-start)."
         @views begin
             all_outcomes[ix] .= outcomes
             all_recipes[ix] .= recipes
         end
-        flush(stdout)
     end
     return all_outcomes, all_recipes
 end
@@ -118,7 +116,6 @@ function compute_shadows(d::AbstractSimulator, circuit_ir::Program, recipes, obs
     measurements = Matrix{Int}(undef, n_snapshots, n_qubits)
     for s_ix in 1:n_snapshots
         copyto!(snapshot_d, d)
-
         snapshot_rotations = reduce(vcat, [diagonalizing_gates(OBS_LIST[recipes[s_ix, wire_idx] + 1], [wire]) for (wire_idx, wire) in enumerate(obs_qubits)])
         snapshot_d         = evolve!(snapshot_d, snapshot_rotations)
         @views begin
@@ -137,7 +134,9 @@ function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwar
     if shots > 0 && !isempty(circuit_ir.basis_rotation_instructions)
         operations = vcat(operations, circuit_ir.basis_rotation_instructions)
     end
-    operations = [Instruction(op) for op in operations]
+    inputs     = get(kwargs, :inputs, Dict{String, Float64}())
+    symbol_inputs = Dict{Symbol, Number}(Symbol(k)=>v for (k,v) in inputs)
+    operations = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
     _validate_operation_qubits(operations)
 
     reinit!(d, qc, shots)
@@ -146,7 +145,14 @@ function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwar
     if shots == 0 && !isempty(circuit_ir.results)
         result_types = _translate_result_types(circuit_ir.results, qc)
         _validate_result_types_qubits_exist(result_types, qc)
-        results = _generate_results(circuit_ir.results, result_types, d)
+        if circuit_ir.results[1] isa Braket.IR.AdjointGradient
+            rt = result_types[1] 
+            ev, grad = calculate(rt, Vector{Instruction}(circuit_ir.instructions), inputs, d)
+            result_val = Dict{String, Any}("expectation"=>ev, "gradient"=>grad)
+            results = [Braket.ResultTypeValue(circuit_ir.results[1], result_val)]
+        else
+            results = _generate_results(circuit_ir.results, result_types, d)
+        end
     end
     return _bundle_results(results, circuit_ir, d) 
 end

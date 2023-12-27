@@ -40,7 +40,7 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
     tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
     for (ix, spec, input) in tasks_and_inputs
         if spec isa Circuit
-            param_names = Set(String(param) for param in spec.parameters)
+            param_names = Set(string(param.name) for param in spec.parameters)
             unbounded_params = setdiff(param_names, collect(keys(input)))
             !isempty(unbounded_params) && throw(ErrorException("cannot execute circuit with unbound parameters $unbounded_params."))
         end
@@ -72,7 +72,7 @@ function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, input
         validate_circuit_and_shots(circuit, shots) 
         program = ir(circuit, Val(:JAQCD))
         qubits  = qubit_count(circuit)
-        r       = simulator(program, qubits, args...; shots=shots, kwargs...)
+        r       = simulator(program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
         return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))

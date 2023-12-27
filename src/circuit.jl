@@ -267,7 +267,7 @@ QubitSet(0, 1)
 qubits(c::Circuit) = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
 function qubits(p::Program)
     inst_qubits = mapreduce(ix->ix.target, union, p.instructions, init=Set{Int}())
-    res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? ix.targets : Set{Int}(), union, p.results, init=Set{Int}())
+    res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? reduce(vcat, ix.targets) : Set{Int}(), union, p.results, init=Set{Int}())
     return union(inst_qubits, res_qubits)
 end
 """
