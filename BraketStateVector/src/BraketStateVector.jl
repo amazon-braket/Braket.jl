@@ -8,7 +8,8 @@ export StateVector, StateVectorSimulator, DensityMatrixSimulator, evolve!, class
 
 const StateVector{T}         = Vector{T}
 const DensityMatrix{T}       = Matrix{T}
-const AbstractStateVector{T} = AbstractVector{T}
+const AbstractStateVector{T}   = AbstractVector{T}
+const AbstractDensityMatrix{T} = AbstractMatrix{T}
 
 abstract type AbstractSimulator <: Braket.BraketSimulator end
 Braket.name(s::AbstractSimulator) = device_id(s)
@@ -157,6 +158,7 @@ function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwar
     return _bundle_results(results, circuit_ir, d) 
 end
 
+include("custom_gates.jl")
 include("gate_kernels.jl")
 include("noise_kernels.jl")
 include("observables.jl")
@@ -169,9 +171,9 @@ include("dm_simulator.jl")
 include("precompile.jl")
 
 function __init__()
-    Braket._simulator_devices[]["braket_dm"] = DensityMatrixSimulator{ComplexF64}
-    Braket._simulator_devices[]["braket_sv"] = StateVectorSimulator{ComplexF64}
-    Braket._simulator_devices[]["default"]   = StateVectorSimulator{ComplexF64}
+    Braket._simulator_devices[]["braket_dm"] = DensityMatrixSimulator{ComplexF64, DensityMatrix{ComplexF64}}
+    Braket._simulator_devices[]["braket_sv"] = StateVectorSimulator{ComplexF64, StateVector{ComplexF64}}
+    Braket._simulator_devices[]["default"]   = StateVectorSimulator{ComplexF64, StateVector{ComplexF64}}
 end
 
 end # module BraketStateVector

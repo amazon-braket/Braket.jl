@@ -3,13 +3,12 @@ module BraketStateVectorPythonExt
 using BraketStateVector, BraketStateVector.Braket, PythonCall
 
 import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program, Gate, AngledGate, IRObservable
-import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit
+import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit, DoubleExcitation, SingleExcitation
 
 const pennylane = Ref{Py}()
 const numpy     = Ref{Py}()
 const braket    = Ref{Py}()
 
-include("custom_gates.jl")
 include("translation.jl")
 
 function __init__()

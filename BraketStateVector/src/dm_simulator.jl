@@ -1,59 +1,67 @@
-mutable struct DensityMatrixSimulator{T} <: AbstractSimulator where {T}
-    density_matrix::DensityMatrix{T}
+mutable struct DensityMatrixSimulator{T, S} <: AbstractSimulator where {T, S<:AbstractDensityMatrix{T}}
+    density_matrix::S
     qubit_count::Int
     shots::Int
-    _density_matrix_after_observables::DensityMatrix{T}
-    function DensityMatrixSimulator{T}(qubit_count::Int, shots::Int) where {T}
-        dm      = zeros(complex(T), 2^qubit_count, 2^qubit_count)
-        dm[1,1] = complex(1.0)
-        return new(dm, qubit_count, shots, zeros(complex(T), 0, 0))
+    _density_matrix_after_observables::S
+    function DensityMatrixSimulator{T, S}(qubit_count::Int, shots::Int) where {T, S<:AbstractDensityMatrix{T}}
+        dm      = S(undef, 2^qubit_count, 2^qubit_count)
+        fill!(dm, zero(T))
+        dm[1,1] = one(T)
+        return new(dm, qubit_count, shots, S(undef, 0, 0))
     end
-    function DensityMatrixSimulator{T}(density_matrix::DensityMatrix{T}, qubit_count::Int, shots::Int) where {T}
-        return new(density_matrix, qubit_count, shots, zeros(complex(T), 0, 0))
+    function DensityMatrixSimulator{T, S}(density_matrix::S, qubit_count::Int, shots::Int) where {T, S<:AbstractDensityMatrix{T}}
+        return new(density_matrix, qubit_count, shots, S(undef, 0, 0))
     end
 end
-DensityMatrixSimulator(::T, qubit_count::Int, shots::Int) where {T} = DensityMatrixSimulator{T}(qubit_count, shots)
-DensityMatrixSimulator(qubit_count::Int, shots::Int) = DensityMatrixSimulator{ComplexF64}(qubit_count, shots)
-Braket.qubit_count(dms::DensityMatrixSimulator) = dms.qubit_count
-Braket.properties(d::DensityMatrixSimulator) = dm_props
-supported_operations(d::DensityMatrixSimulator)   = dm_props.action["braket.ir.openqasm.program"].supportedOperations
-supported_result_types(d::DensityMatrixSimulator) = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
-Braket.device_id(dms::DensityMatrixSimulator) = "braket_dm"
-Braket.name(dms::DensityMatrixSimulator) = "DensityMatrixSimulator"
-Base.show(io::IO, dms::DensityMatrixSimulator) = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots)")
-Base.similar(dms::DensityMatrixSimulator{T}; shots::Int=dms.shots) where {T} = DensityMatrixSimulator{T}(dms.qubit_count, shots)
-Base.copy(dms::DensityMatrixSimulator{T}) where {T} = DensityMatrixSimulator{T}(deepcopy(dms.density_matrix), dms.qubit_count, dms.shots)
-function Base.copyto!(dst::DensityMatrixSimulator{T}, src::DensityMatrixSimulator{T}) where {T}
+DensityMatrixSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} = DensityMatrixSimulator{T, DensityMatrix{T}}(qubit_count, shots)
+DensityMatrixSimulator(qubit_count::Int, shots::Int) = DensityMatrixSimulator(ComplexF64, qubit_count, shots)
+Braket.qubit_count(dms::DensityMatrixSimulator)      = dms.qubit_count
+Braket.properties(d::DensityMatrixSimulator)         = dm_props
+supported_operations(d::DensityMatrixSimulator)      = dm_props.action["braket.ir.openqasm.program"].supportedOperations
+supported_result_types(d::DensityMatrixSimulator)    = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
+Braket.device_id(dms::DensityMatrixSimulator)        = "braket_dm"
+Braket.name(dms::DensityMatrixSimulator)             = "DensityMatrixSimulator"
+Base.show(io::IO, dms::DensityMatrixSimulator)       = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots)")
+Base.similar(dms::DensityMatrixSimulator{T, S}; shots::Int=dms.shots) where {T, S<:AbstractDensityMatrix{T}} = DensityMatrixSimulator{T, S}(dms.qubit_count, shots)
+Base.copy(dms::DensityMatrixSimulator{T, S}) where {T, S<:AbstractDensityMatrix{T}} = DensityMatrixSimulator{T, S}(deepcopy(dms.density_matrix), dms.qubit_count, dms.shots)
+function Base.copyto!(dst::DensityMatrixSimulator{T, S}, src::DensityMatrixSimulator{T, S}) where {T, S}
     copyto!(dst.density_matrix, src.density_matrix)
     return dst
 end
 
-function reinit!(dms::DensityMatrixSimulator{T}, qubit_count::Int, shots::Int) where {T}
-    dm = zeros(complex(T), 2^qubit_count, 2^qubit_count)
-    dm[1,1] = complex(1.0)
-    dms.density_matrix = dm
-    dms.qubit_count = qubit_count
-    dms.shots = shots
-    dms._density_matrix_after_observables = zeros(complex(T), 0, 0)
+function reinit!(dms::DensityMatrixSimulator{T, S}, qubit_count::Int, shots::Int) where {T, S<:AbstractDensityMatrix{T}}
+    if size(dms.density_matrix) != (2^qubit_count, 2^qubit_count)
+        dms.density_matrix = S(undef, 2^qubit_count, 2^qubit_count)
+    end
+    fill!(dms.density_matrix, zero(T))
+    dms.density_matrix[1,1] = one(T)
+    dms.qubit_count         = qubit_count
+    dms.shots               = shots
+    dms._density_matrix_after_observables = S(undef, 0, 0)
     return
 end
 
-function evolve!(dms::DensityMatrixSimulator{T}, operations::Vector{Instruction}) where {T<:Complex}
+function _evolve_op!(dms::DensityMatrixSimulator{T, S}, op::G, target::Int...) where {T<:Complex, S<:AbstractDensityMatrix{T}, G<:Gate}
+    reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
+    apply_gate!(Val(false), op, reshaped_dm, target...)
+    apply_gate!(Val(true),  op, reshaped_dm, (dms.qubit_count .+ target)...)
+end
+
+function _evolve_op!(dms::DensityMatrixSimulator{T, S}, op::N, target::Int...) where {T<:Complex, S<:AbstractDensityMatrix{T}, N<:Noise}
+    apply_noise!(op, dms.density_matrix, target...)
+end
+
+function evolve!(dms::DensityMatrixSimulator{T, S}, operations::Vector{Instruction}) where {T<:Complex, S<:AbstractDensityMatrix{T}}
     for op in operations
-        if op.operator isa Gate
-            reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
-            apply_gate!(Val(false), op.operator, reshaped_dm, op.target...)
-            apply_gate!(Val(true),  op.operator, reshaped_dm, (dms.qubit_count .+ op.target)...)
-        elseif op.operator isa Noise
-            apply_noise!(op.operator, dms.density_matrix, op.target...)
-        end
+        # use this to dispatch on Gates vs Noises
+        _evolve_op!(dms, op.operator, op.target...)
     end
     return dms
 end
 
 for (gate, obs) in ((:X, :(Braket.Observables.X)), (:Y, :(Braket.Observables.Y)), (:Z, :(Braket.Observables.Z)), (:I, :(Braket.Observables.I)), (:H, :(Braket.Observables.H)))
     @eval begin
-        function apply_observable!(observable::$obs, dm::DensityMatrix{T}, targets) where {T<:Complex}
+        function apply_observable!(observable::$obs, dm::S, targets) where {T<:Complex, S<:AbstractDensityMatrix{T}}
             nq = Int(log2(size(dm, 1)))
             reshaped_dm = reshape(dm, length(dm))
             for target in targets
@@ -131,8 +139,8 @@ function expectation(dms::DensityMatrixSimulator, observable::Observables.Observ
 end
 state_vector(dms::DensityMatrixSimulator)   = isdiag(dms.density_matrix) ? diag(dms.density_matrix) : error("cannot express density matrix with off-diagonal elements as a pure state.") 
 density_matrix(dms::DensityMatrixSimulator) = dms.density_matrix
-probabilities(dms::DensityMatrixSimulator) = real.(diag(dms.density_matrix))
-samples(dms::DensityMatrixSimulator) = sample(0:size(dms.density_matrix, 1)-1, Weights(probabilities(dms)), dms.shots)
+probabilities(dms::DensityMatrixSimulator)  = real.(diag(dms.density_matrix))
+samples(dms::DensityMatrixSimulator)        = sample(0:size(dms.density_matrix, 1)-1, Weights(probabilities(dms)), dms.shots)
 
 function swap_bits(ix::Int, qubit_map::Dict{Int, Int})
     # only flip 01 and 10

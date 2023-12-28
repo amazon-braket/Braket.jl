@@ -447,7 +447,7 @@ Main.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="shadows")
+parser.add_argument("--protocol", type=str, default="qwc")
 parser.add_argument("--mol", type=str, default="H8")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')

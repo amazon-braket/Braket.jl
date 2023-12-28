@@ -1,44 +1,47 @@
-mutable struct StateVectorSimulator{T} <: AbstractSimulator where {T}
-    state_vector::StateVector{T}
+mutable struct StateVectorSimulator{T,S<:AbstractStateVector{T}} <: AbstractSimulator
+    state_vector::S
     qubit_count::Int
     shots::Int
-    _state_vector_after_observables::StateVector{T}
-    function StateVectorSimulator{T}(state_vector::StateVector{T}, qubit_count::Int, shots::Int) where {T}
+    _state_vector_after_observables::S
+    function StateVectorSimulator{T, S}(state_vector::S, qubit_count::Int, shots::Int) where {T, S<:AbstractStateVector{T}}
         return new(state_vector, qubit_count, shots, zeros(complex(T), 0))
     end
-    function StateVectorSimulator{T}(qubit_count::Int, shots::Int) where {T}
-        sv    = zeros(complex(T), 2^qubit_count)
-        sv[1] = complex(1.0)
-        return new(sv, qubit_count, shots, zeros(complex(T), 0))
+    function StateVectorSimulator{T, S}(qubit_count::Int, shots::Int) where {T, S<:AbstractStateVector{T}}
+        sv    = S(undef, 2^qubit_count)
+        fill!(sv, zero(T))
+        sv[1] = one(T)
+        return new(sv, qubit_count, shots, S(undef, 0))
     end
 end
-StateVectorSimulator(::T, qubit_count::Int, shots::Int) where {T} = StateVectorSimulator{T}(qubit_count, shots)
-StateVectorSimulator(qubit_count::Int, shots::Int) = StateVectorSimulator{ComplexF64}(qubit_count, shots)
-Braket.qubit_count(svs::StateVectorSimulator) = svs.qubit_count
-Braket.properties(svs::StateVectorSimulator) = sv_props
+StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} = StateVectorSimulator{T, StateVector{T}}(qubit_count, shots)
+StateVectorSimulator(qubit_count::Int, shots::Int) = StateVectorSimulator(ComplexF64, qubit_count, shots)
+Braket.qubit_count(svs::StateVectorSimulator)     = svs.qubit_count
+Braket.properties(svs::StateVectorSimulator)      = sv_props
 supported_operations(svs::StateVectorSimulator)   = sv_props.action["braket.ir.openqasm.program"].supportedOperations
 supported_result_types(svs::StateVectorSimulator) = sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
-Braket.device_id(svs::StateVectorSimulator) = "braket_sv"
-Braket.name(svs::StateVectorSimulator) = "StateVectorSimulator"
-Base.show(io::IO, svs::StateVectorSimulator) = print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots)")
-Base.similar(svs::StateVectorSimulator{T}; shots::Int=svs.shots) where {T} = StateVectorSimulator{T}(svs.qubit_count, shots)
-Base.copy(svs::StateVectorSimulator{T}) where {T} = StateVectorSimulator{T}(deepcopy(svs.state_vector), svs.qubit_count, svs.shots)
-function Base.copyto!(dst::StateVectorSimulator{T}, src::StateVectorSimulator{T}) where {T}
+Braket.device_id(svs::StateVectorSimulator)       = "braket_sv"
+Braket.name(svs::StateVectorSimulator)            = "StateVectorSimulator"
+Base.show(io::IO, svs::StateVectorSimulator)      = print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots)")
+Base.similar(svs::StateVectorSimulator{T, S}; shots::Int=svs.shots) where {T, S} = StateVectorSimulator{T, S}(svs.qubit_count, shots)
+Base.copy(svs::StateVectorSimulator{T, S}) where {T, S} = StateVectorSimulator{T, S}(deepcopy(svs.state_vector), svs.qubit_count, svs.shots)
+function Base.copyto!(dst::StateVectorSimulator{T, S}, src::StateVectorSimulator{T, S}) where {T, S}
     copyto!(dst.state_vector, src.state_vector)
     return dst
 end
 
-function reinit!(svs::StateVectorSimulator{T}, qubit_count::Int, shots::Int) where {T}
-    sv = zeros(complex(T), 2^qubit_count)
-    sv[1] = complex(1.0)
-    svs.state_vector = sv
-    svs.qubit_count = qubit_count
-    svs.shots = shots
-    svs._state_vector_after_observables = zeros(complex(T), 0)
+function reinit!(svs::StateVectorSimulator{T, S}, qubit_count::Int, shots::Int) where {T, S}
+    if length(svs.state_vector) != 2^qubit_count
+        resize!(svs.state_vector, 2^qubit_count)
+    end
+    fill!(svs.state_vector, zero(T))
+    svs.state_vector[1] = one(T)
+    svs.qubit_count     = qubit_count
+    svs.shots           = shots
+    svs._state_vector_after_observables = S(undef, 0)
     return
 end
 
-function evolve!(svs::StateVectorSimulator{T}, operations::Vector{Instruction}) where {T<:Complex}
+function evolve!(svs::StateVectorSimulator{T, S}, operations::Vector{Instruction}) where {T<:Complex, S<:AbstractStateVector{T}}
     for (oix, op) in enumerate(operations)
         apply_gate!(op.operator, svs.state_vector, op.target...)
     end
@@ -54,7 +57,7 @@ for (gate, obs) in ((:X, :(Braket.Observables.X)),
                     (:I, :(Braket.Observables.I)),
                     (:H, :(Braket.Observables.H)))
     @eval begin
-        function apply_observable!(observable::$obs, sv::StateVector{T}, target::Int) where {T<:Complex}
+        function apply_observable!(observable::$obs, sv::AbstractStateVector{T}, target::Int) where {T<:Complex}
             apply_gate!($gate(), sv, target)
             return sv
         end
@@ -190,7 +193,7 @@ function _get_params_and_angles(g::AngledGate{N}) where {N}
 end
 _get_params_and_angles(g::Gate) = Dict{String, Int}()
 
-function calculate(ag::AdjointGradient, instructions::Vector{Instruction}, inputs::Dict{String, Float64}, svs::StateVectorSimulator{T}) where {T<:Complex}
+function calculate(ag::AdjointGradient, instructions::Vector{Instruction}, inputs::Dict{String, Float64}, svs::StateVectorSimulator{T, S}) where {T<:Complex, S<:AbstractStateVector{T}}
     svs.shots != 0 && throw(ArgumentError("state vector simulator initiated with non-zero shots $(svs.shots). Adjoint gradient only supported for shots=0."))
     # apply Hamiltonian to ket_svs
     H            = ag.observable

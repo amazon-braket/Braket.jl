@@ -2,16 +2,16 @@ struct DoubleExcitation <: AngledGate{1}
     angle::NTuple{1, Union{Float64, FreeParameter}}
     DoubleExcitation(angle::T) where {T<:NTuple{1, Union{Float64, FreeParameter}}} = new(angle)
 end
-chars(::Type{DoubleExcitation}) = "G2(ang)"
-qubit_count(::Type{DoubleExcitation}) = 4
+Braket.chars(::Type{DoubleExcitation}) = "G2(ang)"
+Braket.qubit_count(::Type{DoubleExcitation}) = 4
 inverted_gate(g::DoubleExcitation) = DoubleExcitation(-g.angle[1])
 
 struct SingleExcitation <: AngledGate{1}
     angle::NTuple{1, Union{Float64, FreeParameter}}
     SingleExcitation(angle::T) where {T<:NTuple{1, Union{Float64, FreeParameter}}} = new(angle)
 end
-chars(::Type{SingleExcitation}) = "G(ang)"
-qubit_count(::Type{SingleExcitation}) = 2
+Braket.chars(::Type{SingleExcitation}) = "G(ang)"
+Braket.qubit_count(::Type{SingleExcitation}) = 2
 inverted_gate(g::SingleExcitation) = SingleExcitation(-g.angle[1])
 
 function apply_gate!(::Val{V}, g::DoubleExcitation, state_vec::AbstractStateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {V, T<:Complex}
