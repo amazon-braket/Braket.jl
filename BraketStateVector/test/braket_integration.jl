@@ -1,5 +1,5 @@
-using Test, Statistics, LinearAlgebra, Braket, Braket.Observables, BraketStateVector
-using Braket: I
+using Test, CUDA, Statistics, LinearAlgebra, Braket, Braket.Observables, BraketStateVector
+using Braket: I, name
 
 @testset "Basic integration of local simulators with Braket.jl" begin
     @testset "Simulator $sim_type" for (sim_type, rt) in (("braket_sv", Braket.StateVector), ("braket_dm", Braket.DensityMatrix))
@@ -202,7 +202,7 @@ end
                 eigsh   = [-70.90875406, -31.04969387, 0, 3.26468993, 38.693758]
                 eigsii  = eigvals(kron(i_array, kron(i_array, ho_mat3)))
                 obs_targets = [0, 1, 2]
-                @testset "Obs $obs"for (obs, expected_mean, expected_var, expected_eigs) in [(Observables.I() * ho, meani, vari, eigsi),
+                @testset "Obs $obs" for (obs, expected_mean, expected_var, expected_eigs) in [(Observables.I() * ho, meani, vari, eigsi),
                                                                                              (Observables.Y() * ho, meany, vary, eigsy),
                                                                                              (Observables.Z() * ho, meanz, varz, eigsz),
                                                                                              (ho2 * ho, meanh, varh, eigsh),
@@ -251,7 +251,7 @@ end
                 eigsh   = [-70.90875406, -31.04969387, 0, 3.26468993, 38.693758]
                 eigsii  = eigvals(kron(i_array, kron(i_array, ho_mat3)))
                 obs_targets = [0, 1, 2]
-                @testset "Obs $obs"for (obs, targets, expected_mean, expected_var, expected_eigs) in [(ho, [1, 2], meani, vari, eigsi),
+                @testset "Obs $obs" for (obs, targets, expected_mean, expected_var, expected_eigs) in [(ho, [1, 2], meani, vari, eigsi),
                                                                                                       (h, [0,1,2], meanh, varh, eigsh),
                                                                                                       (ho3, [2], meanii, varii, eigsii),
                                                                                                       (ho4, [1,2], meanii, varii, eigsii),

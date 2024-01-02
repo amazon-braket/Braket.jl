@@ -148,7 +148,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             simulation = f(StateVectorSimulator(qubit_count, 0))
             simulation = evolve!(simulation, instructions)
             @test state_vector ≈ collect(simulation.state_vector)
-            @test probability_amplitudes ≈ BraketStateVector.probabilities(simulation)
+	    @test probability_amplitudes ≈ collect(BraketStateVector.probabilities(simulation))
         end
         @testset "Apply observables $obs" for (obs, equivalent_gates, qubit_count) in [
             ([(Braket.Observables.X(), [0])], [Instruction(H(), [0])], 1),
@@ -195,7 +195,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             simulation = f(StateVectorSimulator(qubit_count, 0))
             operations = qft_circuit_operations(qubit_count)
             simulation = BraketStateVector.evolve!(simulation, operations)
-            @test BraketStateVector.probabilities(simulation) ≈ fill(1.0/(2^qubit_count), 2^qubit_count)
+	    @test collect(BraketStateVector.probabilities(simulation)) ≈ fill(1.0/(2^qubit_count), 2^qubit_count)
         end
         @testset "samples" begin
             simulation = f(StateVectorSimulator(2, 10000))

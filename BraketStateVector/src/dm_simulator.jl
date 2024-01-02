@@ -87,12 +87,8 @@ function apply_observable!(observable::Braket.Observables.HermitianObservable, d
     Threads.@threads for raw_ix in 0:(slim_size^2)-1
         ix = div(raw_ix, slim_size) 
         jx = mod(raw_ix, slim_size) 
-        padded_ix = ix
-        padded_jx = jx
-        for t in ordered_ts
-            padded_ix = pad_bit(padded_ix, t)
-            padded_jx = pad_bit(padded_jx, t)
-        end
+        padded_ix = pad_bits(ix, ordered_ts)
+        padded_jx = pad_bits(jx, ordered_ts)
         ixs = map(flip_list) do f
             flipped_ix = padded_ix
             for f_val in f

@@ -1,11 +1,11 @@
-using Test, LinearAlgebra, Braket, BraketStateVector, DataStructures
+using Test, CUDA, Cthulhu, LinearAlgebra, Braket, BraketStateVector, DataStructures
 
 import Braket: Instruction
 
 funcs = CUDA.functional() ? (identity, cu) : (identity,)
 
 @testset "Density matrix simulator" begin
-    for f in funcs
+    @testset for f in funcs
         sx = [0 1; 1 0]
         si = [1 0; 0 1]
         matrix_3q = kron(sx, kron(si, si))
@@ -65,8 +65,8 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             (
                 [Instruction(X(), [0]), Instruction(X(), [1]), Instruction(TwoQubitPauliChannel(Dict("XX"=>0.1, "YZ"=>0.2)), [0, 1])],
                 2,
-                tqcp_dm,
-                diag(tqcp_dm),
+		collect(tqcp_dm),
+		diag(collect(tqcp_dm)),
             ),
             (
                 [Instruction(H(), [0]), Instruction(PhaseDamping(0.36), [0]), Instruction(H(), [0])],
@@ -146,8 +146,8 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         ]
             simulation = f(DensityMatrixSimulator(qubit_count, 0))
             simulation = evolve!(simulation, instructions)
-            @test density_matrix ≈ simulation.density_matrix
-            @test probability_amplitudes ≈ BraketStateVector.probabilities(simulation)
+	    @test density_matrix ≈ collect(simulation.density_matrix)
+	    @test probability_amplitudes ≈ collect(BraketStateVector.probabilities(simulation))
         end
 
         @testset "Apply observables $obs" for (obs, equivalent_gates, qubit_count) in [ 
@@ -194,7 +194,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
             simulation = f(DensityMatrixSimulator(qubit_count, 0))
             operations = qft_circuit_operations(qubit_count)
             simulation = evolve!(simulation, operations)
-            @assert BraketStateVector.probabilities(simulation) ≈ fill(1.0 / (2^qubit_count), 2^qubit_count)
+	    @assert collect(BraketStateVector.probabilities(simulation)) ≈ fill(1.0 / (2^qubit_count), 2^qubit_count)
         end
         @testset "samples" begin
             simulation = f(DensityMatrixSimulator(2, 10000))

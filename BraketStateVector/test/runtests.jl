@@ -1,7 +1,8 @@
 using Test
 
 @testset "BraketStateVector" begin
-    for test in ("sv_simulator",
+    for test in (
+		 "sv_simulator",
                  "dm_simulator",
                  "result_types",
                  "braket_integration",

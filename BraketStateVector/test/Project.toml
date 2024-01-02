@@ -1,6 +1,8 @@
 [deps]
 Braket = "19504a0f-b47d-4348-9127-acc6cc69ef67"
 BraketStateVector = "4face768-c059-465f-83fa-0d546ea16c1e"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"

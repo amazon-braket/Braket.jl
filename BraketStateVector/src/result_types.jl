@@ -1,12 +1,12 @@
 calculate(sv::Braket.StateVector, sim::AbstractSimulator) = state_vector(sim)  
 function calculate(a::Braket.Amplitude, sim::AbstractSimulator)
-    state      = state_vector(sim)
+    state      = collect(state_vector(sim))
     rev_states = reverse.(a.states)
     state_ints = [sum(tryparse(Int, string(amp_state[k]))*2^(k-1) for k=1:length(amp_state)) for amp_state in rev_states]
     return Dict(basis_state=>state[state_int+1] for (basis_state, state_int) in zip(a.states, state_ints))
 end
 
-function marginal_probability(probs::Vector{Float64}, qubit_count::Int, targets)
+function marginal_probability(probs::Vector{T}, qubit_count::Int, targets) where {T<:Real}
     unused_qubits = setdiff(collect(0:qubit_count-1), targets)
     endian_unused = qubit_count .- unused_qubits .- 1
     final_probs = zeros(Float64, 2^length(targets))
@@ -62,7 +62,7 @@ function expectation_op_squared(sim, obs::Braket.Observables.HermitianObservable
     return expectation(sim, Braket.Observables.HermitianObservable(obs.matrix*obs.matrix), targets...)
 end
 
-function apply_observable!(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T<:VecOrMat{<:Complex}}
+function apply_observable!(observable::Braket.Observables.TensorProduct, sv_or_dm::T, targets::Int...) where {T<:AbstractVecOrMat{<:Complex}}
     target_ix = 1
     for f in observable.factors
         f_n_qubits = qubit_count(f)
@@ -72,7 +72,7 @@ function apply_observable!(observable::Braket.Observables.TensorProduct, sv_or_d
     end
     return sv_or_dm
 end
-apply_observable(observable::O, sv_or_dm::T, target::Int...) where {O<:Braket.Observables.Observable, T<:VecOrMat{<:Complex}} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
+apply_observable(observable::O, sv_or_dm::T, target::Int...) where {O<:Braket.Observables.Observable, T<:AbstractVecOrMat{<:Complex}} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
 
 function calculate(var::Braket.Variance, sim::AbstractSimulator)
     obs     = var.observable

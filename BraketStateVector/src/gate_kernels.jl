@@ -1,9 +1,9 @@
-@inline function pad_bit(amp_index::Int64, t::Int64)
+@inline function pad_bit(amp_index::Ti, t::Tj)::Ti where {Ti<:Integer, Tj<:Integer}
     left  = (amp_index >> t) << t
     right = amp_index - left
-    return (left << one(Int64)) ⊻ right
+    return (left << one(Ti)) ⊻ right
 end
-function pad_bits(ix::Int, to_pad)
+function pad_bits(ix::Ti, to_pad)::Ti where {Ti<:Integer}
     padded_ix = ix
     for bit in to_pad 
         padded_ix = pad_bit(padded_ix, bit)
@@ -11,8 +11,10 @@ function pad_bits(ix::Int, to_pad)
     return padded_ix
 end
 
-@inline flip_bit(amp_index::Int, t::Int) = amp_index ⊻ (one(Int64) << t)
-function flip_bits(ix::Int, to_flip)
+@inline function flip_bit(amp_index::Ti, t::Tj)::Ti where {Ti<:Integer, Tj<:Integer}
+    return amp_index ⊻ (one(Ti) << t)
+end
+function flip_bits(ix::Ti, to_flip)::Ti where {Ti<:Integer}
     flipped_ix = ix
     for f_val in to_flip 
         flipped_ix = flip_bit(flipped_ix, f_val)
@@ -97,7 +99,7 @@ apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where
 apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, qubit::Int) where {V, T<:Complex} = apply_gate_single_target!(Val(V), g, state_vec, qubit)
 
 # generic two-qubit non controlled unitaries
-function apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, t1::Int, t2::Int) where {V, G<:Gate, T<:Complex}
+function apply_gate!(::Val{V}, g::G, state_vec::StateVector{T}, t1::Int, t2::Int) where {V, G<:Gate, T<:Complex}
     g_mat = matrix_rep(g)
     n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
     small_t, big_t = minmax(endian_t1, endian_t2)
@@ -183,12 +185,12 @@ end
 
 for (cg, tg, nc) in ((:CNot, :X, 1), (:CY, :Y, 1), (:CZ, :Z, 1), (:CV, :V, 1), (:CSwap, :Swap, 1), (:CCNot, :X, 2))
     @eval begin
-        apply_gate!(::Val{Vc}, g::$cg, state_vec::AbstractStateVector{T}, qubits::Int...) where {Vc, T<:Complex} = apply_controlled_gate!(Val(Vc), Val($nc), g, $tg(), state_vec, qubits...)
+        apply_gate!(::Val{Vc}, g::$cg, state_vec::StateVector{T}, qubits::Int...) where {Vc, T<:Complex} = apply_controlled_gate!(Val(Vc), Val($nc), g, $tg(), state_vec, qubits...)
     end
 end
 
 # arbitrary number of targets
-function apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, ts::Vararg{Int, NQ}) where {V, T<:Complex, NQ}
+function apply_gate!(::Val{V}, g::Unitary, state_vec::StateVector{T}, ts::Vararg{Int, NQ}) where {V, T<:Complex, NQ}
     n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
     endian_ts isa Int && (endian_ts = (endian_ts,)) 
     ordered_ts = sort(collect(endian_ts))
