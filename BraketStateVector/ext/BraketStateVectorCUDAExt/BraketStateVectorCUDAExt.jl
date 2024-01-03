@@ -4,7 +4,7 @@ using BraketStateVector, BraketStateVector.Braket, BraketStateVector.StatsBase, 
 
 import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program, Gate, AngledGate, IRObservable, apply_gate!, apply_noise!
 
-import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, AbstractDensityMatrix, get_amps_and_qubits, pad_bits, flip_bits, flip_bit, DoubleExcitation, SingleExcitation, apply_gate_single_target!, evolve!, apply_controlled_gate!, pad_bit, matrix_rep, samples, probabilities, density_matrix, apply_observable!, marginal_probability
+import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, AbstractDensityMatrix, get_amps_and_qubits, pad_bits, flip_bits, flip_bit, DoubleExcitation, SingleExcitation, apply_gate_single_target!, evolve!, apply_controlled_gate!, pad_bit, matrix_rep, samples, probabilities, density_matrix, apply_observable!, marginal_probability, reinit!
 
 const DEFAULT_THREAD_COUNT        = 512
 const CuStateVectorSimulator{T}   = StateVectorSimulator{T, CuVector{T}}
@@ -21,6 +21,47 @@ function CUDA.cu(dms::DensityMatrixSimulator{T, S}) where {T, S<:AbstractDensity
     copyto!(cu_dm, dms.density_matrix)
     return DensityMatrixSimulator{T, CuMatrix{T}}(cu_dm, dms.qubit_count, dms.shots)
 end
+    
+function StateVectorSimulator{T, CuVector{T}}(qubit_count::Int, shots::Int) where {T}
+    sv    = CUDA.zeros(T, 2^qubit_count)
+    CUDA.@allowscalar sv[1] = one(T)
+    return StateVectorSimulator{T, CuVector{T}}(sv, qubit_count, shots)
+end
+
+function DensityMatrixSimulator{T, CuMatrix{T}}(qubit_count::Int, shots::Int) where {T}
+    dm    = CUDA.zeros(T, 2^qubit_count, 2^qubit_count)
+    CUDA.@allowscalar dm[1, 1] = one(T)
+    return DensityMatrixSimulator{T, CuMatrix{T}}(dm, qubit_count, shots)
+end
+
+function reinit!(svs::StateVectorSimulator{T, CuVector{T}}, qubit_count::Int, shots::Int) where {T}
+    if length(svs.state_vector) != 2^qubit_count
+        svs.state_vector = CuVector{T}(undef, 2^qubit_count)
+    end
+    svs.state_vector   .= zero(T)
+    CUDA.@allowscalar svs.state_vector[1] = one(T)
+    svs.qubit_count     = qubit_count
+    svs.shots           = shots
+    svs._state_vector_after_observables = CuVector{T}(undef, 0)
+    return
+end
+
+function reinit!(dms::DensityMatrixSimulator{T, CuMatrix{T}}, qubit_count::Int, shots::Int) where {T}
+    if size(dms.density_matrix) != (2^qubit_count, 2^qubit_count)
+        dms.density_matrix = CuMatrix{T}(undef, 2^qubit_count, 2^qubit_count)
+    end
+    dms.density_matrix .= zero(T)
+    CUDA.@allowscalar dms.density_matrix[1, 1] = one(T)
+    dms.qubit_count     = qubit_count
+    dms.shots           = shots
+    dms._density_matrix_after_observables = CuMatrix{T}(undef, 0, 0)
+    return
+end
+
+function __init__()
+    BraketStateVector.Braket._simulator_devices[]["braket_sv_cu"] = StateVectorSimulator{ComplexF64, CuVector{ComplexF64}}
+    BraketStateVector.Braket._simulator_devices[]["braket_dm_cu"] = DensityMatrixSimulator{ComplexF64, CuMatrix{ComplexF64}}
+end
 
 include("kernels.jl")
 
@@ -30,7 +71,9 @@ function density_matrix(svs::StateVectorSimulator{T, CuVector{T}}) where {T}
     adj_sv_mat = CuMatrix{T}(undef, 1, length(svs.state_vector))
     adj_sv_mat .= adjoint(svs.state_vector)
     dm = CUDA.zeros(T, length(svs.state_vector), length(svs.state_vector))
-    kron!(dm, sv_mat, adj_sv_mat)
+    CUDA.@allowscalar begin
+        kron!(dm, sv_mat, adj_sv_mat)
+    end
     return dm
 end
 
@@ -159,43 +202,33 @@ for (V, f) in ((true, :conj), (false, :identity))
 	    @cuda threads=tc blocks=bc apply_gate_single_target_kernel!(g_00, g_01, g_10, g_11, state_vec, endian_qubit)
 	    return
 	end
-    end
-end
-apply_gate!(::Val{false}, g::Unitary, state_vec::CuVector{T}, qubit::Int) where {T<:Complex} = apply_gate_single_target!(Val(false), g, state_vec, qubit)
-apply_gate!(::Val{true}, g::Unitary, state_vec::CuVector{T}, qubit::Int) where {T<:Complex} = apply_gate_single_target!(Val(true), g, state_vec, qubit)
-
-function apply_gate!(::Val{false}, g::G, state_vec::CuVector{T}, t1::Int, t2::Int) where {G<:Gate, T<:Complex}
-    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
-    g_mat    = Matrix(matrix_rep(g))
-    total_ix = div(n_amps, 4)
-    tc, bc   = get_launch_dims(total_ix)
-    @cuda threads=tc blocks=bc apply_gate_kernel!(CuMatrix{T}(g_mat), state_vec, endian_t1, endian_t2)
-    return
-end
-function apply_gate!(::Val{true}, g::G, state_vec::CuVector{T}, t1::Int, t2::Int) where {G<:Gate, T<:Complex}
-    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
-    g_mat    = conj(Matrix(matrix_rep(g)))
-    total_ix = div(n_amps, 4)
-    tc, bc   = get_launch_dims(total_ix)
-    @cuda threads=tc blocks=bc apply_gate_kernel!(CuMatrix{T}(g_mat), state_vec, endian_t1, endian_t2)
-    return
-end
-
-for G in (:CPhaseShift, :CPhaseShift00, :CPhaseShift10, :CPhaseShift01), (V, f) in ((true, :conj), (false, :identity))
-    @eval begin
-	function apply_gate!(::Val{$V}, g::$G, state_vec::CuVector{T}, t1::Int, t2::Int) where {T<:Complex}
+	function apply_gate!(::Val{$V}, g::G, state_vec::CuVector{T}, t1::Int, t2::Int) where {G<:Gate, T<:Complex}
 	    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
-	    g_mat    = $f(Vector{T}(matrix_rep(g)))
+	    g_mat    = $f(Matrix(matrix_rep(g)))
 	    total_ix = div(n_amps, 4)
 	    tc, bc   = get_launch_dims(total_ix)
-	    @cuda threads=tc blocks=bc apply_gate_kernel!(CuVector{T}(g_mat), state_vec, endian_t1, endian_t2)
+	    @cuda threads=tc blocks=bc apply_gate_kernel!(CuMatrix{T}(g_mat), state_vec, endian_t1, endian_t2)
 	    return
 	end
-    end
-end
-
-for (V, f) in ((false, :identity), (true, :conj))
-    @eval begin
+	function apply_gate!(::Val{$V}, g::SingleExcitation, state_vec::CuVector{T}, t1::Int, t2::Int) where {T<:Complex}
+	    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
+	    cosϕ = T(cos(g.angle[1]/2.0))
+	    sinϕ = T(sin(g.angle[1]/2.0))
+	    total_ix = div(n_amps, 4)
+	    tc, bc   = get_launch_dims(total_ix)
+	    @cuda threads=tc blocks=bc apply_gate_single_ex_kernel!(cosϕ, sinϕ, state_vec, endian_t1, endian_t2)
+	    return
+	end
+	function apply_gate!(::Val{$V}, g::DoubleExcitation, state_vec::CuVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {T<:Complex}
+	    n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2, t3, t4)
+	    cosϕ = T(cos(g.angle[1]/2.0))
+	    sinϕ = T(sin(g.angle[1]/2.0))
+	    total_ix = div(n_amps, 16)
+	    ordered_ts = tuple(sort(collect(endian_ts))...)
+	    tc, bc   = get_launch_dims(total_ix)
+	    @cuda threads=tc blocks=bc apply_gate_double_ex_kernel!(cosϕ, sinϕ, state_vec, tuple(endian_ts...), ordered_ts)
+	    return
+	end
 	function apply_controlled_gate!(::Val{$V}, ::Val{1}, g::G, tg::TG, state_vec::CuVector{T}, control::Int, target::Int) where {G<:Gate, TG<:Gate, T<:Complex}
 	    n_amps, (endian_control, endian_target) = get_amps_and_qubits(state_vec, control, target)
 	    total_ix = div(n_amps, 4)
@@ -204,33 +237,16 @@ for (V, f) in ((false, :identity), (true, :conj))
 	    @cuda threads=tc blocks=bc apply_controlled_gate_kernel!(Val(1), g_00, g_01, g_10, g_11, state_vec, endian_control, endian_target)
 	    return
 	end
-    end
-end
-
-function apply_controlled_gate!(::Val{false}, ::Val{1}, g::G, tg::TG, state_vec::CuVector{T}, control::Int, t1::Int, t2::Int) where {G<:Gate, TG<:Gate, T<:Complex}
-    tg_mat = matrix_rep(tg)
-    n_amps, (endian_control, endian_t1, endian_t2) = get_amps_and_qubits(state_vec, control, t1, t2) 
-    small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
-    total_ix = div(n_amps, 8)
-    tc, bc   = get_launch_dims(total_ix)
-    tg_mat   = CuMatrix{T}(matrix_rep(tg))
-    @cuda threads=tc blocks=bc apply_controlled_gate_kernel!(Val(1), tg_mat, state_vec, endian_control, endian_t1, endian_t2, small_t, mid_t, big_t)
-    return
-end
-
-function apply_controlled_gate!(::Val{true}, ::Val{1}, g::G, tg::TG, state_vec::CuVector{T}, control::Int, t1::Int, t2::Int) where {G<:Gate, TG<:Gate, T<:Complex}
-    tg_mat = matrix_rep(tg)
-    n_amps, (endian_control, endian_t1, endian_t2) = get_amps_and_qubits(state_vec, control, t1, t2) 
-    total_ix = div(n_amps, 8)
-    tc, bc   = get_launch_dims(total_ix)
-    tg_mat   = CuMatrix{T}(conj!(matrix_rep(tg)))
-    @cuda threads=tc blocks=bc apply_controlled_gate_kernel!(Val(1), tg_mat, state_vec, endian_control, endian_t1, endian_t2)
-    return
-end
-
-# doubly controlled unitaries
-for (V, f) in ((false, :identity), (true, :conj))
-    @eval begin
+	function apply_controlled_gate!(::Val{$V}, ::Val{1}, g::G, tg::TG, state_vec::CuVector{T}, control::Int, t1::Int, t2::Int) where {G<:Gate, TG<:Gate, T<:Complex}
+	    n_amps, (endian_control, endian_t1, endian_t2) = get_amps_and_qubits(state_vec, control, t1, t2) 
+	    small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
+	    total_ix = div(n_amps, 8)
+	    tc, bc   = get_launch_dims(total_ix)
+	    tg_mat   = CuMatrix{T}($f(matrix_rep(tg)))
+	    @cuda threads=tc blocks=bc apply_controlled_gate_kernel!(Val(1), tg_mat, state_vec, endian_control, endian_t1, endian_t2, small_t, mid_t, big_t)
+	    return
+	end
+	# doubly controlled unitaries
 	function apply_controlled_gate!(::Val{$V}, ::Val{2}, g::G, tg::TG, state_vec::CuVector{T}, c1::Int, c2::Int, t::Int) where {G<:Gate, TG<:Gate, T<:Complex}
 	    n_amps, (endian_c1, endian_c2, endian_t) = get_amps_and_qubits(state_vec, c1, c2, t) 
 	    total_ix = div(n_amps, 8)
@@ -240,20 +256,7 @@ for (V, f) in ((false, :identity), (true, :conj))
 	    @cuda threads=tc blocks=bc apply_controlled_gate_kernel!(Val(2), g_00, g_01, g_10, g_11, state_vec, endian_c1, endian_c2, endian_t, small_t, mid_t, big_t)
 	    return
 	end
-    end
-end
-
-# TODO fix this
-for (cg, tg, nc) in ((:CNot, :X, 1), (:CY, :Y, 1), (:CZ, :Z, 1), (:CV, :V, 1), (:CSwap, :Swap, 1), (:CCNot, :X, 2))
-    @eval begin
-        apply_gate!(::Val{true}, g::$cg, state_vec::CuVector{T}, qubits::Int...) where {T<:Complex} = apply_controlled_gate!(Val(true), Val($nc), g, $tg(), state_vec, qubits...)
-	apply_gate!(::Val{false}, g::$cg, state_vec::CuVector{T}, qubits::Int...) where {T<:Complex} = apply_controlled_gate!(Val(false), Val($nc), g, $tg(), state_vec, qubits...)
-    end
-end
-
-# arbitrary number of targets
-for (V, f) in ((true, :conj), (false, :identity))
-    @eval begin
+	# arbitrary number of targets
 	function apply_gate!(::Val{$V}, g::Unitary, state_vec::CuVector{T}, ts::Vararg{Int, NQ}) where {T<:Complex, NQ}
 	    n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
 	    endian_ts isa Int && (endian_ts = (endian_ts,))
@@ -273,6 +276,30 @@ for (V, f) in ((true, :conj), (false, :identity))
 	    @cuda threads=tc blocks=bc apply_gate_kernel!(g_mat, CuVector{Int}(flip_masks), state_vec, ordered_ts, Val(length(flip_masks)))
 	    return
 	end
+    end
+end
+apply_gate!(::Val{false}, g::Unitary, state_vec::CuVector{T}, qubit::Int) where {T<:Complex} = apply_gate_single_target!(Val(false), g, state_vec, qubit)
+apply_gate!(::Val{true}, g::Unitary, state_vec::CuVector{T}, qubit::Int) where {T<:Complex} = apply_gate_single_target!(Val(true), g, state_vec, qubit)
+
+for G in (:CPhaseShift, :CPhaseShift00, :CPhaseShift10, :CPhaseShift01), (V, f) in ((true, :conj), (false, :identity))
+    @eval begin
+	function apply_gate!(::Val{$V}, g::$G, state_vec::CuVector{T}, t1::Int, t2::Int) where {T<:Complex}
+	    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
+	    g_mat    = $f(Vector{T}(matrix_rep(g)))
+	    total_ix = div(n_amps, 4)
+	    tc, bc   = get_launch_dims(total_ix)
+	    @cuda threads=tc blocks=bc apply_gate_kernel!(CuVector{T}(g_mat), state_vec, endian_t1, endian_t2)
+	    return
+	end
+    end
+end
+
+
+# TODO fix this
+for (cg, tg, nc) in ((:CNot, :X, 1), (:CY, :Y, 1), (:CZ, :Z, 1), (:CV, :V, 1), (:CSwap, :Swap, 1), (:CCNot, :X, 2))
+    @eval begin
+        apply_gate!(::Val{true}, g::$cg, state_vec::CuVector{T}, qubits::Int...) where {T<:Complex} = apply_controlled_gate!(Val(true), Val($nc), g, $tg(), state_vec, qubits...)
+	apply_gate!(::Val{false}, g::$cg, state_vec::CuVector{T}, qubits::Int...) where {T<:Complex} = apply_controlled_gate!(Val(false), Val($nc), g, $tg(), state_vec, qubits...)
     end
 end
 

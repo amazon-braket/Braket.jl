@@ -193,6 +193,36 @@ function apply_noise_kernel!(dm::CuDeviceMatrix{T}, ordered_ts::NTuple{N, Int}, 
     return
 end
 
+function apply_gate_single_ex_kernel!(cosϕ::T, sinϕ::T, state_vec::CuDeviceVector{T}, endian_t1::Int64, endian_t2::Int64) where {T<:Complex}
+    ix             = (threadIdx().x-1) + (blockIdx().x-1) * blockDim().x
+    small_t, big_t = minmax(endian_t1, endian_t2)
+    padded_ix      = pad_bits(ix, (small_t, big_t))
+    @inbounds begin
+        i01     = flip_bit(padded_ix, endian_t1) + 1
+	i10     = flip_bit(padded_ix, endian_t2) + 1
+        amp01   = state_vec[i01]
+        amp10   = state_vec[i10]
+        state_vec[i01] = cosϕ * amp01 - sinϕ * amp10
+        state_vec[i10] = sinϕ * amp01 + cosϕ * amp10
+    end
+    return
+end
+
+function apply_gate_double_ex_kernel!(cosϕ::T, sinϕ::T, state_vec::CuDeviceVector{T}, endian_ts::NTuple{4, Int}, ordered_ts::NTuple{4, Int}) where {T<:Complex}
+    ix         = (threadIdx().x-1) + (blockIdx().x-1) * blockDim().x
+    t1, t2, t3, t4 = endian_ts
+    @inbounds begin
+        padded_ix = pad_bits(ix, ordered_ts)
+        i0011     = flip_bits(padded_ix, (t3, t4)) + 1
+        i1100     = flip_bits(padded_ix, (t1, t2)) + 1
+        amp0011   = state_vec[i0011]
+        amp1100   = state_vec[i1100]
+        state_vec[i0011] = cosϕ * amp0011 - sinϕ * amp1100
+        state_vec[i1100] = sinϕ * amp0011 + cosϕ * amp1100
+    end
+    return
+end
+
 function apply_gate_single_target_kernel!(g_00::T, g_01::T, g_10::T, g_11::T, state_vec::CuDeviceVector{T}, endian_qubit::Int64) where {T<:Complex}
     ix         = (threadIdx().x-1) + (blockIdx().x-1) * blockDim().x
     lower_ix   = pad_bit(ix, endian_qubit)

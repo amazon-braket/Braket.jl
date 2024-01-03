@@ -91,7 +91,7 @@ function classical_shadow(d::LocalSimulator, obs_qubits, circuits::PyList{Any}, 
     return shadow 
 end
 
-function (d::LocalSimulator)(task_specs::PyList{Any}, inputs::Union{PyList{Any}, PyDict{Any, Any}}, args...; kwargs...)
+function (d::LocalSimulator)(task_specs::Union{PyList{Any}, NTuple{N, PyIterable}}, inputs::Union{PyList{Any}, PyDict{Any, Any}}, args...; kwargs...) where {N}
     # handle inputs
     if inputs isa PyDict{Any, Any}
         jl_inputs = pyconvert(Dict{String, Float64}, inputs)

@@ -14,7 +14,7 @@ Braket.chars(::Type{SingleExcitation}) = "G(ang)"
 Braket.qubit_count(::Type{SingleExcitation}) = 2
 inverted_gate(g::SingleExcitation) = SingleExcitation(-g.angle[1])
 
-function apply_gate!(::Val{V}, g::DoubleExcitation, state_vec::AbstractStateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {V, T<:Complex}
+function apply_gate!(::Val{V}, g::DoubleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {V, T<:Complex}
     n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2, t3, t4)
     ordered_ts = sort(collect(endian_ts))
     cosϕ = cos(g.angle[1]/2.0)
@@ -31,7 +31,7 @@ function apply_gate!(::Val{V}, g::DoubleExcitation, state_vec::AbstractStateVect
     return
 end
 
-function apply_gate!(::Val{V}, g::SingleExcitation, state_vec::AbstractStateVector{T}, t1::Int, t2::Int) where {V, T<:Complex}
+function apply_gate!(::Val{V}, g::SingleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int) where {V, T<:Complex}
     n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2)
     ordered_ts = sort(collect(endian_ts))
     cosϕ = cos(g.angle[1]/2.0)
