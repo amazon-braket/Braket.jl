@@ -21,7 +21,7 @@ supported_operations(d::DensityMatrixSimulator)      = dm_props.action["braket.i
 supported_result_types(d::DensityMatrixSimulator)    = dm_props.action["braket.ir.openqasm.program"].supportedResultTypes
 Braket.device_id(dms::DensityMatrixSimulator)        = "braket_dm"
 Braket.name(dms::DensityMatrixSimulator)             = "DensityMatrixSimulator"
-Base.show(io::IO, dms::DensityMatrixSimulator)       = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots)")
+Base.show(io::IO, dms::DensityMatrixSimulator)       = print(io, "DensityMatrixSimulator(qubit_count=$(qubit_count(dms)), shots=$(dms.shots))")
 Base.similar(dms::DensityMatrixSimulator{T, S}; shots::Int=dms.shots) where {T, S<:AbstractDensityMatrix{T}} = DensityMatrixSimulator{T, S}(dms.qubit_count, shots)
 Base.copy(dms::DensityMatrixSimulator{T, S}) where {T, S<:AbstractDensityMatrix{T}} = DensityMatrixSimulator{T, S}(deepcopy(dms.density_matrix), dms.qubit_count, dms.shots)
 function Base.copyto!(dst::DensityMatrixSimulator{T, S}, src::DensityMatrixSimulator{T, S}) where {T, S}

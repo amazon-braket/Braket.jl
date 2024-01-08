@@ -28,6 +28,7 @@ device_id(s::String) = s
 function (d::LocalSimulator)(task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
     sim = copy(d._delegate)
     local_result = _run_internal(sim, task_spec, args...; inputs=inputs, shots=shots, kwargs...)
+    sim = nothing
     return LocalQuantumTask(local_result.task_metadata.id, local_result)
 end
 
@@ -47,15 +48,17 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
     end
     sims = [copy(d._delegate) for ix in 1:length(task_specs)]
     @info "Braket.jl: batch size is $(length(task_specs)). Starting run..."
-    Base.GC.enable(false)
+    #Base.GC.enable(false)
     start = time()
     results = Vector{GateModelQuantumTaskResult}(undef, length(task_specs))
-    Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
-        results[ix] = _run_internal(sims[ix], spec, args...; inputs=input, shots=shots, kwargs...)
+    stats = @timed begin
+        Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
+            results[ix] = _run_internal(sims[ix], spec, args...; inputs=input, shots=shots, kwargs...)
+        end
+        #Base.GC.enable(true)
     end
-    Base.GC.enable(true)
     stop = time()
-    @info "Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stop-start)."
+    @info "Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
     return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
 

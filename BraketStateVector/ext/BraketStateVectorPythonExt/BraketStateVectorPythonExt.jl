@@ -100,7 +100,10 @@ function (d::LocalSimulator)(task_specs::Union{PyList{Any}, NTuple{N, PyIterable
         jl_inputs = [pyconvert(Dict{String, Float64}, py_inputs) for py_inputs in inputs]
     end
     jl_specs   = [pyconvert(Program, spec) for spec in task_specs]
-    return results(d(jl_specs, args...; inputs=jl_inputs, kwargs...))
+    PythonCall.GC.disable()  
+    r = results(d(jl_specs, args...; inputs=jl_inputs, kwargs...))
+    PythonCall.GC.enable()  
+    return r
 end
 function Py(r::GateModelQuantumTaskResult)
     return pylist([numpy[].array(v).squeeze() for v in r.values])

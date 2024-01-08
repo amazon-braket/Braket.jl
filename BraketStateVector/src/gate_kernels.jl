@@ -68,35 +68,52 @@ for (G, g_mat) in ((:X, matrix_rep(X())),
                    (:T, matrix_rep(T())),
                    (:Ti, matrix_rep(Ti())),), (is_conj, g00, g10, g01, g11) in ((false, g_mat...), (true, conj.(g_mat)...))
     @eval begin
-        gate_kernel(::Val{$is_conj}, g::$G, lower_amp::Tv, higher_amp::Tv) where {Tv<:Complex} = $g00 * lower_amp + $g01 * higher_amp, $g10 * lower_amp + $g11 * higher_amp
+        @inline gate_kernel(::Val{$is_conj}, ::Val{:lower}, g::$G, lower_amp::Tv, higher_amp::Tv) where {Tv<:Complex}  = $g00 * lower_amp + $g01 * higher_amp
+        @inline gate_kernel(::Val{$is_conj}, ::Val{:higher}, g::$G, lower_amp::Tv, higher_amp::Tv) where {Tv<:Complex} = $g10 * lower_amp + $g11 * higher_amp
     end
 end
 gate_kernel(::Val{V}, g::Unitary, lower_amp::Tv, higher_amp::Tv) where {V, Tv<:Complex} = gate_kernel(Val(V), SMatrix{2, 2, ComplexF64}(g.matrix), SVector{2, ComplexF64}(lower_amp, higher_amp))
 
-for (G, cos_g, sin_g, g_mat, c_g_mat) in ((:PhaseShift, :(cos(g.angle[1])), :(sin(g.angle[1])), (1.0, 0.0, 0.0, :(cos_g + im*sin_g)), (1.0, 0.0, 0.0, :(cos_g - im*sin_g))),
-                                          (:Rx,         :(cos(g.angle[1]/2.0)), :(sin(g.angle[1]/2.0)), (:cos_g, :(-im*sin_g), :(-im*sin_g), :cos_g), (:cos_g, :(im*sin_g), :(im*sin_g), :cos_g)),
-                                          (:Ry,         :(cos(g.angle[1]/2.0)), :(sin(g.angle[1]/2.0)), (:cos_g, :sin_g, :(-sin_g), :cos_g), (:cos_g, :sin_g, :(-sin_g), :cos_g)),
-                                          (:Rz,         :(cos(g.angle[1]/2.0)), :(sin(g.angle[1]/2.0)), (:(cos_g-im*sin_g), 0.0, 0.0, :(cos_g+im*sin_g)), (:(cos_g+im*sin_g), 0.0, 0.0, :(cos_g-im*sin_g)))), (is_conj, g00, g10, g01, g11) in ((false, g_mat...), (true, c_g_mat...))
-    @eval begin
-        gate_kernel(::Val{$is_conj}, g::$G, lower_amp::T, higher_amp::T) where {T} = (cos_g = $cos_g; sin_g = $sin_g; return $g00 * lower_amp + $g01 * higher_amp, $g10 * lower_amp + $g11 * higher_amp)
-    end
-end
-
 # single target
 # use this to avoid hitting generalized Unitary
 function apply_gate_single_target!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where {V, G<:Gate, T<:Complex}
-    n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit) 
+    n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
     Threads.@threads for ix in 0:div(n_amps, 2)-1
         lower_ix   = pad_bit(ix, endian_qubit)
         higher_ix  = flip_bit(lower_ix, endian_qubit) + 1
         lower_ix  += 1
-        lower_amp  = state_vec[lower_ix]
-        higher_amp = state_vec[higher_ix]
-        state_vec[lower_ix], state_vec[higher_ix] = gate_kernel(Val(V), g, lower_amp, higher_amp)
+        @inbounds begin
+            lower_amp  = state_vec[lower_ix]
+            higher_amp = state_vec[higher_ix]
+            state_vec[lower_ix]  = gate_kernel(Val(V), Val(:lower), g, lower_amp, higher_amp)
+            state_vec[higher_ix] = gate_kernel(Val(V), Val(:higher), g, lower_amp, higher_amp)
+        end
+    end
+end
+
+# getindex on Tuples is really slow if you do it repeatedly inside a loop!
+for G in (:PhaseShift, :Rx, :Ry, :Rz), (is_conj, f) in ((true, :conj), (false, :identity))
+    @eval begin
+        function apply_gate_single_target!(::Val{$is_conj}, g::$G, state_vec::AbstractStateVector{T}, qubit::Int) where {T<:Complex}
+            n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
+            g_mat = $f(matrix_rep(g))
+            g00, g10, g01, g11 = g_mat
+            Threads.@threads for ix in 0:div(n_amps, 2)-1
+                lower_ix   = pad_bit(ix, endian_qubit)
+                higher_ix  = flip_bit(lower_ix, endian_qubit) + 1
+                lower_ix  += 1
+                @inbounds begin
+                    lower_amp  = state_vec[lower_ix]
+                    higher_amp = state_vec[higher_ix]
+                    state_vec[lower_ix]  = g00 * lower_amp + g01 * higher_amp
+                    state_vec[higher_ix] = g10 * lower_amp + g11 * higher_amp
+                end
+            end
+        end
     end
 end
 apply_gate!(::Val{V}, g::G, state_vec::AbstractStateVector{T}, qubit::Int) where {V, G<:Gate, T<:Complex} = apply_gate_single_target!(Val(V), g, state_vec, qubit)
-apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, qubit::Int) where {V, T<:Complex} = apply_gate_single_target!(Val(V), g, state_vec, qubit)
+apply_gate!(::Val{V}, g::Unitary, state_vec::AbstractStateVector{T}, qubit::Int) where {V, T<:Complex}    = apply_gate_single_target!(Val(V), g, state_vec, qubit)
 
 # generic two-qubit non controlled unitaries
 function apply_gate!(::Val{V}, g::G, state_vec::StateVector{T}, t1::Int, t2::Int) where {V, G<:Gate, T<:Complex}
@@ -110,7 +127,9 @@ function apply_gate!(::Val{V}, g::G, state_vec::StateVector{T}, t1::Int, t2::Int
         ix_01   = flip_bit(ix_00, endian_t1)
         ix_11   = flip_bit(ix_10, endian_t1)
         ind_vec = SVector(ix_00+1, ix_01+1, ix_10+1, ix_11+1)
-        state_vec[ind_vec] = gate_kernel(Val(V), g_mat, state_vec[ind_vec])
+        @inbounds begin
+            state_vec[ind_vec] = gate_kernel(Val(V), g_mat, state_vec[ind_vec])
+        end
     end
     return
 end
@@ -134,7 +153,7 @@ for (sw, factor) in ((:Swap, 1.0), (:ISwap, im), (:PSwap, :(exp(im*g.angle[1])))
 end
 
 function apply_controlled_gate!(::Val{V}, ::Val{1}, g::G, tg::TG, state_vec::AbstractStateVector{T}, control::Int, target::Int) where {V, G<:Gate, TG<:Gate, T<:Complex}
-    n_amps, (endian_control, endian_target) = get_amps_and_qubits(state_vec, control, target) 
+    n_amps, (endian_control, endian_target) = get_amps_and_qubits(state_vec, control, target)
     small_t, big_t = minmax(endian_control, endian_target)
     Threads.@threads for ix in 0:div(n_amps, 4)-1
         ix_00 = pad_bit(pad_bit(ix, small_t), big_t)
@@ -143,9 +162,12 @@ function apply_controlled_gate!(::Val{V}, ::Val{1}, g::G, tg::TG, state_vec::Abs
         ix_11 = flip_bit(ix_01, endian_control)
         lower_ix   = ix_10+1
         higher_ix  = ix_11+1
-        lower_amp  = state_vec[lower_ix]
-        higher_amp = state_vec[higher_ix]
-        state_vec[lower_ix], state_vec[higher_ix] = gate_kernel(Val(V), tg, lower_amp, higher_amp)
+        @inbounds begin
+            lower_amp  = state_vec[lower_ix]
+            higher_amp = state_vec[higher_ix]
+            state_vec[lower_ix]  = gate_kernel(Val(V), Val(:lower), tg, lower_amp, higher_amp)
+            state_vec[higher_ix] = gate_kernel(Val(V), Val(:higher), tg, lower_amp, higher_amp)
+        end
     end
     return
 end
@@ -159,7 +181,9 @@ function apply_controlled_gate!(::Val{V}, ::Val{1}, g::G, tg::TG, state_vec::Abs
         ix_01 = flip_bit(ix_00, endian_t1)
         ix_11 = flip_bit(ix_01, endian_t2)
         ix_vec = SVector{4, Int}(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
-        state_vec[ix_vec] = gate_kernel(Val(V), tg_mat, state_vec[ix_vec])
+        @inbounds begin
+            state_vec[ix_vec] = gate_kernel(Val(V), tg_mat, state_vec[ix_vec])
+        end
     end
     return
 end
@@ -176,9 +200,12 @@ function apply_controlled_gate!(::Val{V}, ::Val{2}, g::G, tg::TG, state_vec::Abs
         # flip target
         higher_ix  = flip_bit(lower_ix, endian_target) + 1
         lower_ix  += 1
-        lower_amp  = state_vec[lower_ix]
-        higher_amp = state_vec[higher_ix]
-        state_vec[lower_ix], state_vec[higher_ix] = gate_kernel(Val(V), tg, lower_amp, higher_amp)
+        @inbounds begin
+            lower_amp  = state_vec[lower_ix]
+            higher_amp = state_vec[higher_ix]
+            state_vec[lower_ix]  = gate_kernel(Val(V), Val(:lower), tg, lower_amp, higher_amp)
+            state_vec[higher_ix] = gate_kernel(Val(V), Val(:higher), tg, lower_amp, higher_amp)
+        end
     end
     return
 end
@@ -204,9 +231,11 @@ function apply_gate!(::Val{V}, g::Unitary, state_vec::StateVector{T}, ts::Vararg
         padded_ix = pad_bits(ix, ordered_ts)
         ixs = SVector{2^nq, Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
         @views begin 
-            amps = state_vec[ixs]
-            new_amps = gate_kernel(Val(V), g_mat, amps)
-            state_vec[ixs] = new_amps
+            @inbounds begin
+                amps = state_vec[ixs]
+                new_amps = gate_kernel(Val(V), g_mat, amps)
+                state_vec[ixs] = new_amps
+            end
         end
     end
     return

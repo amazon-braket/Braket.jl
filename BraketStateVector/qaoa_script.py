@@ -137,6 +137,19 @@ for opt_iter in range(n_iter):
 stop = time.time()
 print(f'Simulation total duration: {stop-start}.')
 
+params = np.random.uniform(size=[2, n_layers])
+circ = shadow_circuit if protocol == 'shadows' else qwc_circuit
+key = {'nv': nv, 'noise': noise, 'shots': shot}
+
+start = time.time()
+for opt_iter in range(n_iter):
+    params = opt.step(circ, params)
+    cost = circ(params)
+    print(f"Completed iteration {opt_iter} with cost {cost}")
+
+stop = time.time()
+print(f'Simulation total duration: {stop-start}.')
+
 print("Task Summary")
 print(t.quantum_tasks_statistics())
 print('Note: Charges shown are estimates based on your Amazon Braket simulator and quantum processing unit (QPU) task usage. Estimated charges shown may differ from your actual charges. Estimated charges do not factor in any discounts or credits, and you may experience additional charges based on your use of other services such as Amazon Elastic Compute Cloud (Amazon EC2).')

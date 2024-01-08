@@ -42,9 +42,11 @@ function apply_gate!(::Val{V}, g::MultiRZ, state_vec::StateVector{T}, ts::Vararg
         # diagonal in Z basis
         # use SVector * Vector kernel
         @views begin
-            amps = state_vec[ixs]
-            new_amps = gate_kernel(Val(V), g_mat, amps)
-            state_vec[ixs] = new_amps
+            @inbounds begin
+                amps = state_vec[ixs]
+                new_amps = gate_kernel(Val(V), g_mat, amps)
+                state_vec[ixs] = new_amps
+            end
         end
     end
     return
@@ -59,10 +61,12 @@ function apply_gate!(::Val{V}, g::DoubleExcitation, state_vec::StateVector{T}, t
         padded_ix = pad_bits(ix, ordered_ts)
         i0011     = flip_bits(padded_ix, (t3, t4)) + 1
         i1100     = flip_bits(padded_ix, (t1, t2)) + 1
-        amp0011   = state_vec[i0011]
-        amp1100   = state_vec[i1100]
-        state_vec[i0011] = cosϕ * amp0011 - sinϕ * amp1100
-        state_vec[i1100] = sinϕ * amp0011 + cosϕ * amp1100
+        @inbounds begin
+            amp0011   = state_vec[i0011]
+            amp1100   = state_vec[i1100]
+            state_vec[i0011] = cosϕ * amp0011 - sinϕ * amp1100
+            state_vec[i1100] = sinϕ * amp0011 + cosϕ * amp1100
+        end
     end
     return
 end
@@ -76,10 +80,12 @@ function apply_gate!(::Val{V}, g::SingleExcitation, state_vec::StateVector{T}, t
         padded_ix = pad_bits(ix, ordered_ts)
         i01     = flip_bit(padded_ix, t1) + 1
         i10     = flip_bit(padded_ix, t2) + 1
-        amp01   = state_vec[i01]
-        amp10   = state_vec[i10]
-        state_vec[i01] = cosϕ * amp01 - sinϕ * amp10
-        state_vec[i10] = sinϕ * amp01 + cosϕ * amp10
+        @inbounds begin
+            amp01   = state_vec[i01]
+            amp10   = state_vec[i10]
+            state_vec[i01] = cosϕ * amp01 - sinϕ * amp10
+            state_vec[i10] = sinϕ * amp01 + cosϕ * amp10
+        end
     end
     return
 end

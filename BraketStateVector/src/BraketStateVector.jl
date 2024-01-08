@@ -1,6 +1,6 @@
 module BraketStateVector
 
-using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random
+using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random, Printf
 
 import Braket: Instruction, BraketSimulator, Program, OpenQasmProgram, apply_gate!, apply_noise!, I, device_id, bind_value!
 
@@ -17,6 +17,15 @@ Braket.name(s::AbstractSimulator) = device_id(s)
 include("validation.jl")
     
 const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
+
+
+function meminfo_julia()
+  # @printf "GC total:  %9.3f MiB\n" Base.gc_total_bytes(Base.gc_num())/2^20
+  # Total bytes (above) usually underreports, thus I suggest using live bytes (below)
+  @info @sprintf "GC live:   %9.3f MiB\n" Base.gc_live_bytes()/2^20
+  @info @sprintf "JIT:       %9.3f MiB\n" Base.jit_total_bytes()/2^20
+  @info @sprintf "Max. RSS:  %9.3f MiB\n" Sys.maxrss()/2^20
+end
 
 function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulator}
 
@@ -135,11 +144,10 @@ function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwar
     if shots > 0 && !isempty(circuit_ir.basis_rotation_instructions)
         operations = vcat(operations, circuit_ir.basis_rotation_instructions)
     end
-    inputs     = get(kwargs, :inputs, Dict{String, Float64}())
+    inputs        = get(kwargs, :inputs, Dict{String, Float64}())
     symbol_inputs = Dict{Symbol, Number}(Symbol(k)=>v for (k,v) in inputs)
-    operations = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
+    operations    = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
     _validate_operation_qubits(operations)
-
     reinit!(d, qc, shots)
     d       = evolve!(d, operations)
     results = Braket.ResultTypeValue[]
@@ -147,15 +155,16 @@ function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwar
         result_types = _translate_result_types(circuit_ir.results, qc)
         _validate_result_types_qubits_exist(result_types, qc)
         if circuit_ir.results[1] isa Braket.IR.AdjointGradient
-            rt = result_types[1] 
-            ev, grad = calculate(rt, Vector{Instruction}(circuit_ir.instructions), inputs, d)
+            rt         = result_types[1] 
+            ev, grad   = calculate(rt, Vector{Instruction}(circuit_ir.instructions), inputs, d)
             result_val = Dict{String, Any}("expectation"=>ev, "gradient"=>grad)
-            results = [Braket.ResultTypeValue(circuit_ir.results[1], result_val)]
+            results    = [Braket.ResultTypeValue(circuit_ir.results[1], result_val)]
         else
             results = _generate_results(circuit_ir.results, result_types, d)
         end
     end
-    return _bundle_results(results, circuit_ir, d) 
+    res = _bundle_results(results, circuit_ir, d) 
+    return res 
 end
 
 include("custom_gates.jl")

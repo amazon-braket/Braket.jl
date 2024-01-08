@@ -21,7 +21,7 @@ supported_operations(svs::StateVectorSimulator)   = sv_props.action["braket.ir.o
 supported_result_types(svs::StateVectorSimulator) = sv_props.action["braket.ir.openqasm.program"].supportedResultTypes
 Braket.device_id(svs::StateVectorSimulator)       = "braket_sv"
 Braket.name(svs::StateVectorSimulator)            = "StateVectorSimulator"
-Base.show(io::IO, svs::StateVectorSimulator)      = print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots)")
+Base.show(io::IO, svs::StateVectorSimulator)      = print(io, "StateVectorSimulator(qubit_count=$(qubit_count(svs)), shots=$(svs.shots))")
 Base.similar(svs::StateVectorSimulator{T, S}; shots::Int=svs.shots) where {T, S} = StateVectorSimulator{T, S}(svs.qubit_count, shots)
 Base.copy(svs::StateVectorSimulator{T, S}) where {T, S} = StateVectorSimulator{T, S}(deepcopy(svs.state_vector), svs.qubit_count, svs.shots)
 function Base.copyto!(dst::StateVectorSimulator{T, S}, src::StateVectorSimulator{T, S}) where {T, S}
