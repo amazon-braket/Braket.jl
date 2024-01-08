@@ -14,6 +14,42 @@ Braket.chars(::Type{SingleExcitation}) = "G(ang)"
 Braket.qubit_count(::Type{SingleExcitation}) = 2
 inverted_gate(g::SingleExcitation) = SingleExcitation(-g.angle[1])
 
+struct MultiRZ <: AngledGate{1}
+    angle::NTuple{1, Union{Float64, FreeParameter}}
+    MultiRZ(angle::T) where {T<:NTuple{1, Union{Float64, FreeParameter}}} = new(angle)
+end
+Braket.chars(::Type{MultiRZ})  = "G(ang)"
+Braket.qubit_count(g::MultiRZ) = 1
+inverted_gate(g::MultiRZ)      = MultiRZ(-g.angle[1])
+
+apply_gate!(::Val{V}, g::MultiRZ, state_vec::StateVector{T}, t::Int)           where {V, T<:Complex} = apply_gate!(Val(V), Rz(g.angle), state_vec, t)
+apply_gate!(::Val{V}, g::MultiRZ, state_vec::StateVector{T}, t1::Int, t2::Int) where {V, T<:Complex} = apply_gate!(Val(V), ZZ(g.angle), state_vec, t1, t2)
+function apply_gate!(::Val{V}, g::MultiRZ, state_vec::StateVector{T}, ts::Vararg{Int, N}) where {V, T<:Complex, N}
+    n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
+    ordered_ts = sort(collect(endian_ts))
+    flip_list  = map(0:2^N-1) do t
+        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:N-1]
+        return ordered_ts[f_vals]
+    end
+    factor = -im*g.angle[1]/2.0
+    r_mat  = factor * Braket.pauli_eigenvalues(N) 
+    g_mat  = SVector{2^N, ComplexF64}(exp.(r_mat))
+
+    Threads.@threads for ix in 0:div(n_amps, 2^N)-1
+        padded_ix = pad_bits(ix, ordered_ts)
+        ixs = SVector{2^N, Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
+        # multiRZ = exp(-iθ Z^n / 2)
+        # diagonal in Z basis
+        # use SVector * Vector kernel
+        @views begin
+            amps = state_vec[ixs]
+            new_amps = gate_kernel(Val(V), g_mat, amps)
+            state_vec[ixs] = new_amps
+        end
+    end
+    return
+end
+
 function apply_gate!(::Val{V}, g::DoubleExcitation, state_vec::StateVector{T}, t1::Int, t2::Int, t3::Int, t4::Int) where {V, T<:Complex}
     n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2, t3, t4)
     ordered_ts = sort(collect(endian_ts))

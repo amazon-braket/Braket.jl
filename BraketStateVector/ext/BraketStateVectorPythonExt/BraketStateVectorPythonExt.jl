@@ -3,7 +3,7 @@ module BraketStateVectorPythonExt
 using BraketStateVector, BraketStateVector.Braket, PythonCall
 
 import BraketStateVector.Braket: LocalSimulator, qubit_count, _run_internal, Instruction, Observables, AbstractProgramResult, ResultTypeValue, format_result, LocalQuantumTask, LocalQuantumTaskBatch, GateModelQuantumTaskResult, GateModelTaskResult, Program, Gate, AngledGate, IRObservable
-import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit, DoubleExcitation, SingleExcitation
+import BraketStateVector: AbstractSimulator, classical_shadow, AbstractStateVector, apply_gate!, get_amps_and_qubits, pad_bits, flip_bits, flip_bit, DoubleExcitation, SingleExcitation, MultiRZ
 
 const pennylane = Ref{Py}()
 const numpy     = Ref{Py}()
@@ -46,6 +46,7 @@ function __init__()
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.parametric_ops_multi_qubit:IsingXY", Instruction, pennylane_convert_IsingXY)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.parametric_ops_multi_qubit:IsingYY", Instruction, pennylane_convert_IsingYY)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.parametric_ops_multi_qubit:IsingZZ", Instruction, pennylane_convert_IsingZZ)
+    PythonCall.pyconvert_add_rule("pennylane.ops.qubit.parametric_ops_multi_qubit:MultiRZ", Instruction, pennylane_convert_MultiRZ)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.qchem_ops:DoubleExcitation", Instruction, pennylane_convert_DoubleExcitation)
     PythonCall.pyconvert_add_rule("pennylane.ops.qubit.qchem_ops:SingleExcitation", Instruction, pennylane_convert_SingleExcitation)
     PythonCall.pyconvert_add_rule("builtins:list", Union{Float64, FreeParameter}, pennylane_convert_parameters)

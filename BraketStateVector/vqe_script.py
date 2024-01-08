@@ -148,7 +148,7 @@ def run_adapt(
 
     return progress_tracker
 
-Main = init_julia()
+jl = init_julia()
 #juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path="/Users/hyatkath/.julia/dev/Braket")
 #juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path="/Users/hyatkath/.julia/dev/Braket/BraketStateVector")
 Main.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')

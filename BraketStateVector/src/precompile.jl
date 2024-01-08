@@ -118,6 +118,7 @@ if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the pac
                 [0.97766824, 0, 0, 0.02233176],
             ),
             ([Instruction(ZZ(0.15), [0, 1])], 2, [0.99718882 - 0.07492971*im, 0, 0, 0], [1, 0, 0, 0]),
+            ([Instruction(BraketStateVector.MultiRZ(0.15), [0, 1, 2])], 3, [0.99718882 - 0.07492971*im, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0]),
             (
                 [
                     Instruction(X(), [0]),

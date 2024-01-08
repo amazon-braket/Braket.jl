@@ -51,6 +51,10 @@ for (conv_fn, jl_typ) in ((:pennylane_convert_IsingXX, :XX),
         end
     end
 end
+function pennylane_convert_MultiRZ(::Type{Instruction}, x::Py)
+    angle = pyconvert(Union{Float64, FreeParameter}, x.parameters)
+    return PythonCall.pyconvert_return(Instruction(MultiRZ((angle,),), pyconvert(Vector{Int}, x.wires)))
+end
 
 for (conv_fn, jl_typ) in ((:pennylane_convert_CNOT, :CNot),
                           (:pennylane_convert_CY, :CY),
