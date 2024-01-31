@@ -72,7 +72,7 @@ function apply_observable!(observable::Braket.Observables.TensorProduct, sv_or_d
     end
     return sv_or_dm
 end
-apply_observable(observable::O, sv_or_dm::T, target::Int...) where {O<:Braket.Observables.Observable, T<:AbstractVecOrMat{<:Complex}} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
+apply_observable(observable::O, sv_or_dm, target::Int...) where {O<:Braket.Observables.Observable} = apply_observable!(observable, deepcopy(sv_or_dm), target...)
 
 function calculate(var::Braket.Variance, sim::AbstractSimulator)
     obs     = var.observable

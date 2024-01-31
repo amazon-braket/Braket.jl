@@ -1,16 +1,17 @@
-mutable struct StateVectorSimulator{T,S<:AbstractStateVector{T}} <: AbstractSimulator
+mutable struct StateVectorSimulator{T,S} <: AbstractSimulator
     state_vector::S
     qubit_count::Int
     shots::Int
+    buffer::AbstractArray{UInt8}
     _state_vector_after_observables::S
-    function StateVectorSimulator{T, S}(state_vector::S, qubit_count::Int, shots::Int) where {T, S<:AbstractStateVector{T}}
-        return new(state_vector, qubit_count, shots, zeros(complex(T), 0))
+    function StateVectorSimulator{T, S}(state_vector::S, qubit_count::Int, shots::Int) where {T, S}
+	    return new(state_vector, qubit_count, shots, T[], S(zeros(T, 0), 0))
     end
-    function StateVectorSimulator{T, S}(qubit_count::Int, shots::Int) where {T, S<:AbstractStateVector{T}}
+    function StateVectorSimulator{T, S}(qubit_count::Int, shots::Int) where {T, S}
         sv    = S(undef, 2^qubit_count)
         fill!(sv, zero(T))
         sv[1] = one(T)
-        return new(sv, qubit_count, shots, S(undef, 0))
+	return new(sv, qubit_count, shots, T[], S(undef, 0))
     end
 end
 StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} = StateVectorSimulator{T, StateVector{T}}(qubit_count, shots)
@@ -41,7 +42,7 @@ function reinit!(svs::StateVectorSimulator{T, S}, qubit_count::Int, shots::Int) 
     return
 end
 
-function evolve!(svs::StateVectorSimulator{T, S}, operations::Vector{Instruction}) where {T<:Complex, S<:AbstractStateVector{T}}
+function evolve!(svs::StateVectorSimulator{T, S}, operations::Vector{Instruction}) where {T<:Complex, S}
     for (oix, op) in enumerate(operations)
         apply_gate!(op.operator, svs.state_vector, op.target...)
     end
@@ -57,7 +58,7 @@ for (gate, obs) in ((:X, :(Braket.Observables.X)),
                     (:I, :(Braket.Observables.I)),
                     (:H, :(Braket.Observables.H)))
     @eval begin
-        function apply_observable!(observable::$obs, sv::AbstractStateVector{T}, target::Int) where {T<:Complex}
+        function apply_observable!(observable::$obs, sv, target::Int)
             apply_gate!($gate(), sv, target)
             return sv
         end

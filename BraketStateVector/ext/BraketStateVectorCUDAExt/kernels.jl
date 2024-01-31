@@ -11,6 +11,18 @@ function marginal_probability_kernel(final_probs::CuDeviceVector{T}, probs::CuDe
     return
 end
 
+function init_zero_state_kernel!(sv::CuDeviceVector{T}) where {T}
+    ix         = threadIdx().x + (blockIdx().x-1) * blockDim().x
+    sv[ix] = (ix == 1) ? one(T) : zero(T)
+    return
+end
+
+function init_zero_state_kernel!(dm::CuDeviceMatrix{T}) where {T}
+    ix         = threadIdx().x + (blockIdx().x-1) * blockDim().x
+    dm[ix,ix] = (ix == 1) ? one(T) : zero(T)
+    return
+end
+
 function apply_observable_kernel!(sv::CuDeviceVector{T}, g_mat::SMatrix{2, 2, T}, endian_target::Int) where {T}
     ix         = (threadIdx().x-1) + (blockIdx().x-1) * blockDim().x
     lower_ix   = pad_bit(ix, endian_target)

@@ -62,7 +62,7 @@ jl.seval('Braket.IRType[] = :JAQCD')
 parser = argparse.ArgumentParser(description='Options for QAOA circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
 parser.add_argument("--protocol", type=str, default='qwc')
-parser.add_argument("--nv", type=int, default=8)
+parser.add_argument("--nv", type=int, default=26)
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--use-python', dest='use_python', action='store_true')
@@ -101,7 +101,7 @@ qubits = nv
 
 print(f"Number of qubits: {qubits}")
 print(f"Running with protocol {protocol}, nv {nv}, shots {scaled_shot}, noise {noise}, n_qubits {qubits}:")
-dev = get_lightning_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+dev = get_python_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
 opt = qml.SPSAOptimizer(maxiter=spsa_iter)
 
 def qaoa_layer(gamma, alpha):

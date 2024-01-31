@@ -1,6 +1,6 @@
 module BraketStateVector
 
-using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random, Printf
+using Braket, Braket.Observables, LinearAlgebra, StaticArrays, StatsBase, Combinatorics, UUIDs, JSON3, Random, Printf, Profile
 
 import Braket: Instruction, BraketSimulator, Program, OpenQasmProgram, apply_gate!, apply_noise!, I, device_id, bind_value!
 
@@ -31,9 +31,19 @@ function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulat
 
 end
 
+function index_to_endian_bits(ix::Int, qc::Int)
+    bits = Vector{Int}(undef, qc)
+    for q in 0:qc-1
+        b = (ix >> q) & 1
+        bits[end-q] = b
+    end
+    return bits
+end
+
 function _formatted_measurements(d::D) where {D<:AbstractSimulator}
     sim_samples = samples(d)
-    formatted   = [reverse(digits(sample, base=2, pad=qubit_count(d))) for sample in sim_samples]
+    qc = qubit_count(d)
+    formatted = [index_to_endian_bits(sample, qc) for sample in sim_samples]
     return formatted
 end
 
@@ -42,7 +52,7 @@ function _bundle_results(results::Vector{Braket.ResultTypeValue}, circuit_ir::Un
     task_mtd = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], string(uuid4()), d.shots, device_id(d), nothing, nothing, nothing, nothing, nothing)
     addl_mtd = Braket.AdditionalMetadata(circuit_ir, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     formatted_samples = _formatted_measurements(d)
-    measured_qubits   = sort(collect(qubits(circuit_ir)))
+    measured_qubits   = collect(0:qubit_count(d)-1)
     return Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult], formatted_samples, nothing, results, measured_qubits, task_mtd, addl_mtd)
 end
 
@@ -100,11 +110,11 @@ function (d::AbstractSimulator)(circuit_ir::OpenQasmProgram, args...; shots::Int
     reinit!(d, qubit_count, shots)
     d = evolve!(d, operations)
     if shots == 0
-        result_types = _translate_result_types(results, qubit_count)
-        _validate_result_types_qubits_exist(result_types, qubit_count)
-        results = _generate_results(circuit.results, result_types, d)
+	result_types = _translate_result_types(results, qubit_count)
+	_validate_result_types_qubits_exist(result_types, qubit_count)
+	results = _generate_results(circuit.results, result_types, d)
     else
-        d = evolve!(d, circuit.basis_rotation_instructions)
+	d = evolve!(d, circuit.basis_rotation_instructions)
     end
     return _bundle_results(results, circuit_ir, d)
 end
@@ -135,14 +145,13 @@ function compute_shadows(d::AbstractSimulator, circuit_ir::Program, recipes, obs
     return measurements
 end
 
-function (d::AbstractSimulator)(circuit_ir::Program, args...; shots::Int=0, kwargs...)
-    qc = qubit_count(circuit_ir) 
+function (d::AbstractSimulator)(circuit_ir::Program, qc::Int, args...; shots::Int=0, kwargs...)
     _validate_ir_results_compatibility(d, circuit_ir.results, Val(:JAQCD))
     _validate_ir_instructions_compatibility(d, circuit_ir, Val(:JAQCD))
     _validate_shots_and_ir_results(shots, circuit_ir.results, qc)
     operations = circuit_ir.instructions
     if shots > 0 && !isempty(circuit_ir.basis_rotation_instructions)
-        operations = vcat(operations, circuit_ir.basis_rotation_instructions)
+	operations = vcat(operations, circuit_ir.basis_rotation_instructions)
     end
     inputs        = get(kwargs, :inputs, Dict{String, Float64}())
     symbol_inputs = Dict{Symbol, Number}(Symbol(k)=>v for (k,v) in inputs)

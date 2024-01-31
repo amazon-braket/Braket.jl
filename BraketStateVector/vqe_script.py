@@ -5,7 +5,7 @@ import pickle
 import logging
 from collections import Counter
 from typing import FrozenSet, Union, Iterable, Optional
-
+import juliapkg
 import argparse
 import pennylane as qml
 import numpy as np
@@ -94,6 +94,7 @@ def run_adapt(
         #    print(f"Done computing {ix}-th gradient. Duration: {g_stop-g_start}.", flush=True)
         stop = time.time()
         print(f"Done computing gradients. Duration: {stop-start}.", flush=True)
+        exit(1)
         grads = [
             -abs(ex_grad[ix].numpy())
             if isinstance(ex_grad[ix], pnp.tensor)
@@ -149,16 +150,16 @@ def run_adapt(
     return progress_tracker
 
 jl = init_julia()
-#juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path="/Users/hyatkath/.julia/dev/Braket")
-#juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path="/Users/hyatkath/.julia/dev/Braket/BraketStateVector")
-Main.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
-Main.seval('using Braket, BraketStateVector, JSON3, PythonCall')
-Main.seval('Braket.IRType[] = :JAQCD')
+juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket")
+juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket/BraketStateVector")
+jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
+jl.seval('using Braket, BraketStateVector, JSON3, PythonCall')
+jl.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="qwc")
-parser.add_argument("--mol", type=str, default="H8")
+parser.add_argument("--protocol", type=str, default="shadows")
+parser.add_argument("--mol", type=str, default="H6")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")

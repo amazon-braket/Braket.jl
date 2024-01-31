@@ -41,7 +41,13 @@ for (typ, ir_typ, label) in ((:Expectation, :(Braket.IR.Expectation), "expectati
           - An `Int` or `Qubit`
           - Absent, in which case the observable `o` will be applied to all qubits provided it is a single qubit observable.
         """ $typ(o, targets) = $typ(o, QubitSet(targets))
-        $typ(o::String, targets::QubitSet) = $typ(Observables.TensorProduct([o for ii in 1:length(targets)]), targets)
+        function $typ(o::String, targets::QubitSet)
+            return if !isempty(targets)
+                $typ(Observables.TensorProduct([o for ii in 1:length(targets)]), targets)
+            else
+                $typ(StructTypes.constructfrom(Observable, o), targets)
+            end
+        end
         $typ(o::Vector{String}, targets::QubitSet) = $typ(Observables.TensorProduct(o), targets)
         $typ(o) = $typ(o, QubitSet())
         Base.:(==)(e1::$typ, e2::$typ) = (e1.observable == e2.observable && e1.targets == e2.targets)

@@ -21,61 +21,6 @@ function CUDA.cu(dms::DensityMatrixSimulator{T, S}) where {T, S<:AbstractDensity
     copyto!(cu_dm, dms.density_matrix)
     return DensityMatrixSimulator{T, CuMatrix{T}}(cu_dm, dms.qubit_count, dms.shots)
 end
-    
-function StateVectorSimulator{T, CuVector{T}}(qubit_count::Int, shots::Int) where {T}
-    sv    = CUDA.zeros(T, 2^qubit_count)
-    CUDA.@allowscalar sv[1] = one(T)
-    return StateVectorSimulator{T, CuVector{T}}(sv, qubit_count, shots)
-end
-
-function DensityMatrixSimulator{T, CuMatrix{T}}(qubit_count::Int, shots::Int) where {T}
-    dm    = CUDA.zeros(T, 2^qubit_count, 2^qubit_count)
-    CUDA.@allowscalar dm[1, 1] = one(T)
-    return DensityMatrixSimulator{T, CuMatrix{T}}(dm, qubit_count, shots)
-end
-
-function reinit!(svs::StateVectorSimulator{T, CuVector{T}}, qubit_count::Int, shots::Int) where {T}
-    if length(svs.state_vector) != 2^qubit_count
-        svs.state_vector = CuVector{T}(undef, 2^qubit_count)
-    end
-    svs.state_vector   .= zero(T)
-    CUDA.@allowscalar svs.state_vector[1] = one(T)
-    svs.qubit_count     = qubit_count
-    svs.shots           = shots
-    svs._state_vector_after_observables = CuVector{T}(undef, 0)
-    return
-end
-
-function reinit!(dms::DensityMatrixSimulator{T, CuMatrix{T}}, qubit_count::Int, shots::Int) where {T}
-    if size(dms.density_matrix) != (2^qubit_count, 2^qubit_count)
-        dms.density_matrix = CuMatrix{T}(undef, 2^qubit_count, 2^qubit_count)
-    end
-    dms.density_matrix .= zero(T)
-    CUDA.@allowscalar dms.density_matrix[1, 1] = one(T)
-    dms.qubit_count     = qubit_count
-    dms.shots           = shots
-    dms._density_matrix_after_observables = CuMatrix{T}(undef, 0, 0)
-    return
-end
-
-function __init__()
-    BraketStateVector.Braket._simulator_devices[]["braket_sv_cu"] = StateVectorSimulator{ComplexF64, CuVector{ComplexF64}}
-    BraketStateVector.Braket._simulator_devices[]["braket_dm_cu"] = DensityMatrixSimulator{ComplexF64, CuMatrix{ComplexF64}}
-end
-
-include("kernels.jl")
-
-function density_matrix(svs::StateVectorSimulator{T, CuVector{T}}) where {T}
-    sv_mat = CuMatrix{T}(undef, length(svs.state_vector), 1)
-    sv_mat .= svs.state_vector
-    adj_sv_mat = CuMatrix{T}(undef, 1, length(svs.state_vector))
-    adj_sv_mat .= adjoint(svs.state_vector)
-    dm = CUDA.zeros(T, length(svs.state_vector), length(svs.state_vector))
-    CUDA.@allowscalar begin
-        kron!(dm, sv_mat, adj_sv_mat)
-    end
-    return dm
-end
 
 function get_launch_dims(total_ix::Int)
     if total_ix >= DEFAULT_THREAD_COUNT
@@ -86,6 +31,80 @@ function get_launch_dims(total_ix::Int)
         bc = 1
     end
     return tc, bc
+end
+
+function StateVectorSimulator{T, CuVector{T}}(qubit_count::Int, shots::Int) where {T}
+    sv    = CUDA.zeros(T, 2^qubit_count)
+    tc, bc   = get_launch_dims(2^qubit_count)
+    @cuda threads=tc blocks=bc init_zero_state_kernel!(sv)
+    return StateVectorSimulator{T, CuVector{T}}(sv, qubit_count, shots)
+end
+
+function DensityMatrixSimulator{T, CuMatrix{T}}(qubit_count::Int, shots::Int) where {T}
+    dm    = CUDA.zeros(T, 2^qubit_count, 2^qubit_count)
+    tc, bc   = get_launch_dims(2^qubit_count)
+    @cuda threads=tc blocks=bc init_zero_state_kernel!(dm)
+    return DensityMatrixSimulator{T, CuMatrix{T}}(dm, qubit_count, shots)
+end
+
+function reinit!(svs::StateVectorSimulator{T, CuVector{T}}, qubit_count::Int, shots::Int) where {T}
+    CUDA.unsafe_free!(svs._state_vector_after_observables)
+    if length(svs.state_vector) != 2^qubit_count
+	CUDA.unsafe_free!(svs.state_vector)
+        svs.state_vector = CuVector{T}(undef, 2^qubit_count)
+    end
+    tc, bc   = get_launch_dims(2^qubit_count)
+    @cuda threads=tc blocks=bc init_zero_state_kernel!(svs.state_vector)
+    svs.qubit_count     = qubit_count
+    svs.shots           = shots
+    svs._state_vector_after_observables = CuVector{T}(undef, 0)
+    return
+end
+
+function reinit!(dms::DensityMatrixSimulator{T, CuMatrix{T}}, qubit_count::Int, shots::Int) where {T}
+    if size(dms.density_matrix) != (2^qubit_count, 2^qubit_count)
+        CUDA.unsafe_free!(dms.density_matrix)
+        dms.density_matrix = CuMatrix{T}(undef, 2^qubit_count, 2^qubit_count)
+    end
+    tc, bc   = get_launch_dims(2^qubit_count)
+    @cuda threads=tc blocks=bc init_zero_state_kernel!(dms.density_matrix)
+    dms.qubit_count     = qubit_count
+    dms.shots           = shots
+    dms._density_matrix_after_observables = CuMatrix{T}(undef, 0, 0)
+    return
+end
+
+function _run_internal(simulator::StateVectorSimulator{T, CuVector{T}}, circuit::Program, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...) where {T}
+    if haskey(properties(simulator).action, "braket.ir.jaqcd.program")
+        program = circuit
+        qubits  = qubit_count(circuit)
+        r       = simulator(program, qubits, args...; shots=shots, kwargs...)
+	CUDA.unsafe_free!(simulator.state_vector)
+	return format_result(r)
+    else
+        throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
+    end
+end
+
+function __init__()
+    BraketStateVector.Braket._simulator_devices[]["braket_sv_cu"] = StateVectorSimulator{ComplexF64, CuVector{ComplexF64}}
+    BraketStateVector.Braket._simulator_devices[]["braket_dm_cu"] = DensityMatrixSimulator{ComplexF64, CuMatrix{ComplexF64}}
+end
+
+include("kernels.jl")
+
+function density_matrix(svs::StateVectorSimulator{T, CuVector{T}}) where {T}
+    sv_mat  = CuMatrix{T}(undef, length(svs.state_vector), 1)
+    sv_mat .= svs.state_vector
+    adj_sv_mat = CuMatrix{T}(undef, 1, length(svs.state_vector))
+    adj_sv_mat .= adjoint(svs.state_vector)
+    dm = CUDA.zeros(T, length(svs.state_vector), length(svs.state_vector))
+    CUDA.@allowscalar begin
+        kron!(dm, sv_mat, adj_sv_mat)
+    end
+    CUDA.unsafe_free!(sv_mat)
+    CUDA.unsafe_free!(adj_sv_mat)
+    return dm
 end
 
 function marginal_probability(probs::CuVector{T}, qubit_count::Int, targets) where {T<:Real}
@@ -204,10 +223,11 @@ for (V, f) in ((true, :conj), (false, :identity))
 	end
 	function apply_gate!(::Val{$V}, g::G, state_vec::CuVector{T}, t1::Int, t2::Int) where {G<:Gate, T<:Complex}
 	    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
-	    g_mat    = $f(Matrix(matrix_rep(g)))
+	    g_mat    = SMatrix{4, 4, T}($f(Matrix(matrix_rep(g))))
 	    total_ix = div(n_amps, 4)
 	    tc, bc   = get_launch_dims(total_ix)
-	    @cuda threads=tc blocks=bc apply_gate_kernel!(CuMatrix{T}(g_mat), state_vec, endian_t1, endian_t2)
+	    
+	    @cuda threads=tc blocks=bc apply_gate_kernel!(g_mat, state_vec, endian_t1, endian_t2)
 	    return
 	end
 	function apply_gate!(::Val{$V}, g::SingleExcitation, state_vec::CuVector{T}, t1::Int, t2::Int) where {T<:Complex}
@@ -242,7 +262,7 @@ for (V, f) in ((true, :conj), (false, :identity))
 	    small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
 	    total_ix = div(n_amps, 8)
 	    tc, bc   = get_launch_dims(total_ix)
-	    tg_mat   = CuMatrix{T}($f(matrix_rep(tg)))
+	    tg_mat   = SMatrix{8, 8, T}($f(matrix_rep(tg)))
 	    @cuda threads=tc blocks=bc apply_controlled_gate_kernel!(Val(1), tg_mat, state_vec, endian_control, endian_t1, endian_t2, small_t, mid_t, big_t)
 	    return
 	end
@@ -262,7 +282,7 @@ for (V, f) in ((true, :conj), (false, :identity))
 	    endian_ts isa Int && (endian_ts = (endian_ts,))
 	    ordered_ts = tuple(sort(collect(endian_ts))...)
 	    nq         = NQ
-	    g_mat      = CuMatrix{T}($f(matrix_rep(g)))
+	    g_mat      = SMatrix{2^NQ, 2^NQ, T}($f(matrix_rep(g)))
 	    #use a mask here
 	    flip_list  = map(0:2^nq-1) do t
 		f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix in 0:nq-1]
@@ -273,7 +293,7 @@ for (V, f) in ((true, :conj), (false, :identity))
 	    end
 	    total_ix = div(n_amps, 2^nq)
 	    tc, bc   = get_launch_dims(total_ix)
-	    @cuda threads=tc blocks=bc apply_gate_kernel!(g_mat, CuVector{Int}(flip_masks), state_vec, ordered_ts, Val(length(flip_masks)))
+	    @cuda threads=tc blocks=bc apply_gate_kernel!(g_mat, SVector{2^NQ, Int}(flip_masks), state_vec, ordered_ts, Val(length(flip_masks)))
 	    return
 	end
     end
@@ -285,10 +305,10 @@ for G in (:CPhaseShift, :CPhaseShift00, :CPhaseShift10, :CPhaseShift01), (V, f) 
     @eval begin
 	function apply_gate!(::Val{$V}, g::$G, state_vec::CuVector{T}, t1::Int, t2::Int) where {T<:Complex}
 	    n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
-	    g_mat    = $f(Vector{T}(matrix_rep(g)))
+	    g_mat    = SVector{4, T}($f(Vector{T}(matrix_rep(g))))
 	    total_ix = div(n_amps, 4)
 	    tc, bc   = get_launch_dims(total_ix)
-	    @cuda threads=tc blocks=bc apply_gate_kernel!(CuVector{T}(g_mat), state_vec, endian_t1, endian_t2)
+	    @cuda threads=tc blocks=bc apply_gate_kernel!(g_mat, state_vec, endian_t1, endian_t2)
 	    return
 	end
     end
@@ -356,7 +376,50 @@ function apply_noise!(ph::PhaseFlip, dm::CuMatrix{T}, qubit::Int) where {T}
     return
 end
 
-samples(svs::StateVectorSimulator{T, CuVector{T}}) where {T} = sample(0:(2^svs.qubit_count-1), Weights(collect(probabilities(svs))), svs.shots)
+#=
+function sample_small_n(n::Int, normed_weights::CuVector{T}) where {T}
+    function sample_small_n_kernel(sampled_vals::CuDeviceVector{Int}, needles::CuDeviceVector{T}, normed_weights::CuDeviceVector{T}) where {T}
+        ix = threadIdx().x + (blockIdx().x - 1)*blockDim().x
+        laneId = (threadIdx().x-1) & 0x1f
+        for sample in 1:length(sampled_vals)
+	    @inbounds begin
+		    thread_weight = normed_weights[ix]
+		    sample_needle = needles[sample]
+		    has_greater   = CUDA.vote_ballot_sync(CUDA.FULL_MASK, thread_weight >= sample_needle)
+		    has_lesser    = CUDA.vote_ballot_sync(CUDA.FULL_MASK, thread_weight < sample_needle)
+		    low_needle    = 1 << laneId 
+		    high_needle   = laneId == 31 ? 0 : 1 << (laneId + 1)
+		    low_found     = (has_lesser & low_needle) >> laneId
+		    high_found    = laneId == 31 ? (has_greater & high_needle) : (has_greater & high_needle) >> (laneId + 1)
+		    #@cushow sample, laneId, sample_needle, thread_weight, low_found, high_found 
+		    # first significant bit of has_greater is the lane that has the good threadidx
+		    if low_found > 0 && high_found > 0
+			sampled_vals[sample] = ix
+		    end
+	    end
+        end
+        return
+    end
+    sampled_inds = CUDA.zeros(Int, n)
+    needles   = CUDA.rand(T, n)
+    tc, bc    = get_launch_dims(length(normed_weights))
+    @cuda threads=tc blocks=bc sample_small_n_kernel(sampled_inds, needles, normed_weights)
+    host_inds = collect(sampled_inds)
+    return host_inds
+end
+=#
+
+function samples(svs::StateVectorSimulator{T, CuVector{T}}) where {T}
+    #probs   = probabilities(svs)
+    #normed_weights = cumsum(probs) ./ sum(probs)
+    #host_probs = collect(probs)
+    #probs   = nothing
+    #samples = sample_small_n(svs.shots, normed_weights)
+    #normed_weights = nothing
+    #samples = sample(0:(2^svs.qubit_count-1), Weights(host_probs), svs.shots)
+    samples = zeros(Int, svs.shots)
+    return samples
+end
 samples(dms::DensityMatrixSimulator{T, CuMatrix{T}}) where {T} = sample(0:(2^dms.qubit_count-1), Weights(collect(probabilities(dms))), dms.shots)
 
 end

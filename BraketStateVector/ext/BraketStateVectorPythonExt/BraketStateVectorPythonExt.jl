@@ -100,9 +100,14 @@ function (d::LocalSimulator)(task_specs::Union{PyList{Any}, NTuple{N, PyIterable
         jl_inputs = [pyconvert(Dict{String, Float64}, py_inputs) for py_inputs in inputs]
     end
     jl_specs   = [pyconvert(Program, spec) for spec in task_specs]
-    PythonCall.GC.disable()  
+    task_specs = nothing
+    inputs     = nothing
+    GC.gc(false)
+    @info "Entering pure Julia segment."
+    PythonCall.GC.disable()
     r = results(d(jl_specs, args...; inputs=jl_inputs, kwargs...))
-    PythonCall.GC.enable()  
+    PythonCall.GC.enable()
+    @info "Leaving pure Julia segment."
     return r
 end
 function Py(r::GateModelQuantumTaskResult)

@@ -33,7 +33,7 @@ using HTTP
 using JSON3, StructTypes
 using LinearAlgebra
 using DataStructures
-
+using StaticArrays
 using NamedTupleTools
 using OrderedCollections
 using Tar

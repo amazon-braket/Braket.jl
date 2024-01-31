@@ -183,5 +183,12 @@ if ccall(:jl_generating_output, Cint, ()) == 1   # if we're precompiling the pac
         simulation = StateVectorSimulator(2, 10000)
         simulation = BraketStateVector.evolve!(simulation, [Instruction(H(), [0]), Instruction(CNot(), [0, 1])])
         samples = BraketStateVector.samples(simulation)
+
+	for N in 1:16
+	    pe = Braket.PauliEigenvalues(Val(N))
+	    for i in 1:2^N
+		pe[i]
+	    end
+	end
     end
 end

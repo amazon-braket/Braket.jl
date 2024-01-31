@@ -1,21 +1,26 @@
 using Braket, Braket.Observables, Test, JSON3, StructTypes, LinearAlgebra
-using Braket: VIRTUAL, PHYSICAL, OpenQASMSerializationProperties, pauli_eigenvalues, IRObservable
+using Braket: VIRTUAL, PHYSICAL, OpenQASMSerializationProperties, PauliEigenvalues, IRObservable
 using LinearAlgebra: eigvals
 
 @testset "Observables" begin
     Braket.IRType[] = :JAQCD
     @testset "pauli eigenvalues" begin
         z = [1.0 0.0; 0.0 -1.0]
-        @test pauli_eigenvalues(1) == diag(z)
-        @test pauli_eigenvalues(2) == diag(kron(z,z))
-        @test pauli_eigenvalues(3) == diag(kron(z,z,z,))
+        for n in 2:6
+            pe  = PauliEigenvalues(Val(n))
+            mat = kron(ntuple(i->diag(z), n)...)
+            for ix in 1:2^n
+                @test pe[ix] == mat[ix]
+            end
+        end
     end
     @testset "Hermitian" begin
         m = [1. -im; im -1.]
         o = Observables.HermitianObservable(m)
         @test qubit_count(o) == 1
         rt = Expectation(o, [0])
-        @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
+        read_rt = JSON3.read(JSON3.write(rt), Braket.Result)
+        @test read_rt == rt
         @test ir(o) isa IRObservable
         mult_h = 2.0 * o
         @test mult_h.matrix == 2.0 * m
@@ -100,10 +105,12 @@ using LinearAlgebra: eigvals
             (Observables.TensorProduct(["x", "y", "i"]),[1, 1, -1, -1, -1, -1, 1, 1]),
             (Observables.TensorProduct([Observables.X(), ho, Observables.Y()]),[-1, 1, -1, 1, 1, -1, 1, -1, 1, -1, 1, -1, -1, 1, -1, 1])
         )
-            @test eigvals(tp) == convert(Vector{Float64}, evs)
+            for ix in 1:length(evs)
+                @test eigvals(tp)[ix] == convert(Float64, evs[ix])
+            end
         end
         @testset for typ in (Observables.H(), Observables.X(), Observables.Y(), Observables.Z())
-            @test eigvals(typ) == [1.0, -1.0]
+            @test eigvals(typ)[[1, 2]] == [1.0, -1.0]
         end
         @testset for (mat, evs) in [([1.0 0.0; 0.0 1.0], [1, 1]), ([0 -im; im 0], [-1.0, 1.0]), ([1 1-im; 1+im -1], [-sqrt(3), sqrt(3)])]
             @test eigvals(Observables.HermitianObservable(mat)) ≈ evs

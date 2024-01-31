@@ -127,8 +127,11 @@ function apply_gate!(::Val{V}, g::G, state_vec::StateVector{T}, t1::Int, t2::Int
         ix_01   = flip_bit(ix_00, endian_t1)
         ix_11   = flip_bit(ix_10, endian_t1)
         ind_vec = SVector(ix_00+1, ix_01+1, ix_10+1, ix_11+1)
-        @inbounds begin
-            state_vec[ind_vec] = gate_kernel(Val(V), g_mat, state_vec[ind_vec])
+        @views begin
+            @inbounds begin
+                amps = state_vec[ind_vec]
+                state_vec[ind_vec] = gate_kernel(Val(V), g_mat, amps)
+            end
         end
     end
     return

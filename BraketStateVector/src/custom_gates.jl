@@ -32,8 +32,8 @@ function apply_gate!(::Val{V}, g::MultiRZ, state_vec::StateVector{T}, ts::Vararg
         return ordered_ts[f_vals]
     end
     factor = -im*g.angle[1]/2.0
-    r_mat  = factor * Braket.pauli_eigenvalues(N) 
-    g_mat  = SVector{2^N, ComplexF64}(exp.(r_mat))
+    r_mat  = Braket.PauliEigenvalues(Val(N)) 
+    g_mat  = SVector{2^N, ComplexF64}(exp(factor * r_mat[i]) for i in 1:2^N)
 
     Threads.@threads for ix in 0:div(n_amps, 2^N)-1
         padded_ix = pad_bits(ix, ordered_ts)
