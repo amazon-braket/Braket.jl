@@ -417,7 +417,7 @@ _selected_measurements(measurements, measured_qubits::NTuple{M, Int}, targets::N
 function _to_base_10(m, nq::Int)
     ix = 0
     for q in 0:nq-1
-	@inbounds ix |= m[q+1] << (nq - 1 - q)
+        @inbounds ix |= m[q+1] << (nq - 1 - q)
     end
     return ix + 1
 end
