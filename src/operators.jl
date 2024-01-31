@@ -25,6 +25,10 @@ struct PauliEigenvalues{N}
     PauliEigenvalues{N}(coeff::Float64=1.0) where {N} = new(coeff)
 end
 PauliEigenvalues(::Val{N}, coeff::Float64=1.0) where {N} = PauliEigenvalues{N}(coeff)
+Base.length(p::PauliEigenvalues{N}) where {N} = 2^N
+function Base.iterate(p::PauliEigenvalues{N}, ix::Int=1) where {N}
+    return ix <= length(p) ? (p[ix], ix+1) : nothing
+end
 
 Base.getindex(p::PauliEigenvalues{1}, i::Int)::Float64 = getindex((p.coeff, -p.coeff), i)
 function Base.getindex(p::PauliEigenvalues{N}, i::Int)::Float64 where N

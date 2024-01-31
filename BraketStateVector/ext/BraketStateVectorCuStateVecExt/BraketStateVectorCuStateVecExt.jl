@@ -1,4 +1,4 @@
-module BraketStateVectorCuStateVecExt
+module BraketStateVectorCuVectorExt
 
 using BraketStateVector,
     BraketStateVector.Braket,
@@ -9,7 +9,7 @@ using BraketStateVector,
     cuStateVec.CUDA,
     LinearAlgebra
 
-using cuStateVec: CuStateVec, applyMatrix!, sample
+using cuStateVec: CuVector, applyMatrix!, sample
 
 import BraketStateVector.Braket: Instruction
 
@@ -37,7 +37,7 @@ import BraketStateVector:
     reinit!
 
 const DEFAULT_THREAD_COUNT = 512
-const CuStateVectorSimulator{T}   = StateVectorSimulator{T,CuVector{T}}
+const CuVectortorSimulator{T}   = StateVectorSimulator{T,CuVector{T}}
 const CuDensityMatrixSimulator{T} = DensityMatrixSimulator{T,CuMatrix{T}}
 
 function CUDA.cu(svs::StateVectorSimulator{T,S}) where {T,S<:AbstractStateVector{T}}
@@ -54,14 +54,14 @@ end
 
 function __init__()
     BraketStateVector.Braket._simulator_devices[]["braket_sv_custatevec"] =
-        StateVectorSimulator{ComplexF64,CuStateVec{ComplexF64}}
+        StateVectorSimulator{ComplexF64,CuVector{ComplexF64}}
     BraketStateVector.Braket._simulator_devices[]["braket_dm_custatevec"] =
-        DensityMatrixSimulator{ComplexF64,CuStateVec{ComplexF64}}
+        DensityMatrixSimulator{ComplexF64,CuMatrix{ComplexF64}}
 end
 
-function StateVectorSimulator{T,CuStateVec{T}}(qubit_count::Int, shots::Int) where {T}
-    return StateVectorSimulator{T,CuStateVec{T}}(
-        CuStateVec(T, qubit_count),
+function StateVectorSimulator{T,CuVector{T}}(qubit_count::Int, shots::Int) where {T}
+    return StateVectorSimulator{T,CuVector{T}}(
+        CuVector(T, qubit_count),
         qubit_count,
         shots,
     )
@@ -74,13 +74,13 @@ function init_zero_state_kernel!(sv::CuDeviceVector{T}) where {T}
 end
 
 function reinit!(
-    svs::StateVectorSimulator{T,CuStateVec{T}},
+    svs::StateVectorSimulator{T,CuVector{T}},
     qubit_count::Int,
     shots::Int,
 ) where {T}
     if qubit_count != svs.qubit_count
         new_sv = CuVector{T}(undef, 2^qubit_count)
-        svs.state_vector = CuStateVec{T}(new_sv, qubit_count)
+        svs.state_vector = CuVector{T}(new_sv, qubit_count)
     end
     block_size = 512
     tc = 2^qubit_count >= block_size ? block_size : 2^qubit_count
@@ -89,13 +89,13 @@ function reinit!(
     svs.qubit_count = qubit_count
     svs.shots = shots
     svs.buffer = CuVector{UInt8}(undef, 0)
-    svs._state_vector_after_observables = CuStateVec{T}(CuVector{T}(undef, 0), 0)
+    svs._state_vector_after_observables = CuVector{T}(CuVector{T}(undef, 0), 0)
     return
 end
 
 function apply_observable!(
     observable::Braket.Observables.HermitianObservable,
-    sv::CuStateVec{T},
+    sv::CuVector{T},
     targets::Vararg{Int,N},
 ) where {T<:Complex,N}
     applyMatrix!(sv, observable.matrix, false, collect(targets), Int[], Int[])
@@ -103,7 +103,7 @@ function apply_observable!(
 end
 
 function evolve!(
-    svs::StateVectorSimulator{T,CuStateVec{T}},
+    svs::StateVectorSimulator{T,CuVector{T}},
     operations::Vector{Instruction},
 ) where {T<:Complex}
     for (oix, op) in enumerate(operations)
@@ -113,17 +113,18 @@ function evolve!(
 end
 
 function customApplyMatrix!(
-    state_vec::CuStateVec{T},
+    state_vec::CuVector{T},
     mat::Matrix{T},
     targets::Vector{Int},
     controls::Vector{Int},
 ) where {T}
+    n_bits = Int(log2(length(state_vec)))
     function bufferSize()
         out = Ref{Csize_t}()
         cuStateVec.custatevecApplyMatrixGetWorkspaceSize(
             cuStateVec.handle(),
             T,
-            state_vec.nbits,
+            n_bits,
             mat,
             T,
             cuStateVec.CUSTATEVEC_MATRIX_LAYOUT_COL,
@@ -143,9 +144,9 @@ function customApplyMatrix!(
     end
     cuStateVec.custatevecApplyMatrix(
         cuStateVec.handle(),
-        state_vec.data,
+        state_vec,
         T,
-        state_vec.nbits,
+        n_bits,
         mat,
         T,
         cuStateVec.CUSTATEVEC_MATRIX_LAYOUT_COL,
@@ -167,7 +168,7 @@ for (V, f) in ((true, :conj), (false, :identity))
         function apply_gate!(
             ::Val{$V},
             g::G,
-            state_vec::CuStateVec{T},
+            state_vec::CuVector{T},
             t::Vararg{Int,N},
         ) where {G<:Gate,T<:Complex,N}
             g_mat = $f(Matrix(matrix_rep(g)))
@@ -179,7 +180,7 @@ for (V, f) in ((true, :conj), (false, :identity))
             function apply_gate!(
                 ::Val{$V},
                 g::$G,
-                state_vec::CuStateVec{T},
+                state_vec::CuVector{T},
                 c::Int,
                 t::Int,
             ) where {T<:Complex}
@@ -193,7 +194,7 @@ for (V, f) in ((true, :conj), (false, :identity))
             function apply_gate!(
                 ::Val{$V},
                 g::$cg,
-                state_vec::CuStateVec{T},
+                state_vec::CuVector{T},
                 c::Int,
                 ts::Int...,
             ) where {T<:Complex}
@@ -207,53 +208,13 @@ for (V, f) in ((true, :conj), (false, :identity))
             function apply_gate!(
                 ::Val{$V},
                 g::$g,
-                state_vec::CuStateVec{T},
+                state_vec::CuVector{T},
                 c1::Int,
                 c2::Int,
                 ts::Int...,
             ) where {T<:Complex}
                 g_mat = $f(matrix_rep(g))
-                return customApplyMatrix!(state_vec, g_mat, false, collect(ts), [c1, c2])
-            end
-        end
-    end
-    for g in (:DoubleExcitation,)
-        @eval begin
-            function apply_gate!(
-                ::Val{$V},
-                g::$g,
-                state_vec::CuStateVec{T},
-                ts::Int...,
-            ) where {T<:Complex}
-                raw_mat = zeros(T, 16, 16)
-                cosϕ = cos(g.angle[1] / 2.0)
-                sinϕ = sin(g.angle[1] / 2.0)
-                raw_mat[4, 4] = cosϕ
-                raw_mat[13, 13] = cosϕ
-                raw_mat[4, 13] = -sinϕ
-                raw_mat[13, 4] = sinϕ
-                g_mat = $f(raw_mat)
-                return customApplyMatrix!(state_vec, g_mat, collect(ts), Int[])
-            end
-        end
-    end
-    for g in (:SingleExcitation,)
-        @eval begin
-            function apply_gate!(
-                ::Val{$V},
-                g::$g,
-                state_vec::CuStateVec{T},
-                ts::Int...,
-            ) where {T<:Complex}
-                raw_mat = zeros(T, 4, 4)
-                cosϕ = cos(g.angle[1] / 2.0)
-                sinϕ = sin(g.angle[1] / 2.0)
-                raw_mat[2, 2] = cosϕ
-                raw_mat[3, 3] = cosϕ
-                raw_mat[2, 3] = -sinϕ
-                raw_mat[3, 2] = sinϕ
-                g_mat = $f(raw_mat)
-                return customApplyMatrix!(state_vec, g_mat, collect(ts), Int[])
+                return customApplyMatrix!(state_vec, g_mat, collect(ts), [c1, c2])
             end
         end
     end
@@ -357,8 +318,8 @@ function marginal_probability(probs::CuVector{T}, qubit_count::Int, targets) whe
     return final_probs
 end
 
-function samples(svs::StateVectorSimulator{T,CuStateVec{T}}) where {T}
-    return sample(svs.state_vector, collect(0:svs.qubit_count-1), svs.shots)
+function samples(svs::StateVectorSimulator{T,CuVector{T}}) where {T}
+    return sample(CuStateVec{T}(svs.state_vector, svs.qubit_count), collect(0:svs.qubit_count-1), svs.shots)
 end
 
 end # module

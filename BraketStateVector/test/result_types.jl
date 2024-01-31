@@ -53,23 +53,23 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
     end
     function _expectation_from_diagonalization(sim::AbstractVector, qubits, eigenvalues)
         qc       = Int(log2(length(sim)))
-	marginal = collect(BraketStateVector.marginal_probability(abs2.(sim), qc, qubits))
+        marginal = collect(BraketStateVector.marginal_probability(abs2.(sim), qc, qubits))
         return real(dot(marginal, eigenvalues))
     end
     function _expectation_from_diagonalization(sim::AbstractMatrix, qubits, eigenvalues)
         qc       = Int(log2(size(sim, 1)))
-	marginal = collect(BraketStateVector.marginal_probability(real.(diag(sim)), qc, qubits))
+        marginal = collect(BraketStateVector.marginal_probability(real.(diag(sim)), qc, qubits))
         return real(dot(marginal, eigenvalues))
     end
     function _variance_from_diagonalization(sim::AbstractVector, qubits, eigenvalues)
         qc       = Int(log2(length(sim)))
-	marginal = collect(BraketStateVector.marginal_probability(abs2.(sim), qc, qubits))
+        marginal = collect(BraketStateVector.marginal_probability(abs2.(sim), qc, qubits))
         evs      = eigenvalues
         return real(dot(marginal, (real.(evs).^2) .- real(dot(marginal, evs)^2)))
     end
     function _variance_from_diagonalization(sim::AbstractMatrix, qubits, eigenvalues)
         qc       = Int(log2(size(sim, 1)))
-	marginal = collect(BraketStateVector.marginal_probability(real.(diag(sim)), qc, qubits))
+        marginal = collect(BraketStateVector.marginal_probability(real.(diag(sim)), qc, qubits))
         evs      = eigenvalues
         return real(dot(marginal, (real.(evs).^2) .- real(dot(marginal, evs)^2)))
     end

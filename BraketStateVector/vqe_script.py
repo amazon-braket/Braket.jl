@@ -52,6 +52,9 @@ def get_python_device(n_wires: int, shots, noise: bool = False):
 def get_lightning_device(n_wires: int, shots, noise: bool = False):
     return qml.device("lightning.qubit", wires=n_wires, shots=shots)
 
+def get_qiskit_device(n_wires: int, shots, noise: bool = False):
+    return qml.device('qiskit.aer', wires=n_wires, backend='aer_simulator_statevector', shots=shots)
+
 def get_touched_qubits(ex):
     return set().union(ex)
 
@@ -158,8 +161,8 @@ jl.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
-parser.add_argument("--protocol", type=str, default="shadows")
-parser.add_argument("--mol", type=str, default="H6")
+parser.add_argument("--protocol", type=str, default="qwc")
+parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")
@@ -238,7 +241,8 @@ print("FCI energy:", dset.fci_energy, " VQE energy: ", dset.vqe_energy)
 print(f"Number of qubits: {qubits}, number of groups: {n_groups}, number of excitations: {len(all_exs)}")
 print(f"Running with protocol {protocol}, encoding {encoding}, molecule {mol}, shots {scaled_shot}, noise {noise}, n_qubits {qubits}:", flush=True)
 #dev = get_python_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
-dev = get_lightning_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+#dev = get_lightning_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+dev = get_qiskit_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
 opt = qml.SPSAOptimizer(maxiter=n_iter)
                 
 @qml.qnode(dev, diff_method=diff_method)

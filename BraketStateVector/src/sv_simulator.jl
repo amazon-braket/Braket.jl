@@ -8,10 +8,10 @@ mutable struct StateVectorSimulator{T,S} <: AbstractSimulator
         state_vector::S,
         qubit_count::Int,
         shots::Int,
-    ) where {T,S}
-        return new(state_vector, qubit_count, shots, T[], S(zeros(T, 0), 0))
+    ) where {T, S<:AbstractVector{T}}
+        return new(state_vector, qubit_count, shots, T[], S(undef, 0))
     end
-    function StateVectorSimulator{T,S}(qubit_count::Int, shots::Int) where {T,S}
+    function StateVectorSimulator{T,S}(qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
         sv = S(undef, 2^qubit_count)
         fill!(sv, zero(T))
         sv[1] = one(T)
@@ -44,7 +44,7 @@ function Base.copyto!(
     return dst
 end
 
-function reinit!(svs::StateVectorSimulator{T,S}, qubit_count::Int, shots::Int) where {T,S}
+function reinit!(svs::StateVectorSimulator{T,S}, qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
     if length(svs.state_vector) != 2^qubit_count
         resize!(svs.state_vector, 2^qubit_count)
     end
@@ -59,7 +59,7 @@ end
 function evolve!(
     svs::StateVectorSimulator{T,S},
     operations::Vector{Instruction},
-) where {T<:Complex,S}
+) where {T<:Complex,S<:AbstractVector{T}}
     for (oix, op) in enumerate(operations)
         apply_gate!(op.operator, svs.state_vector, op.target...)
     end
@@ -78,7 +78,7 @@ for (gate, obs) in (
     (:H, :(Braket.Observables.H)),
 )
     @eval begin
-        function apply_observable!(observable::$obs, sv, target::Int)
+        function apply_observable!(observable::$obs, sv::S, target::Int) where {S<:AbstractVector{<:Complex}}
             apply_gate!($gate(), sv, target)
             return sv
         end
