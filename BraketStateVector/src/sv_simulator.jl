@@ -3,19 +3,24 @@ mutable struct StateVectorSimulator{T,S} <: AbstractSimulator
     qubit_count::Int
     shots::Int
     buffer::AbstractArray{UInt8}
+    shot_buffer::Vector{Int} # only used when shots>0
+    _alias::Vector{Int}
+    _ap::Vector{Float64}
     _state_vector_after_observables::S
     function StateVectorSimulator{T,S}(
         state_vector::S,
         qubit_count::Int,
         shots::Int,
     ) where {T, S<:AbstractVector{T}}
-        return new(state_vector, qubit_count, shots, T[], S(undef, 0))
+        ap_size = shots > 0 ? 2^qubit_count : 0
+        return new(state_vector, qubit_count, shots, T[], Vector{Int}(undef, shots), Vector{Int}(undef, ap_size), Vector{Float64}(undef, ap_size), S(undef, 0))
     end
     function StateVectorSimulator{T,S}(qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
         sv = S(undef, 2^qubit_count)
         fill!(sv, zero(T))
         sv[1] = one(T)
-        return new(sv, qubit_count, shots, T[], S(undef, 0))
+        ap_size = shots > 0 ? 2^qubit_count : 0
+        return new(sv, qubit_count, shots, T[], Vector{Int}(undef, shots), Vector{Int}(undef, ap_size), Vector{Float64}(undef, ap_size), S(undef, 0))
     end
 end
 StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
@@ -47,6 +52,13 @@ end
 function reinit!(svs::StateVectorSimulator{T,S}, qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
     if length(svs.state_vector) != 2^qubit_count
         resize!(svs.state_vector, 2^qubit_count)
+        if shots > 0
+            resize!(svs._alias, 2^qubit_count)
+            resize!(svs._ap, 2^qubit_count)
+        end
+    end
+    if svs.shots != shots
+        resize!(svs.shot_buffer, shots)
     end
     fill!(svs.state_vector, zero(T))
     svs.state_vector[1] = one(T)
@@ -195,9 +207,6 @@ function apply_observables!(svs::StateVectorSimulator, observables)
     return svs
 end
 probabilities(svs::StateVectorSimulator) = abs2.(svs.state_vector)
-samples(svs::StateVectorSimulator) =
-    sample(0:(2^svs.qubit_count-1), Weights(probabilities(svs)), svs.shots)
-
 
 function _apply_ag_Hamiltonian(sv::StateVector{T}, H::Sum, targets) where {T<:Complex}
     bra = similar(sv)

@@ -1,3 +1,20 @@
+function samples(s::AbstractSimulator)
+    wv = Weights(probabilities(s))
+    n = 2^s.qubit_count
+    inds = 0:(n-1)
+    ap = s._ap
+    alias = s._alias
+    StatsBase.make_alias_table!(wv, sum(wv), ap, alias)
+    rng = Random.default_rng()
+    sampler = Random.Sampler(rng, 1:n)
+    for i = 1:s.shots
+        j = rand(rng, sampler)
+        s.shot_buffer[i] = rand(rng) < ap[j] ? j-1 : alias[j]-1
+    end
+    return s.shot_buffer
+end
+
+
 calculate(sv::Braket.StateVector, sim::AbstractSimulator) = state_vector(sim)
 function calculate(a::Braket.Amplitude, sim::AbstractSimulator)
     state = collect(state_vector(sim))

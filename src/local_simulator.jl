@@ -46,19 +46,37 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
             !isempty(unbounded_params) && throw(ErrorException("cannot execute circuit with unbound parameters $unbounded_params."))
         end
     end
-    sims = [copy(d._delegate) for ix in 1:length(task_specs)]
-    @info "Braket.jl: batch size is $(length(task_specs)). Starting run..."
-    #Base.GC.enable(false)
-    start = time()
     results = Vector{GateModelQuantumTaskResult}(undef, length(task_specs))
-    stats = @timed begin
-        Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
-            results[ix] = _run_internal(sims[ix], spec, args...; inputs=input, shots=shots, kwargs...)
+    # let each thread pick up an idle simulator
+    sims     = Channel(Threads.nthreads())
+    foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
+    max_qc   = maximum(qubit_count, task_specs)
+    do_chunk = max_qc <= 20
+    @info "Braket.jl: batch size is $(length(task_specs)). Chunking? $do_chunk. Starting run..."
+    start = time()
+    @profile begin
+        stats = @timed begin
+		if do_chunk
+		    chunks = collect(Iterators.partition(tasks_and_inputs, div(length(tasks_and_inputs), Threads.nthreads())))
+		    println("Doing chunked run with $(length(chunks)).")
+		    Threads.@threads for c_ix in 1:length(chunks)
+		        sim = take!(sims)
+			for (ix, spec, input) in chunks[c_ix]
+		            results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
+		        end
+		        put!(sims, sim)
+		    end
+		else
+		    Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
+		        sim = take!(sims)
+		        results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
+		        put!(sims, sim)
+		    end
+	    end
         end
-        #Base.GC.enable(true)
+        @info "Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
     end
     stop = time()
-    @info "Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
     return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
 
@@ -86,7 +104,8 @@ function _run_internal(simulator, circuit::Program, args...; shots::Int=0, input
         program = circuit
         qubits  = qubit_count(circuit)
         r       = simulator(program, qubits, args...; shots=shots, kwargs...)
-        return format_result(r)
+	fr = format_result(r)
+	return fr
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end

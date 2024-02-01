@@ -3,6 +3,9 @@ mutable struct DensityMatrixSimulator{T,S} <:
     density_matrix::S
     qubit_count::Int
     shots::Int
+    shot_buffer::Vector{Int}
+    _alias::Vector{Int}
+    _ap::Vector{Float64}
     _density_matrix_after_observables::S
     function DensityMatrixSimulator{T,S}(
         qubit_count::Int,
@@ -11,14 +14,15 @@ mutable struct DensityMatrixSimulator{T,S} <:
         dm = S(undef, 2^qubit_count, 2^qubit_count)
         fill!(dm, zero(T))
         dm[1, 1] = one(T)
-        return new(dm, qubit_count, shots, S(undef, 0, 0))
+        ap_size = shots > 0 ? 2^qubit_count : 0
+        return new(dm, qubit_count, shots, Vector{Int}(undef, shots), Vector{Int}(undef, ap_size), Vector{Float64}(undef, ap_size), S(undef, 0, 0))
     end
     function DensityMatrixSimulator{T,S}(
         density_matrix::S,
         qubit_count::Int,
         shots::Int,
     ) where {T,S<:AbstractDensityMatrix{T}}
-        return new(density_matrix, qubit_count, shots, S(undef, 0, 0))
+        return new(density_matrix, qubit_count, shots, Vector{Int}(undef, shots), Vector{Int}(undef, shots), Vector{Float64}(undef, shots), S(undef, 0, 0))
     end
 end
 DensityMatrixSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
@@ -57,6 +61,13 @@ function reinit!(
 ) where {T,S<:AbstractDensityMatrix{T}}
     if size(dms.density_matrix) != (2^qubit_count, 2^qubit_count)
         dms.density_matrix = S(undef, 2^qubit_count, 2^qubit_count)
+        if shots > 0
+            resize!(dms._alias, 2^qubit_count)
+            resize!(dms._ap, 2^qubit_count)
+        end
+    end
+    if dms.shots != shots
+        resize!(dms.shot_buffer, shots)
     end
     fill!(dms.density_matrix, zero(T))
     dms.density_matrix[1, 1] = one(T)
@@ -194,8 +205,6 @@ state_vector(dms::DensityMatrixSimulator) =
     error("cannot express density matrix with off-diagonal elements as a pure state.")
 density_matrix(dms::DensityMatrixSimulator) = dms.density_matrix
 probabilities(dms::DensityMatrixSimulator) = real.(diag(dms.density_matrix))
-samples(dms::DensityMatrixSimulator) =
-    sample(0:size(dms.density_matrix, 1)-1, Weights(probabilities(dms)), dms.shots)
 
 function swap_bits(ix::Int, qubit_map::Dict{Int,Int})
     # only flip 01 and 10

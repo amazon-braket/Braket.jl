@@ -93,7 +93,7 @@ function _bundle_results(
         nothing,
         nothing,
     )
-    formatted_samples = _formatted_measurements(d)
+    formatted_samples = d.shots > 0 ? _formatted_measurements(d) : Vector{Int}[]
     measured_qubits = collect(0:qubit_count(d)-1)
     return Braket.GateModelTaskResult(
         Braket.header_dict[Braket.GateModelTaskResult],

@@ -42,18 +42,24 @@ def noise_model():
 def get_julia_device(n_wires: int, shots, noise: bool = False):
     default_dev = "braket_dm" if noise else "braket_sv"
     nm = noise_model() if noise else None
+    print("USING JULIA DEVICE")
     return JuliaQubitDevice(n_wires, default_dev, shots=shots, noise_model=nm)
 
 def get_python_device(n_wires: int, shots, noise: bool = False):
     default_dev = "braket_dm" if noise else "braket_sv"
     nm = noise_model() if noise else None
+    print("USING BRAKET_SV DEVICE")
     return qml.device("braket.local.qubit", backend=default_dev, wires=n_wires, shots=shots, noise_model=nm)
 
 def get_lightning_device(n_wires: int, shots, noise: bool = False):
+    print("USING LIGHTNING DEVICE")
     return qml.device("lightning.qubit", wires=n_wires, shots=shots)
 
 def get_qiskit_device(n_wires: int, shots, noise: bool = False):
-    return qml.device('qiskit.aer', wires=n_wires, backend='aer_simulator_statevector', shots=shots)
+    print("USING QISKIT DEVICE")
+    dev = qml.device('qiskit.aer', wires=n_wires, backend='aer_simulator_statevector', shots=shots, statevector_parallel_threshold=8)
+    dev.set_transpile_args(**{"optimization_level": 0})
+    return dev
 
 def get_touched_qubits(ex):
     return set().union(ex)
@@ -88,13 +94,15 @@ def run_adapt(
         params = [0.0]*len(excitation_pool)
         start = time.time()
         print(f"Compute gradients for {key} at iter {adapt_iter}", flush=True)
-        ex_grad = gradient_circ(params, excitation_pool, selected_params, selected_excitations)
-        #ex_grad = [0.0]*len(excitation_pool)
-        #for ix in range(len(excitation_pool)):
-        #    g_start = time.time()
-        #    ex_grad[ix] = gradient_circ([params[ix]], [excitation_pool[ix]], selected_params, selected_excitations)
-        #    g_stop = time.time()
-        #    print(f"Done computing {ix}-th gradient. Duration: {g_stop-g_start}.", flush=True)
+        #ex_grad = gradient_circ(params, excitation_pool, selected_params, selected_excitations)
+        ex_grad = [0.0]*len(excitation_pool)
+        for ix in range(len(excitation_pool)):
+            g_start = time.time()
+            ex_grad[ix] = gradient_circ([params[ix]], [excitation_pool[ix]], selected_params, selected_excitations)
+            g_stop = time.time()
+            print(f"Done computing {ix}-th gradient. Duration: {g_stop-g_start}.", flush=True)
+            jl.seval('statprofilehtml()')
+            exit(1)
         stop = time.time()
         print(f"Done computing gradients. Duration: {stop-start}.", flush=True)
         exit(1)
@@ -152,17 +160,11 @@ def run_adapt(
 
     return progress_tracker
 
-jl = init_julia()
-juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket")
-juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket/BraketStateVector")
-jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
-jl.seval('using Braket, BraketStateVector, JSON3, PythonCall')
-jl.seval('Braket.IRType[] = :JAQCD')
 
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
 parser.add_argument("--protocol", type=str, default="qwc")
-parser.add_argument("--mol", type=str, default="H4")
+parser.add_argument("--mol", type=str, default="H10")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")
@@ -170,6 +172,24 @@ parser.add_argument('--use-python', dest='use_python', action='store_true')
 parser.set_defaults(noise=False)
 parser.set_defaults(use_python=False)
 args = parser.parse_args()
+
+shot = args.shot
+protocol = args.protocol
+mol = args.mol
+noise = args.noise
+use_python = args.use_python
+#output_file = args.output
+
+print(f"Using Python? {use_python}")
+#if not use_python:
+jl = init_julia()
+juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket")
+juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket/BraketStateVector")
+juliapkg.add("StatProfilerHTML", "a8a75453-ed82-57c9-9e16-4cd1196ecbf5")
+#jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
+jl.seval('using Braket, BraketStateVector, JSON3, PythonCall, Profile, StatProfilerHTML')
+jl.seval('Braket.IRType[] = :JAQCD')
+jl.seval('Profile.init(n = 10^7)')
 
 previous_progress = {}
 if args.prevprog:
@@ -194,19 +214,13 @@ cutoff = 1e-3
 diff_method = "parameter-shift"
 encoding = "jordan_wigner"
 bond_lengths = {"H2": 0.7, "H4": 0.8, "H6": 0.8, "H8": 0.8, "H10": 1.0, "LiH": 1.71}
-
-shot = args.shot
-protocol = args.protocol
-mol = args.mol
-noise = args.noise
-use_python = args.use_python
-#output_file = args.output
+electrons = {"H2": 2, "H4": 4, "H6": 6, "H8": 8, "H10": 10}
 
 datasets = qml.data.load("qchem", molname=mol, basis="STO-3G", bondlength=bond_lengths[mol])
 dset = datasets[0]
 E = dset.fci_energy
 molecule = dset.molecule
-n_electrons = molecule.n_electrons
+n_electrons = electrons[mol] #molecule.n_electrons
 n_orbitals = molecule.n_orbitals
 H = dset.hamiltonian
 #H, qubits = qml.qchem.molecular_hamiltonian(
@@ -219,8 +233,8 @@ H = dset.hamiltonian
 #    method="pyscf",
 #)
 qubits = len(H.wires)
-hf_state = dset.hf_state
-print(hf_state, flush=True)
+hf_state = dset.hf_state if mol != "H10" else qml.qchem.hf_state(10, 20) 
+#print(hf_state, flush=True)
 scaled_shot = shot
 coeffs, obs = H.coeffs, H.ops
 H_qwc = qml.Hamiltonian(coeffs, obs, grouping_type="qwc")
@@ -284,6 +298,10 @@ def qwc_circuit(
 
 circ = shadow_circuit if protocol == 'shadows' else qwc_circuit
 key = {'mol': mol, 'noise': noise, 'protocol': protocol, 'shots': shot}
+
+e0 = circ([0.0], [all_exs[0]], [], [])
+
+jl.seval('Profile.clear()')
 
 start = time.time()
 result = run_adapt(

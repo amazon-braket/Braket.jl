@@ -40,6 +40,17 @@ const DEFAULT_THREAD_COUNT = 512
 const CuVectortorSimulator{T}   = StateVectorSimulator{T,CuVector{T}}
 const CuDensityMatrixSimulator{T} = DensityMatrixSimulator{T,CuMatrix{T}}
 
+function get_launch_dims(total_ix::Int)
+    if total_ix >= DEFAULT_THREAD_COUNT
+        tc = DEFAULT_THREAD_COUNT
+        bc = div(total_ix, tc)
+    else
+        tc = total_ix
+        bc = 1
+    end
+    return tc, bc
+end
+
 function CUDA.cu(svs::StateVectorSimulator{T,S}) where {T,S<:AbstractStateVector{T}}
     cu_sv = CuVector{T}(undef, length(svs.state_vector))
     copyto!(cu_sv, svs.state_vector)

@@ -22,6 +22,7 @@ import AWS.Mocking: apply
 @service EcR use_response_type=true
 @service CLOUDWATCH_LOGS use_response_type=true
 
+using Profile
 using Base64
 using Compat
 using CSV
