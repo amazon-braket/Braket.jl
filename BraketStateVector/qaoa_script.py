@@ -61,7 +61,7 @@ def get_qiskit_device(n_wires: int, shots, noise: bool = False):
 jl = init_julia()
 #juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path="/Users/hyatkath/.julia/dev/Braket")
 #juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path="/Users/hyatkath/.julia/dev/Braket/BraketStateVector")
-jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
+#jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
 jl.seval('using Braket, BraketStateVector, JSON3, PythonCall')
 jl.seval('Braket.IRType[] = :JAQCD')
 

@@ -51,7 +51,7 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
     sims     = Channel(Threads.nthreads())
     foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
     max_qc   = maximum(qubit_count, task_specs)
-    do_chunk = max_qc <= 20
+    do_chunk = max_qc <= 20 && length(task_specs) > Threads.nthreads()
     @info "Braket.jl: batch size is $(length(task_specs)). Chunking? $do_chunk. Starting run..."
     start = time()
     @profile begin
@@ -61,8 +61,9 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
 		    println("Doing chunked run with $(length(chunks)).")
 		    Threads.@threads for c_ix in 1:length(chunks)
 		        sim = take!(sims)
-			for (ix, spec, input) in chunks[c_ix]
+                for (ix, spec, input) in chunks[c_ix]
 		            results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
+                    mod(ix, 100) == 0 && println("Thread $(Threads.threadid()) completed task $ix.")
 		        end
 		        put!(sims, sim)
 		    end

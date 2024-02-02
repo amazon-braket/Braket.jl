@@ -2,16 +2,22 @@ function samples(s::AbstractSimulator)
     wv = Weights(probabilities(s))
     n = 2^s.qubit_count
     inds = 0:(n-1)
+    rng = Random.default_rng()
     ap = s._ap
     alias = s._alias
     StatsBase.make_alias_table!(wv, sum(wv), ap, alias)
-    rng = Random.default_rng()
+
     sampler = Random.Sampler(rng, 1:n)
     for i = 1:s.shots
         j = rand(rng, sampler)
         s.shot_buffer[i] = rand(rng) < ap[j] ? j-1 : alias[j]-1
     end
     return s.shot_buffer
+    #=
+    for i = 1:s.shots
+        s.shot_buffer[i] = StatsBase.sample(rng, wv) - 1
+    end
+    return s.shot_buffer=#
 end
 
 
