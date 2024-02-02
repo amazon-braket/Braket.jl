@@ -6,24 +6,35 @@ mutable struct DensityMatrixSimulator{T,S} <:
     shot_buffer::Vector{Int}
     _alias::Vector{Int}
     _ap::Vector{Float64}
+    _larges::Vector{Int}
+    _smalls::Vector{Int}
     _density_matrix_after_observables::S
-    function DensityMatrixSimulator{T,S}(
-        qubit_count::Int,
-        shots::Int,
-    ) where {T,S<:AbstractDensityMatrix{T}}
-        dm = S(undef, 2^qubit_count, 2^qubit_count)
-        fill!(dm, zero(T))
-        dm[1, 1] = one(T)
-        ap_size = shots > 0 ? 2^qubit_count : 0
-        return new(dm, qubit_count, shots, Vector{Int}(undef, shots), Vector{Int}(undef, ap_size), Vector{Float64}(undef, ap_size), S(undef, 0, 0))
-    end
     function DensityMatrixSimulator{T,S}(
         density_matrix::S,
         qubit_count::Int,
         shots::Int,
     ) where {T,S<:AbstractDensityMatrix{T}}
-        return new(density_matrix, qubit_count, shots, Vector{Int}(undef, shots), Vector{Int}(undef, shots), Vector{Float64}(undef, shots), S(undef, 0, 0))
+        shot_buffer = Vector{Int}(undef, shots)
+        ap_len  = ap_size(shots, qubit_count)
+        _alias  = Vector{Int}(undef, ap_len)
+        _ap     = Vector{Float64}(undef, ap_len)
+        _larges = Vector{Int}(undef, ap_len)
+        _smalls = Vector{Int}(undef, ap_len)
+        return new(density_matrix, qubit_count, shots, shot_buffer, _alias, _ap, _larges, _smalls, S(undef, 0, 0))
     end
+end
+function init(::Type{DensityMatrixSimulator{T,S}}, qubit_count::Int) where {T,S<:AbstractMatrix{T}}
+    dm = S(undef, 2^qubit_count, 2^qubit_count)
+    fill!(dm, zero(T))
+    dm[1, 1] = one(T)
+    return dm
+end
+function DensityMatrixSimulator{T,S}(
+    qubit_count::Int,
+    shots::Int,
+) where {T,S<:AbstractDensityMatrix{T}}
+    dm = init(DensityMatrixSimulator{T,S}, qubit_count)
+    return DensityMatrixSimulator{T, S}(dm, qubit_count, shots)
 end
 DensityMatrixSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
     DensityMatrixSimulator{T,DensityMatrix{T}}(qubit_count, shots)
@@ -59,12 +70,14 @@ function reinit!(
     qubit_count::Int,
     shots::Int,
 ) where {T,S<:AbstractDensityMatrix{T}}
-    if size(dms.density_matrix) != (2^qubit_count, 2^qubit_count)
-        dms.density_matrix = S(undef, 2^qubit_count, 2^qubit_count)
-        if shots > 0
-            resize!(dms._alias, 2^qubit_count)
-            resize!(dms._ap, 2^qubit_count)
-        end
+    n = 2^qubit_count
+    if size(dms.density_matrix) != (n, n)
+        dms.density_matrix = S(undef, n, n)
+        ap_len = ap_size(shots, qubit_count)
+        resize!(dms._alias, ap_len)
+        resize!(dms._ap, ap_len)
+        resize!(dms._larges, ap_len)
+        resize!(dms._smalls, ap_len)
     end
     if dms.shots != shots
         resize!(dms.shot_buffer, shots)

@@ -6,22 +6,34 @@ mutable struct StateVectorSimulator{T,S} <: AbstractSimulator
     shot_buffer::Vector{Int} # only used when shots>0
     _alias::Vector{Int}
     _ap::Vector{Float64}
+    _larges::Vector{Int}
+    _smalls::Vector{Int}
     _state_vector_after_observables::S
     function StateVectorSimulator{T,S}(
         state_vector::S,
         qubit_count::Int,
         shots::Int,
     ) where {T, S<:AbstractVector{T}}
-        ap_size = shots > 0 ? 2^qubit_count : 0
-        return new(state_vector, qubit_count, shots, T[], Vector{Int}(undef, shots), Vector{Int}(undef, ap_size), Vector{Float64}(undef, ap_size), S(undef, 0))
+        # careful here, need to dispatch on qubit count if it is large
+        shot_buffer = Vector{Int}(undef, shots)
+        ap_len  = ap_size(shots, qubit_count)
+        _alias  = Vector{Int}(undef, ap_len)
+        _ap     = Vector{Float64}(undef, ap_len)
+        _larges = Vector{Int}(undef, ap_len)
+        _smalls = Vector{Int}(undef, ap_len)
+        return new(state_vector, qubit_count, shots, T[], shot_buffer, _alias, _ap, _larges, _smalls, S(undef, 0))
     end
-    function StateVectorSimulator{T,S}(qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
-        sv = S(undef, 2^qubit_count)
-        fill!(sv, zero(T))
-        sv[1] = one(T)
-        ap_size = shots > 0 ? 2^qubit_count : 0
-        return new(sv, qubit_count, shots, T[], Vector{Int}(undef, shots), Vector{Int}(undef, ap_size), Vector{Float64}(undef, ap_size), S(undef, 0))
-    end
+end
+function init(::Type{StateVectorSimulator{T,S}}, qubit_count::Int) where {T,S<:AbstractVector{T}}
+    sv = S(undef, 2^qubit_count)
+    fill!(sv, zero(T))
+    sv[1] = one(T)
+    return sv
+end
+
+function StateVectorSimulator{T,S}(qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
+    sv = init(StateVectorSimulator{T, S}, qubit_count)
+    return StateVectorSimulator{T, S}(sv, qubit_count, shots)
 end
 StateVectorSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
     StateVectorSimulator{T,StateVector{T}}(qubit_count, shots)
@@ -50,12 +62,14 @@ function Base.copyto!(
 end
 
 function reinit!(svs::StateVectorSimulator{T,S}, qubit_count::Int, shots::Int) where {T,S<:AbstractVector{T}}
-    if length(svs.state_vector) != 2^qubit_count
-        resize!(svs.state_vector, 2^qubit_count)
-        if shots > 0
-            resize!(svs._alias, 2^qubit_count)
-            resize!(svs._ap, 2^qubit_count)
-        end
+    n = 2^qubit_count
+    if length(svs.state_vector) != n
+        resize!(svs.state_vector, n)
+        ap_len = ap_size(shots, qubit_count)
+        resize!(svs._alias, ap_len)
+        resize!(svs._ap, ap_len)
+        resize!(svs._larges, ap_len)
+        resize!(svs._smalls, ap_len)
     end
     if svs.shots != shots
         resize!(svs.shot_buffer, shots)

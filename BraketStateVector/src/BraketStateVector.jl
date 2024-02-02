@@ -32,6 +32,7 @@ const AbstractDensityMatrix{T} = AbstractMatrix{T}
 
 abstract type AbstractSimulator <: Braket.BraketSimulator end
 Braket.name(s::AbstractSimulator) = device_id(s)
+ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubit_count : 0
 
 include("validation.jl")
 
