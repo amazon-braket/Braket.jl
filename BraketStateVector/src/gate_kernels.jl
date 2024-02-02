@@ -224,7 +224,7 @@ function apply_gate!(
         ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
         @views begin
             @inbounds begin
-                amps = state_vec[ind_vec]
+                amps = SVector{4, T}(state_vec[ind_vec])
                 state_vec[ind_vec] = gate_kernel(Val(V), g_mat, amps)
             end
         end
@@ -277,7 +277,7 @@ function apply_controlled_gate!(
         lower_ix = ix_10 + 1
         higher_ix = ix_11 + 1
         @inbounds begin
-            lower_amp = state_vec[lower_ix]
+            lower_amp  = state_vec[lower_ix]
             higher_amp = state_vec[higher_ix]
             state_vec[lower_ix] =
                 gate_kernel(Val(V), Val(:lower), tg, lower_amp, higher_amp)
@@ -307,8 +307,11 @@ function apply_controlled_gate!(
         ix_01 = flip_bit(ix_00, endian_t1)
         ix_11 = flip_bit(ix_01, endian_t2)
         ix_vec = SVector{4,Int}(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
-        @inbounds begin
-            state_vec[ix_vec] = gate_kernel(Val(V), tg_mat, state_vec[ix_vec])
+        @views begin
+            @inbounds begin
+                amps = SVector{4, T}(state_vec[ix_vec])
+                state_vec[ix_vec] = gate_kernel(Val(V), tg_mat, amps)
+            end
         end
     end
     return
@@ -388,7 +391,7 @@ function apply_gate!(
         ixs = SVector{2^nq,Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
         @views begin
             @inbounds begin
-                amps = state_vec[ixs]
+                amps = SVector{2^NQ, T}(state_vec[ixs])
                 new_amps = gate_kernel(Val(V), g_mat, amps)
                 state_vec[ixs] = new_amps
             end

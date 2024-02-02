@@ -56,24 +56,24 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
     start = time()
     @profile begin
         stats = @timed begin
-		if do_chunk
-		    chunks = collect(Iterators.partition(tasks_and_inputs, div(length(tasks_and_inputs), Threads.nthreads())))
-		    println("Doing chunked run with $(length(chunks)).")
-		    Threads.@threads for c_ix in 1:length(chunks)
-		        sim = take!(sims)
-                for (ix, spec, input) in chunks[c_ix]
-		            results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
-                    mod(ix, 100) == 0 && println("Thread $(Threads.threadid()) completed task $ix.")
-		        end
-		        put!(sims, sim)
-		    end
-		else
-		    Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
-		        sim = take!(sims)
-		        results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
-		        put!(sims, sim)
-		    end
-	    end
+            if do_chunk
+                chunks = collect(Iterators.partition(tasks_and_inputs, div(length(tasks_and_inputs), Threads.nthreads())))
+                Threads.@threads for c_ix in 1:length(chunks)
+                    sim = take!(sims)
+                    for (ix, spec, input) in chunks[c_ix]
+                        results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
+                    end
+                    put!(sims, sim)
+                end
+            else
+                Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
+                    sim = take!(sims)
+                    println("Thread $(Threads.threadid()) beginning task $ix.")
+                    results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
+                    println("Thread $(Threads.threadid()) completed task $ix.")
+                    put!(sims, sim)
+                end
+            end
         end
         @info "Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
     end

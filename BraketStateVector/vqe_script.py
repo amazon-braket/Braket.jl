@@ -164,7 +164,7 @@ def run_adapt(
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
 parser.add_argument("--protocol", type=str, default="qwc")
-parser.add_argument("--mol", type=str, default="H10")
+parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")
@@ -180,16 +180,17 @@ noise = args.noise
 use_python = args.use_python
 #output_file = args.output
 
-print(f"Using Python? {use_python}")
 #if not use_python:
 jl = init_julia()
-juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket")
-juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket/BraketStateVector")
-juliapkg.add("StatProfilerHTML", "a8a75453-ed82-57c9-9e16-4cd1196ecbf5")
+#juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket")
+#juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path=os.getenv("HOME") + "/.julia/dev/Braket/BraketStateVector")
+#juliapkg.add("StatProfilerHTML", "a8a75453-ed82-57c9-9e16-4cd1196ecbf5")
 #jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
 jl.seval('using Braket, BraketStateVector, JSON3, PythonCall, Profile, StatProfilerHTML')
 jl.seval('Braket.IRType[] = :JAQCD')
 jl.seval('Profile.init(n = 10^7)')
+
+print(f"Using Python? {use_python}", flush=True)
 
 previous_progress = {}
 if args.prevprog:

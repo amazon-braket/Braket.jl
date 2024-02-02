@@ -62,8 +62,9 @@ jl = init_julia()
 #juliapkg.add("Braket", "19504a0f-b47d-4348-9127-acc6cc69ef67", dev=True, path="/Users/hyatkath/.julia/dev/Braket")
 #juliapkg.add("BraketStateVector", "4face768-c059-465f-83fa-0d546ea16c1e", dev=True, path="/Users/hyatkath/.julia/dev/Braket/BraketStateVector")
 #jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
-jl.seval('using Braket, BraketStateVector, JSON3, PythonCall')
+jl.seval('using Braket, BraketStateVector, JSON3, PythonCall, Profile, StatProfilerHTML')
 jl.seval('Braket.IRType[] = :JAQCD')
+jl.seval('Profile.init(n = 10^7)')
 
 parser = argparse.ArgumentParser(description='Options for QAOA circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
@@ -127,15 +128,7 @@ for nv in range(4, 26, 2):
     circ = qwc_circuit
     key = {'nv': nv, 'noise': noise, 'shots': shot}
 
-    start = time.time()
-    for opt_iter in range(n_iter):
-        params = opt.step(circ, params)
-        cost = circ(params)
-        print(f"Completed iteration {opt_iter} with cost {cost}")
-
-    stop = time.time()
-    print(f'Simulation total duration: {stop-start}.')
-
+    jl.seval('Profile.clear()')
     params = np.random.uniform(size=[2, n_layers])
     circ = qwc_circuit
     key = {'nv': nv, 'noise': noise, 'shots': shot}
@@ -154,6 +147,4 @@ for nv in range(4, 26, 2):
     print('Note: Charges shown are estimates based on your Amazon Braket simulator and quantum processing unit (QPU) task usage. Estimated charges shown may differ from your actual charges. Estimated charges do not factor in any discounts or credits, and you may experience additional charges based on your use of other services such as Amazon Elastic Compute Cloud (Amazon EC2).')
     print(f"Estimated cost to run this example: {t.qpu_tasks_cost() + t.simulator_tasks_cost():.3f} USD")
 
-    #key = key.update({"results": result})
-    with open(os.path.join(os.getenv("HOME"), f"qaoa_{nv}_{shot}_{noise}_sv1.pickle"), 'wb') as fi:
-        pickle.dump(key, fi)
+    jl.seval('statprofilehtml()')

@@ -3,15 +3,13 @@ function make_alias_table!(w::AbstractVector, wsum, a::AbstractVector{Float64}, 
     length(a) == length(alias) == n || throw(DimensionMismatch("Inconsistent array lengths."))
 
     ac = n / wsum
-    for i = 1:n
-        @inbounds a[i] = w[i] * ac
-    end
+    a .= w .* ac
 
     kl = 0  # actual number of larges
     ks = 0  # actual number of smalls
 
-    for i = 1:n
-        @inbounds ai = a[i]
+    @inbounds for i = 1:n
+        ai = a[i]
         if ai > 1.0
             larges[kl+=1] = i  # push to larges
         elseif ai < 1.0
@@ -19,11 +17,11 @@ function make_alias_table!(w::AbstractVector, wsum, a::AbstractVector{Float64}, 
         end
     end
 
-    while kl > 0 && ks > 0
+    @inbounds while kl > 0 && ks > 0
         s = smalls[ks]; ks -= 1  # pop from smalls
         l = larges[kl]; kl -= 1  # pop from larges
-        @inbounds alias[s] = l
-        @inbounds al = a[l] = (a[l] - 1.0) + a[s]
+        alias[s] = l
+        al = a[l] = (a[l] - 1.0) + a[s]
         if al > 1.0
             larges[kl+=1] = l  # push to larges
         else
