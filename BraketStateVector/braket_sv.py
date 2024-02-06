@@ -268,12 +268,12 @@ class JuliaQubitDevice(BraketLocalQubitDevice):
 
         batch_shots = 0 if self.analytic else self.shots
         inputs = [{f"p_{k}": v for k, v in trainable.items()} for trainable in all_trainable]
-        print("\tBegin Julia processing.")
+        print(f"\tBegin Julia processing at {datetime.datetime.now()}.")
         start = time.time()
         jl_start = time.time()
         jl_results = self._device(circuits, inputs, shots=batch_shots)
         jl_stop = time.time()
-        print(f"\tJulia time to compute batch: {jl_stop-jl_start}.", flush=True)
+        print(f"\tJulia time to compute batch: {jl_stop-jl_start}. Returned from Julia at {datetime.datetime.now()}", flush=True)
         pl_results = []
         for (circ, jl_r) in zip(circuits, jl_results):
             if len(circ.measurements) == 1:

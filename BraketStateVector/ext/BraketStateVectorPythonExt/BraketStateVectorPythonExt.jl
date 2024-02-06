@@ -1,6 +1,6 @@
 module BraketStateVectorPythonExt
 
-using BraketStateVector, BraketStateVector.Braket, PythonCall
+using BraketStateVector, BraketStateVector.Braket, PythonCall, BraketStateVector.Dates
 
 import BraketStateVector.Braket:
     LocalSimulator,
@@ -353,12 +353,9 @@ function (d::LocalSimulator)(
     jl_specs = [pyconvert(Program, spec) for spec in task_specs]
     task_specs = nothing
     inputs = nothing
-    GC.gc(false)
-    @info "Entering pure Julia segment."
     PythonCall.GC.disable()
     r = results(d(jl_specs, args...; inputs = jl_inputs, kwargs...))
     PythonCall.GC.enable()
-    @info "Leaving pure Julia segment."
     return r
 end
 function Py(r::GateModelQuantumTaskResult)

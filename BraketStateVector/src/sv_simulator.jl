@@ -74,10 +74,10 @@ function reinit!(svs::StateVectorSimulator{T,S}, qubit_count::Int, shots::Int) w
     if svs.shots != shots
         resize!(svs.shot_buffer, shots)
     end
-    fill!(svs.state_vector, zero(T))
+    svs.state_vector   .= zero(T)
     svs.state_vector[1] = one(T)
-    svs.qubit_count = qubit_count
-    svs.shots = shots
+    svs.qubit_count     = qubit_count
+    svs.shots           = shots
     svs._state_vector_after_observables = S(undef, 0)
     return
 end

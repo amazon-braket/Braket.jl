@@ -1,12 +1,12 @@
-using Test, CUDA, Braket, BraketStateVector, DataStructures
+using Test, CUDA, cuStateVec, Braket, BraketStateVector, DataStructures
 
-import Braket: Instruction
+import Braket: I, Instruction
 
 funcs = CUDA.functional() ? (identity, cu) : (identity,)
 
 @testset "State vector simulator" begin
-    for f in funcs
-        @testset "Simple circuits $instructions" for (instructions, qubit_count, state_vector, probability_amplitudes) in [
+    @testset "f = $f" for f in funcs
+        @testset "Simple circuits nq: $qubit_count $instructions" for (instructions, qubit_count, state_vector, probability_amplitudes) in [
             ([Instruction(H(), [0])], 1, [0.70710678, 0.70710678], [0.5, 0.5]),
             ([Instruction(X(), [0])], 1, [0, 1], [0, 1]),
             ([Instruction(X(), [0])], 2, [0, 0, 1, 0], [0, 0, 1, 0]),

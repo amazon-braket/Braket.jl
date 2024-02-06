@@ -390,7 +390,7 @@ end
 function _unsafe_indexin(targets::NTuple{N, Int}, measured_qubits::NTuple{M, Int})::Vector{Int} where {N,M}
     function _index_finder(t::Int, measured_qubits::NTuple{M, Int}) where {M}
         for mqi in 1:M
-	    @inbounds(t == measured_qubits[mqi]) && return mqi 
+            @inbounds(t == measured_qubits[mqi]) && return mqi 
         end
     end
     return SVector{N, Int}(_index_finder(t, measured_qubits) for t in targets)
@@ -467,11 +467,11 @@ function _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, o
     return mean(samples)
 end
 
-function _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, observable::Observables.Observable, targets::Nothing, ::Type{T}) where {T, M}
+function _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, observable::O, targets::Nothing, ::Type{T}) where {T, M, O<:Observables.Observable}
     return [first(_calculate_for_targets(measurements, measured_qubits, observable, (q,), T)) for q in measured_qubits]
 end
 
-function _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, observable::Observables.Observable, targets::Nothing, ::Type{IR.Sample}) where {M}
+function _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, observable::O, targets::Nothing, ::Type{IR.Sample}) where {M, O<:Observables.Observable}
     return [collect(_calculate_for_targets(measurements, measured_qubits, observable, (q,), IR.Sample)) for q in measured_qubits]
 end
 
@@ -488,27 +488,26 @@ function _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, t
 end
 _calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, targets::Nothing, ::Type{IR.Probability}) where {M} = _calculate_for_targets(measurements, measured_qubits, measured_qubits, IR.Probability)
 
-function _reconstruct_and_compute_value(rt::IR.Probability, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int})
-    targs = isnothing(rt.targets) ? nothing : tuple(rt.targets...)
-    val   = _calculate_for_targets(measurements, tuple(measured_qubits...), targs, IR.Probability)
+_calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, targets::Vector{Int}, ::Type{IR.Probability}) where {M} = _calculate_for_targets(measurements, measured_qubits, tuple(targets...), IR.Probability)
+_calculate_for_targets(measurements, measured_qubits::NTuple{M, Int}, observable::O, targets::Vector{Int}, ::Type{T}) where {M, O<:Observables.Observable, T} = _calculate_for_targets(measurements, measured_qubits, observable, tuple(targets...), T)
+
+function _reconstruct_and_compute_value(rt::IR.Probability, measurements::Vector{Vector{Int}}, measured_qubits::NTuple{M, Int})::ResultTypeValue where {M}
+    val = _calculate_for_targets(measurements, measured_qubits, rt.targets, IR.Probability)
     return ResultTypeValue(rt, val)
 end
 
-function _reconstruct_and_compute_value(rt::T, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int}) where {T<:Union{IR.Expectation, IR.Variance}}
-    obs   = StructTypes.constructfrom(Observables.Observable, rt.observable)
-    targs = isnothing(rt.targets) ? nothing : tuple(rt.targets...)
-    val   = _calculate_for_targets(measurements, tuple(measured_qubits...), obs, targs, T)
+function _reconstruct_and_compute_value(rt::T, measurements::Vector{Vector{Int}}, measured_qubits::NTuple{M, Int})::ResultTypeValue where {T<:Union{IR.Expectation, IR.Variance}, M}
+    obs::Observables.Observable = StructTypes.constructfrom(Observables.Observable, rt.observable)
+    val = _calculate_for_targets(measurements, measured_qubits, obs, rt.targets, T)
     return ResultTypeValue(rt, val)
 end
-function _reconstruct_and_compute_value(rt::IR.Sample, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int})
-    obs     = StructTypes.constructfrom(Observables.Observable, rt.observable)
-    targs   = isnothing(rt.targets) ? nothing : tuple(rt.targets...)
-    val     = _calculate_for_targets(measurements, tuple(measured_qubits...), obs, targs, IR.Sample)
+function _reconstruct_and_compute_value(rt::IR.Sample, measurements::Vector{Vector{Int}}, measured_qubits::NTuple{M, Int})::ResultTypeValue where {M}
+    obs = StructTypes.constructfrom(Observables.Observable, rt.observable)
+    val = _calculate_for_targets(measurements, measured_qubits, obs, rt.targets, IR.Sample)
     return ResultTypeValue(rt, collect(val))
 end
 
-function calculate_result_types(action, measurements::Vector{Vector{Int}}, measured_qubits::Vector{Int})
-    (!hasproperty(action, :results) || isnothing(action.results)) && return ResultTypeValue[]
+function calculate_result_types(action::IR.Program, measurements::Vector{Vector{Int}}, measured_qubits::NTuple{M, Int})::Vector{ResultTypeValue} where {M}
     any(rt.type ∉ ["probability", "sample", "expectation", "variance"] for rt in action.results) && throw(ErrorException("unknown result type."))
     result_types = Vector{ResultTypeValue}(undef, length(action.results))
     for r_ix in 1:length(action.results)
@@ -516,6 +515,7 @@ function calculate_result_types(action, measurements::Vector{Vector{Int}}, measu
     end
     return result_types
 end
+calculate_result_types(action, measurements::Vector{Vector{Int}}, measured_qubits)::Vector{ResultTypeValue} = ResultTypeValue[]
 
 function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::GateModelTaskResult)
     task_mtd = r.taskMetadata
@@ -538,19 +538,19 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     else
         throw(ErrorException("One of `measurements` or `measurementProbabilities` must be populated in the result object."))
     end
-    measured_qubits = r.measuredQubits
+    measured_qubits = ntuple(ix->r.measuredQubits[ix], length(r.measuredQubits))
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
-        result_types = calculate_result_types(addl_mtd.action, measurements, measured_qubits)
+        result_types = calculate_result_types(addl_mtd.action, measurements, measured_qubits)::Vector{ResultTypeValue}
     else
         if !isempty(r.resultTypes) && !isnothing(r.resultTypes[1])
-            false_action = (results=[rt.type for rt in r.resultTypes],)
-            result_types = calculate_result_types(false_action, measurements, measured_qubits)
+            false_action = IR.Program(header_dict[IR.Program], [], [rt.type for rt in r.resultTypes], [])
+            result_types = calculate_result_types(false_action, measurements, measured_qubits)::Vector{ResultTypeValue}
         else
-            result_types = r.resultTypes
+            result_types = r.resultTypes::Vector{ResultTypeValue}
         end
     end
     vals = [rt.value for rt in result_types]
-    return GateModelQuantumTaskResult(task_mtd, addl_mtd, result_types, vals, measurements, measured_qubits, m_counts, m_probs, measurements_copied_from_device, m_counts_copied_from_device, m_probs_copied_from_device, nothing)
+    return GateModelQuantumTaskResult(task_mtd, addl_mtd, result_types, vals, measurements, r.measuredQubits, m_counts, m_probs, measurements_copied_from_device, m_counts_copied_from_device, m_probs_copied_from_device, nothing)
 end
 
 function from_dict(::Type{GateModelQuantumTaskResult}, r::GateModelTaskResult)

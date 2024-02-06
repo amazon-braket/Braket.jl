@@ -1,4 +1,4 @@
-using Test, CUDA, Statistics, LinearAlgebra, Braket, Braket.Observables, BraketStateVector
+using Test, cuStateVec, CUDA, Statistics, LinearAlgebra, Braket, Braket.Observables, BraketStateVector
 using Braket: I, name
 
 @testset "Basic integration of local simulators with Braket.jl" begin
@@ -20,6 +20,16 @@ end
     Braket.IRType[] = :JAQCD 
     PURE_DEVICE     = LocalSimulator("braket_sv")
     NOISE_DEVICE    = LocalSimulator("braket_dm")
+    ALL_DEVICES     = [PURE_DEVICE, NOISE_DEVICE]
+    PURE_DEVICES    = [PURE_DEVICE]
+    NOISE_DEVICES   = [NOISE_DEVICE]
+    if CUDA.functional()
+	    CU_PURE_DEVICE     = LocalSimulator("braket_sv_custatevec")
+	    CU_NOISE_DEVICE    = LocalSimulator("braket_dm_custatevec")
+	    append!(ALL_DEVICES, [CU_PURE_DEVICE, CU_NOISE_DEVICE])
+	    push!(PURE_DEVICES, CU_PURE_DEVICE)
+	    push!(NOISE_DEVICES, CU_NOISE_DEVICE)
+    end
     SHOT_LIST       = (0, 8000)
 
     get_tol(shots::Int) = return (shots > 0 ? Dict("atol"=> 0.1, "rtol"=>0.15) : Dict("atol"=>0.01, "rtol"=>0))
@@ -36,7 +46,7 @@ end
             sign_fix(x)   = (iszero(x) || abs(x) < 1e-12) ? 0.0 : x
             fixed_samples = sort(collect(unique(sign_fix, samples)))
             fixed_eigs    = sort(collect(unique(sign_fix, expected_eigs)))
-            @test isapprox(sort(fixed_samples), sort(fixed_eigs), rtol=tol["rtol"], atol=tol["atol"])
+	    @test isapprox(sort(fixed_samples), sort(fixed_eigs), rtol=tol["rtol"], atol=tol["atol"])
             @test isapprox(mean(samples), expected_mean, rtol=tol["rtol"], atol=tol["atol"])
             @test isapprox(var(samples), expected_var, rtol=tol["rtol"], atol=tol["atol"])
         end
@@ -51,7 +61,7 @@ end
             local_simulator_device = LocalSimulator(backend)
             @test name(local_simulator_device) == device_name
         end
-        @testset "Device $DEVICE, shots $SHOTS" for DEVICE in (PURE_DEVICE, NOISE_DEVICE), SHOTS in SHOT_LIST
+        @testset "Device $DEVICE, shots $SHOTS" for DEVICE in ALL_DEVICES, SHOTS in SHOT_LIST
             if SHOTS > 0
                 @testset "qubit ordering" begin
                     device    = DEVICE
@@ -276,8 +286,8 @@ end
                 var_ = 0.25 * (sin(θ) - 4*cos(θ))^2
                 expected_var = [var_, var_]
                 expected_eigs = eigvals(Hermitian(ho_mat))
-                device = DEVICE
-                shots = SHOTS
+                device  = DEVICE
+                shots   = SHOTS
                 circuit = Circuit([(Rx, 0, θ), (Rx, 1, θ), (Variance, ho), (Expectation, ho, 0)])
                 shots > 0 && circuit(Sample, ho, 1)
                 for task in (circuit, )# ir(circuit, Val(:OpenQASM)))
@@ -366,13 +376,13 @@ end
                 device = DEVICE
                 @testset for task in (bell, )#bell_qasm)
                     tol = get_tol(shots)
-                    res = result(device(task, shots=shots))
+		    res = result(device(task, shots=shots))
                     @test isapprox(res.values[1], 0, rtol=tol["rtol"], atol=tol["atol"])
                     @test isapprox(res.values[2], 1, rtol=tol["rtol"], atol=tol["atol"])
                 end
             end
         end
-        @testset for DEVICE in (PURE_DEVICE,), SHOTS in SHOT_LIST
+        @testset for DEVICE in PURE_DEVICES, SHOTS in SHOT_LIST
             @testset "Result types no shots" begin
                 @testset for include_amplitude in [true, false]
                     circuit = bell_circ()
@@ -414,7 +424,7 @@ end
                 end
             end
         end
-        @testset for DEVICE in (NOISE_DEVICE,), SHOTS in SHOT_LIST
+        @testset for DEVICE in NOISE_DEVICES, SHOTS in SHOT_LIST
             @testset "noisy circuit 1 qubit noise full probability" begin
                 shots = SHOTS
                 tol = get_tol(shots)

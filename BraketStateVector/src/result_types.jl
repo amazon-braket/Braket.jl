@@ -36,12 +36,30 @@ function make_alias_table!(w::AbstractVector, wsum, a::AbstractVector{Float64}, 
     nothing
 end
 
+function alg3!(rng, n, x, p)
+    idx = 1
+    cumProbSum = 0
+    curX = 0
+    for i ∈ n:-1:1
+        ## sample from Beta(1, i)
+        _p = rand(rng)
+        β = (1 - (1 - _p)^(1/i))
+        curX = muladd(β, (1 - curX), curX)
+        while cumProbSum < curX
+            cumProbSum += p[idx]
+            idx += 1
+        end
+        x[n - i + 1] = idx - 1
+    end
+end
+
 function samples(s::AbstractSimulator)
-    wv = Weights(probabilities(s))
-    n = 2^s.qubit_count
+    p   = probabilities(s)
+    wv  = Weights(p)
+    n   = 2^s.qubit_count
+    rng = Random.TaskLocalRNG()
     if s.qubit_count < 30 # build alias tables etc
         inds  = 0:(n-1)
-        rng   = Random.default_rng()
         ap    = s._ap
         alias = s._alias
         larges = s._larges

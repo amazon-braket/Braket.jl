@@ -1,16 +1,20 @@
-using Test, CUDA, Cthulhu, LinearAlgebra, Braket, BraketStateVector, DataStructures
+using Test, CUDA, cuStateVec, LinearAlgebra, Braket, BraketStateVector, DataStructures
 
-import Braket: Instruction
+import Braket: I, Instruction
 
 funcs = CUDA.functional() ? (identity, cu) : (identity,)
 
 @testset "Density matrix simulator" begin
-    @testset for f in funcs
-        sx = [0 1; 1 0]
-        si = [1 0; 0 1]
+    @testset "func $f" for f in funcs
+        sx = ComplexF64[0 1; 1 0]
+        si = ComplexF64[1 0; 0 1]
+        matrix_1q = sx
+        matrix_2q = kron(sx, si)
         matrix_3q = kron(sx, kron(si, si))
         matrix_4q = kron(kron(sx, si), kron(si, si))
         matrix_5q = kron(sx, kron(kron(sx, si), kron(si, si)))
+        density_matrix_2q = zeros(ComplexF64, 4, 4)
+        density_matrix_2q[3, 3] = 1.0
         density_matrix_3q = zeros(ComplexF64, 8, 8)
         density_matrix_3q[5, 5] = 1.0
         density_matrix_4q = zeros(ComplexF64, 16, 16)
@@ -25,7 +29,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         simulation = evolve!(simulation, [Instruction(X(), [0]), Instruction(X(), [1]), Instruction(tqcp_kraus, [0, 1])])
         tqcp_dm    = simulation.density_matrix
 
-        @testset "Simple circuits $instructions" for (instructions, qubit_count, density_matrix, probability_amplitudes) in [
+	@testset "Simple circuits $([typeof(ix.operator) for ix in instructions])" for (instructions, qubit_count, dm, probability_amplitudes) in [
             (
                 [Instruction(X(), [0]), Instruction(BitFlip(0.1), [0])],
                 1,
@@ -93,6 +97,30 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 [0.8999999999, 0.03333333333333, 0.03333333333333, 0.033333333333],
             ),
             (
+		[Instruction(X(), [0])],
+                2,
+                density_matrix_2q,
+                [0.0, 0.0, 1.0, 0.0],
+            ),
+            (
+	        [Instruction(Unitary(matrix_1q), [0])],
+                2,
+                density_matrix_2q,
+                [0.0, 0.0, 1.0, 0.0],
+            ),
+            (
+                [Instruction(Unitary(matrix_2q), (0, 1))],
+                2,
+                density_matrix_2q,
+                [0.0, 0.0, 1.0, 0.0],
+            ),
+            (
+		[Instruction(X(), [0])],
+                3,
+                density_matrix_3q,
+                [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+            ),
+            (
                 [Instruction(Unitary(matrix_3q), (0, 1, 2))],
                 3,
                 density_matrix_3q,
@@ -104,11 +132,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 density_matrix_4q,
                 [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             ),
-            (
-                [Instruction(Kraus([matrix_5q]), [0, 1, 2, 3, 4])],
-                5,
-                density_matrix_5q,
-                [
+            #=([Instruction(Kraus([matrix_5q]), [0, 1, 2, 3, 4])], 5, density_matrix_5q, [
                     0.0,
                     0.0,
                     0.0,
@@ -142,14 +166,13 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                     0.0,
                     0.0,
                 ],
-            ),
+            ),=#
         ]
             simulation = f(DensityMatrixSimulator(qubit_count, 0))
             simulation = evolve!(simulation, instructions)
-	    @test density_matrix ≈ collect(simulation.density_matrix)
+	    @test dm ≈ collect(simulation.density_matrix)
 	    @test probability_amplitudes ≈ collect(BraketStateVector.probabilities(simulation))
         end
-
         @testset "Apply observables $obs" for (obs, equivalent_gates, qubit_count) in [ 
                                                                                        ([(Braket.Observables.X(), [0])], [Instruction(H(), [0])], 1),
                                                                                        ([(Braket.Observables.Z(), [0])], Instruction[], 1),

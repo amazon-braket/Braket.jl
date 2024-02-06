@@ -222,21 +222,41 @@ function apply_gate!(
         ix_01 = flip_bit(ix_00, endian_t1)
         ix_11 = flip_bit(ix_10, endian_t1)
         ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
-        @views begin
-            @inbounds begin
-                amps = SVector{4, T}(state_vec[ind_vec])
-                state_vec[ind_vec] = gate_kernel(Val(V), g_mat, amps)
-            end
+        @inbounds begin
+            amps = SVector{4, T}(state_vec[ix_00+1], state_vec[ix_01+1], state_vec[ix_10+1], state_vec[ix_11+1])
+            new_amps = gate_kernel(Val(V), g_mat, amps)
+            state_vec[ind_vec[1]] = new_amps[1]
+            state_vec[ind_vec[2]] = new_amps[2]
+            state_vec[ind_vec[3]] = new_amps[3]
+            state_vec[ind_vec[4]] = new_amps[4]
         end
     end
     return
 end
+
+function gate_kernel(::Val{false}, g_mat::SMatrix{4, 4, T}, s_vec::SVector{4, T}) where {T}
+    n_amp_00 = g_mat[1, 1] * s_vec[1] + g_mat[1, 2] * s_vec[2] + g_mat[1, 3] * s_vec[3] + g_mat[1, 4] * s_vec[4]
+    n_amp_01 = g_mat[2, 1] * s_vec[1] + g_mat[2, 2] * s_vec[2] + g_mat[2, 3] * s_vec[3] + g_mat[2, 4] * s_vec[4]
+    n_amp_10 = g_mat[3, 1] * s_vec[1] + g_mat[3, 2] * s_vec[2] + g_mat[3, 3] * s_vec[3] + g_mat[3, 4] * s_vec[4]
+    n_amp_11 = g_mat[4, 1] * s_vec[1] + g_mat[4, 2] * s_vec[2] + g_mat[4, 3] * s_vec[3] + g_mat[4, 4] * s_vec[4]
+    return SVector{4, T}(n_amp_00, n_amp_01, n_amp_10, n_amp_11)
+end
+
+function gate_kernel(::Val{false}, g_mat::SVector{4, T}, s_vec::SVector{4, T}) where {T}
+    n_amp_00 = g_mat[1] * s_vec[1]
+    n_amp_01 = g_mat[2] * s_vec[2]
+    n_amp_10 = g_mat[3] * s_vec[3]
+    n_amp_11 = g_mat[4] * s_vec[4]
+    return SVector{4, T}(n_amp_00, n_amp_01, n_amp_10, n_amp_11)
+end
+
 # arbitrary vector type to support views
 gate_kernel(::Val{true}, g_mat::SMatrix{N,N,T}, s_vec::V) where {N,T,V} =
     conj(g_mat) * s_vec
 gate_kernel(::Val{false}, g_mat::SMatrix{N,N,T}, s_vec::V) where {N,T,V} = g_mat * s_vec
 gate_kernel(::Val{true}, g_diag::SVector{N,T}, s_vec::V) where {N,T,V} =
     conj(g_diag) .* s_vec
+
 gate_kernel(::Val{false}, g_diag::SVector{N,T}, s_vec::V) where {N,T,V} = g_diag .* s_vec
 
 # controlled unitaries

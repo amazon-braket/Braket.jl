@@ -32,11 +32,10 @@ function (d::LocalSimulator)(task_spec::Union{Circuit, AbstractProgram}, args...
     return LocalQuantumTask(local_result.task_metadata.id, local_result)
 end
 
-function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, AbstractArray}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...)
-    is_single_task  = length(task_specs) == 1 || task_specs isa Union{Circuit, AbstractProgram}
+function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {T}
+    is_single_task  = length(task_specs) == 1
     is_single_input = inputs isa Dict{String, Float64}
     !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
-    is_single_task && (task_specs = vec(task_specs))
     is_single_input && (inputs = is_single_task ? [inputs] : fill(inputs, length(task_specs)))
     tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
     for (ix, spec, input) in tasks_and_inputs
@@ -52,15 +51,16 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
     foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
     max_qc   = maximum(qubit_count, task_specs)
     do_chunk = max_qc <= 20 && length(task_specs) > Threads.nthreads()
-    @info "Braket.jl: batch size is $(length(task_specs)). Chunking? $do_chunk. Starting run..."
-    start = time()
-    @profile begin
+    println("Braket.jl: batch size is $(length(task_specs)). Chunking? $do_chunk. Starting run...")
+    #@profile begin
         stats = @timed begin
             if do_chunk
                 chunks = collect(Iterators.partition(tasks_and_inputs, div(length(tasks_and_inputs), Threads.nthreads())))
                 Threads.@threads for c_ix in 1:length(chunks)
                     sim = take!(sims)
                     for (ix, spec, input) in chunks[c_ix]
+                        println(spec)
+                        flush(stdout)
                         results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
                     end
                     put!(sims, sim)
@@ -75,9 +75,8 @@ function (d::LocalSimulator)(task_specs::Union{Circuit, AbstractProgram, Abstrac
                 end
             end
         end
-        @info "Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
-    end
-    stop = time()
+        println("Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime).")
+    #end
     return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
 
@@ -105,8 +104,8 @@ function _run_internal(simulator, circuit::Program, args...; shots::Int=0, input
         program = circuit
         qubits  = qubit_count(circuit)
         r       = simulator(program, qubits, args...; shots=shots, kwargs...)
-	fr = format_result(r)
-	return fr
+        fr = format_result(r)
+        return fr
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end

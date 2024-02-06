@@ -14,6 +14,8 @@ import json
 import os
 from braket_sv import JuliaQubitDevice, init_julia
 
+import juliapkg
+
 from braket.tracking import Tracker
 t = Tracker().start()
 from braket.circuits.noise_model import (
@@ -64,7 +66,7 @@ jl = init_julia()
 #jl.seval('using Pkg; Pkg.activate("."); Pkg.resolve()')
 jl.seval('using Braket, BraketStateVector, JSON3, PythonCall, Profile, StatProfilerHTML')
 jl.seval('Braket.IRType[] = :JAQCD')
-jl.seval('Profile.init(n = 10^7)')
+#jl.seval('Profile.init(n = 10^7)')
 
 parser = argparse.ArgumentParser(description='Options for QAOA circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
@@ -76,7 +78,7 @@ parser.set_defaults(noise=False)
 parser.set_defaults(use_python=False)
 args = parser.parse_args()
 
-n_iter = 20
+n_iter = 1
 spsa_iter = 10
 diff_method = "parameter-shift"
 
@@ -89,7 +91,7 @@ p = 0.5
 n_layers = 4
 
 seed = 42
-for nv in range(4, 26, 2):
+for nv in range(4, 29, 2):
     print()
     print()
     print()
@@ -100,8 +102,10 @@ for nv in range(4, 26, 2):
     qubits = nv
 
     print(f"Number of qubits: {qubits}")
-    print(f"Running with nv {nv}, shots {scaled_shot}, noise {noise}, n_qubits {qubits}:")
-    dev = get_qiskit_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+    print(f"Running with nv {nv}, shots {scaled_shot}, noise {noise}, n_qubits {qubits}:", flush=True)
+    #dev = get_qiskit_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+    #dev = get_lightning_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
+    dev = get_python_device(qubits, scaled_shot, noise=noise) if use_python else get_julia_device(qubits, scaled_shot, noise=noise)
     opt = qml.SPSAOptimizer(maxiter=spsa_iter)
 
     def qaoa_layer(gamma, alpha):
@@ -128,7 +132,7 @@ for nv in range(4, 26, 2):
     circ = qwc_circuit
     key = {'nv': nv, 'noise': noise, 'shots': shot}
 
-    jl.seval('Profile.clear()')
+    #jl.seval('Profile.clear()')
     params = np.random.uniform(size=[2, n_layers])
     circ = qwc_circuit
     key = {'nv': nv, 'noise': noise, 'shots': shot}
@@ -141,10 +145,5 @@ for nv in range(4, 26, 2):
 
     stop = time.time()
     print(f'Simulation total duration: {stop-start}.')
-
-    print("Task Summary")
-    print(t.quantum_tasks_statistics())
-    print('Note: Charges shown are estimates based on your Amazon Braket simulator and quantum processing unit (QPU) task usage. Estimated charges shown may differ from your actual charges. Estimated charges do not factor in any discounts or credits, and you may experience additional charges based on your use of other services such as Amazon Elastic Compute Cloud (Amazon EC2).')
-    print(f"Estimated cost to run this example: {t.qpu_tasks_cost() + t.simulator_tasks_cost():.3f} USD")
-
-    jl.seval('statprofilehtml()')
+    jl.seval('GC.gc(true)')
+    #jl.seval('statprofilehtml()')

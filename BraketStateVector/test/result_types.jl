@@ -1,4 +1,4 @@
-using Test, CUDA, Braket, BraketStateVector, LinearAlgebra
+using Test, cuStateVec, CUDA, Braket, BraketStateVector, LinearAlgebra
 import Braket: Instruction
 
 const NUM_SAMPLES = 1000

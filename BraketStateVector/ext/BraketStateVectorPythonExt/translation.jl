@@ -189,6 +189,7 @@ for (ir_typ, conv_fn, braket_name) in (
 end
 
 function pennylane_convert_QuantumScript(::Type{Program}, o)
+    start = time()
     instructions = [pyconvert(Instruction, i) for i in o.operations]
     results_list = [pyconvert(AbstractProgramResult, i) for i in o.measurements]
     instr_qubits = mapreduce(ix -> ix.target, union, instructions)
@@ -212,6 +213,8 @@ function pennylane_convert_QuantumScript(::Type{Program}, o)
         results_list,
         [],
     )
+    stop = time()
+    println("\tTime to convert QuantumScript->Julia: $(stop-start).")
     return PythonCall.pyconvert_return(prog)
 end
 

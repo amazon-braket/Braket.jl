@@ -24,7 +24,8 @@ end
 
 function init_zero_state_kernel!(dm::CuDeviceMatrix{T}) where {T}
     ix = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-    dm[ix, ix] = (ix == 1) ? one(T) : zero(T)
+    jx = threadIdx().y + (blockIdx().y - 1) * blockDim().y
+    dm[ix, jx] = (ix == 1 && jx == 1) ? one(T) : zero(T)
     return
 end
 
@@ -83,8 +84,8 @@ function apply_noise_kernel!(
     dm::CuDeviceMatrix{T},
     endian_t1::Int,
     endian_t2::Int,
-    ns::NTuple{N,SMatrix{4,4,T}},
-) where {N,T}
+    n_mats::CuDeviceMatrix{T},
+) where {T}
     ix = (threadIdx().x - 1) + (blockIdx().x - 1) * blockDim().x
     small_t, big_t = minmax(endian_t1, endian_t2)
     padded_ix = pad_bit(pad_bit(ix, small_t), big_t)
@@ -92,16 +93,22 @@ function apply_noise_kernel!(
     ix_01 = flip_bit(padded_ix, endian_t1) + 1
     ix_10 = flip_bit(padded_ix, endian_t2) + 1
     ix_11 = flip_bit(flip_bit(padded_ix, endian_t2), endian_t1) + 1
-    ixs = SVector{4,Int}(ix_00, ix_01, ix_10, ix_11)
+    ixs   = SVector{4,Int}(ix_00, ix_01, ix_10, ix_11)
     @inbounds begin
         ρ = MMatrix{4,4,T}(undef)
+        n = MMatrix{4,4,T}(undef)
         for ix = 1:4, jx = 1:4
             ρ[ix, jx] = dm[ixs[ix], ixs[jx]]
         end
         k_ρ = zeros(MMatrix{4,4,T})
-        for i = 1:4, j = 1:4, k = 1:4, l = 1:4, n in ns
-            k_ρ[i, j] += n[i, k] * ρ[k, l] * conj(n[j, l])
-        end
+	for ni in 1:div(size(n_mats, 1), 4)
+		for ix = 1:4, jx = 1:4
+		    @inbounds n[ix, jx] = n_mats[ix + (ni-1)*4, jx] 
+		end
+		for i = 1:4, j = 1:4, k = 1:4, l = 1:4
+		    @inbounds k_ρ[i, j] += n[i, k] * ρ[k, l] * conj(n[j, l])
+		end
+	end
         for ix = 1:4, jx = 1:4
             dm[ixs[ix], ixs[jx]] = k_ρ[ix, jx]
         end
@@ -113,25 +120,25 @@ function apply_noise_kernel!(
     dm::CuDeviceMatrix{T},
     ordered_ts::NTuple{N,Int},
     flip_masks::CuDeviceVector{Int},
-    ns::NTuple{NK,SMatrix{Ni,Ni,T}},
-) where {N,Ni,NK,T}
+    n_mats::CuDeviceMatrix{T},
+) where {N, T}
     ix = (threadIdx().x - 1) + (blockIdx().x - 1) * blockDim().x
     padded_ix = pad_bits(ix, ordered_ts)
-    ixs = MVector{Ni,Int}(undef)
-    ρ = MMatrix{Ni,Ni,T}(undef)
-    k_ρ = MMatrix{Ni,Ni,T}(undef)
+    L   = 2^N
+    ixs = SVector{L,Int}((flip_masks[ii] ⊻ padded_ix) + 1 for ii in 1:L)
+    ρ   = MMatrix{L,L,T}(undef)
+    k_ρ = MMatrix{L,L,T}(undef)
     @inbounds begin
-        for ii = 1:2^N
-            ixs[ii] = (flip_masks[ii] ⊻ padded_ix) + 1
-        end
-        for ii = 1:2^N, jj = 1:2^N
-            ρ[ii, jj] = dm[ixs[ii], ixs[jj]]
+        for ii = 1:L, jj = 1:L
+            ρ[ii, jj]   = dm[ixs[ii], ixs[jj]]
             k_ρ[ii, jj] = zero(T)
         end
-        for i = 1:2^N, j = 1:2^N, k = 1:2^N, l = 1:2^N, n in ns
-            k_ρ[i, j] += n[i, k] * ρ[k, l] * conj(n[j, l])
+	for n in eachcol(n_mats), i = 1:L, j = 1:L, k = 1:L, l = 1:L
+	    c_n_ind = l + (j-1) * L
+	    n_ind   = i + (k-1) * L
+	    k_ρ[i, j] += n[n_ind] * ρ[k, l] * conj(n[c_n_ind])
         end
-        for ii = 1:2^N, jj = 1:2^N
+        for ii = 1:L, jj = 1:L
             dm[ixs[ii], ixs[jj]] = k_ρ[ii, jj]
         end
     end
