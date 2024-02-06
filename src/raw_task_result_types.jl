@@ -39,7 +39,7 @@ struct GateModelQuantumTaskResult <: AbstractQuantumTaskResult
     additional_metadata::AdditionalMetadata
     result_types::Union{Nothing, Vector{ResultTypeValue}}
     values::Union{Nothing, Vector{Any}}
-    measurements::Union{Nothing, Array}
+    measurements::Union{Nothing, Matrix{Int}, Vector{Vector{Int}}}
     measured_qubits::Union{Nothing, Vector{Int}}
     measurement_counts::Union{Nothing, Accumulator}
     measurement_probabilities::Union{Nothing, Dict{String, Float64}}
