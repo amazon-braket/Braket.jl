@@ -98,38 +98,6 @@ matrix_rep(g::Unitary) = g.matrix
 apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} = return
 apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} = return
 
-for (G, g_mat) in (
-        (:X, matrix_rep(X())),
-        (:Y, matrix_rep(Y())),
-        (:Z, matrix_rep(Z())),
-        (:H, matrix_rep(H())),
-        (:V, matrix_rep(V())),
-        (:Vi, matrix_rep(Vi())),
-        (:S, matrix_rep(S())),
-        (:Si, matrix_rep(Si())),
-        (:T, matrix_rep(T())),
-        (:Ti, matrix_rep(Ti())),
-    ),
-    (is_conj, g00, g10, g01, g11) in ((false, g_mat...), (true, conj.(g_mat)...))
-
-    @eval begin
-        @inline gate_kernel(
-            ::Val{$is_conj},
-            ::Val{:lower},
-            g::$G,
-            lower_amp::Tv,
-            higher_amp::Tv,
-        ) where {Tv<:Complex} = $g00 * lower_amp + $g01 * higher_amp
-        @inline gate_kernel(
-            ::Val{$is_conj},
-            ::Val{:higher},
-            g::$G,
-            lower_amp::Tv,
-            higher_amp::Tv,
-        ) where {Tv<:Complex} = $g10 * lower_amp + $g11 * higher_amp
-    end
-end
-
 function apply_gate!(g_mat::SMatrix{2, 2, T}, state_vec::StateVector{T}, qubit::Int) where {T<:Complex}
     n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
     chunk_size   = CHUNK_SIZE
@@ -155,7 +123,7 @@ function apply_gate!(g_mat::SMatrix{2, 2, T}, state_vec::StateVector{T}, qubit::
         else
             lower_ix  = pad_bit(chunked_amps[c_ix][1], endian_qubit) + 1
             higher_ix = lower_ix + flipper
-            for task_amps in chunked_amps[c_ix]
+            for task_amp in chunked_amps[c_ix]
                 @inbounds begin
                     lower_amp  = state_vec[lower_ix]
                     higher_amp = state_vec[higher_ix]
@@ -176,21 +144,47 @@ function apply_gate!(g_mat::M, state_vec::StateVector{T}, t1::Int, t2::Int) wher
     chunk_size   = CHUNK_SIZE
     n_tasks      = n_amps >> 2
     n_chunks     = max(div(n_tasks, CHUNK_SIZE), 1)
-    chunked_amps  = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
+    chunked_amps = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
+    t1_flipper   = 1 << endian_t1 
+    t2_flipper   = 1 << endian_t2 
+    is_small_target = t1_flipper < CHUNK_SIZE || t2_flipper < CHUNK_SIZE
     Threads.@threads for c_ix = 1:n_chunks
-        for ix in chunked_amps[c_ix]
-            ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
-            ix_10   = flip_bit(ix_00, endian_t2)
-            ix_01   = flip_bit(ix_00, endian_t1)
-            ix_11   = flip_bit(ix_10, endian_t1)
-            ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
-            @inbounds begin
-                amps = SVector{4, T}(state_vec[ix_00+1], state_vec[ix_01+1], state_vec[ix_10+1], state_vec[ix_11+1])
-                new_amps = g_mat * amps
-                state_vec[ind_vec[1]] = new_amps[1]
-                state_vec[ind_vec[2]] = new_amps[2]
-                state_vec[ind_vec[3]] = new_amps[3]
-                state_vec[ind_vec[4]] = new_amps[4]
+        if is_small_target
+            for ix in chunked_amps[c_ix]
+                ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
+                ix_10   = flip_bit(ix_00, endian_t2)
+                ix_01   = flip_bit(ix_00, endian_t1)
+                ix_11   = flip_bit(ix_10, endian_t1)
+                ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
+                @inbounds begin
+                    amps = SVector{4, T}(state_vec[ix_00+1], state_vec[ix_01+1], state_vec[ix_10+1], state_vec[ix_11+1])
+                    new_amps = g_mat * amps
+                    state_vec[ind_vec[1]] = new_amps[1]
+                    state_vec[ind_vec[2]] = new_amps[2]
+                    state_vec[ind_vec[3]] = new_amps[3]
+                    state_vec[ind_vec[4]] = new_amps[4]
+                end
+            end
+        else
+            ix_00 = pad_bits(chunked_amps[c_ix][1], (small_t, big_t))
+            ix_10 = ix_00 + t2_flipper
+            ix_01 = ix_00 + t1_flipper
+            ix_11 = ix_10 + t1_flipper
+            ix_00 += 1
+            ix_10 += 1
+            ix_01 += 1
+            ix_11 += 1
+            for task_amp in chunked_amps[c_ix]
+                ind_vec = SVector(ix_00, ix_01, ix_10, ix_11)
+                @inbounds begin
+                    amps = SVector{4, T}(view(state_vec, ind_vec))
+                    new_amps = g_mat * amps
+                    @views state_vec[ind_vec[:]] = new_amps[:]
+                end
+                ix_00 += 1
+                ix_10 += 1
+                ix_01 += 1
+                ix_11 += 1
             end
         end
     end
