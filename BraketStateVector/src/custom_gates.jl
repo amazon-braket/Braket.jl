@@ -11,10 +11,10 @@ function matrix_rep(g::DoubleExcitation)
     sinϕ = sin(g.angle[1] / 2.0)
     
     mat = diagm(ones(T, 16))
-    mat[4, 4] = cosϕ
+    mat[4, 4]   = cosϕ
     mat[13, 13] = cosϕ
-    mat[4, 13] = -sinϕ
-    mat[13, 4] = sinϕ
+    mat[4, 13]  = -sinϕ
+    mat[13, 4]  = sinϕ
     return SMatrix{32, 32, ComplexF64}(mat)
 end
 
@@ -109,31 +109,6 @@ for V in (false, true)
                     amp1100 = state_vec[i1100]
                     state_vec[i0011] = cosϕ * amp0011 - sinϕ * amp1100
                     state_vec[i1100] = sinϕ * amp0011 + cosϕ * amp1100
-                end
-            end
-            return
-        end
-
-        function apply_gate!(
-            ::Val{$V},
-            g::SingleExcitation,
-            state_vec::StateVector{T},
-            t1::Int,
-            t2::Int,
-        ) where {T<:Complex}
-            n_amps, endian_ts = get_amps_and_qubits(state_vec, t1, t2)
-            ordered_ts = sort(collect(endian_ts))
-            cosϕ = cos(g.angle[1] / 2.0)
-            sinϕ = sin(g.angle[1] / 2.0)
-            Threads.@threads for ix = 0:div(n_amps, 4)-1
-                padded_ix = pad_bits(ix, ordered_ts)
-                i01 = flip_bit(padded_ix, t1) + 1
-                i10 = flip_bit(padded_ix, t2) + 1
-                @inbounds begin
-                    amp01 = state_vec[i01]
-                    amp10 = state_vec[i10]
-                    state_vec[i01] = cosϕ * amp01 - sinϕ * amp10
-                    state_vec[i10] = sinϕ * amp01 + cosϕ * amp10
                 end
             end
             return
