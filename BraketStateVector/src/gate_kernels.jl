@@ -135,36 +135,30 @@ function apply_gate!(g_mat::SMatrix{2, 2, T}, state_vec::StateVector{T}, qubit::
     chunk_size   = CHUNK_SIZE
     n_tasks      = n_amps >> 1
     n_chunks     = max(div(n_tasks, CHUNK_SIZE), 1)
-    chunked_amps = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
     flipper      = 1 << endian_qubit
     is_small_target = flipper < CHUNK_SIZE
     g_00, g_10, g_01, g_11 = g_mat
-    Threads.@threads for c_ix = 1:n_chunks
-        if is_small_target
-            for task_amp in chunked_amps[c_ix]
-                lower_ix  = pad_bit(task_amp, endian_qubit)
-                higher_ix = flip_bit(lower_ix, endian_qubit) + 1
-                lower_ix  += 1
-                @inbounds begin
-                    lower_amp  = state_vec[lower_ix]
-                    higher_amp = state_vec[higher_ix]
-                    state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
-                    state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
-                end
+    Threads.@threads for c_ix = 0:n_chunks-1
+        my_amps   = if n_chunks > 1
+                c_ix*CHUNK_SIZE:((c_ix+1)*CHUNK_SIZE - 1)
+            else 
+                0:n_tasks-1
             end
-        else
-            lower_ix  = pad_bit(chunked_amps[c_ix][1], endian_qubit) + 1
-            higher_ix = lower_ix + flipper
-            for task_amps in chunked_amps[c_ix]
-                @inbounds begin
-                    lower_amp  = state_vec[lower_ix]
-                    higher_amp = state_vec[higher_ix]
-                    state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
-                    state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
-                end
-                lower_ix += 1
-                higher_ix += 1
+        lower_ix  = pad_bit(my_amps[1], endian_qubit) + 1
+        higher_ix = lower_ix + flipper
+        for task_amp in 0:length(my_amps)-1
+            if is_small_target && div(task_amp, flipper) > 0 && mod(task_amp, flipper) == 0
+                lower_ix  = higher_ix
+                higher_ix = lower_ix + flipper
             end
+            @inbounds begin
+                lower_amp  = state_vec[lower_ix]
+                higher_amp = state_vec[higher_ix]
+                state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
+                state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
+            end
+            lower_ix  += 1
+            higher_ix += 1
         end
     end
 end
@@ -176,7 +170,7 @@ function apply_gate!(g_mat::M, state_vec::StateVector{T}, t1::Int, t2::Int) wher
     chunk_size   = CHUNK_SIZE
     n_tasks      = n_amps >> 2
     n_chunks     = max(div(n_tasks, CHUNK_SIZE), 1)
-    chunked_amps  = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
+    chunked_amps = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
     Threads.@threads for c_ix = 1:n_chunks
         for ix in chunked_amps[c_ix]
             ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
