@@ -58,6 +58,14 @@ matrix_rep(g::Ry) = SMatrix{2,2}(
     ),
 )
 
+matrix_rep(g::GPi)  = SMatrix{2,2}(complex([0 exp(-im * g.angle[1]); exp(im * g.angle[1]) 0]))
+matrix_rep(g::GPi2) = SMatrix{2,2}(complex([1. -im*exp(-im*g.angle[1]); -im*exp(im*g.angle[1]) 1.]))
+matrix_rep(g::MS)   = SMatrix{4,4}(complex([cos(g.angle[3]/2.0) 0.0 0.0 -im * exp(-im*(g.angle[1] + g.angle[2])) * sin(g.angle[3] / 2);
+                                            0.0 cos(g.angle[3]/2) -im*exp(-im*(g.angle[1] - g.angle[2]))*sin(g.angle[3]/2) 0.0;
+                                            0.0 -im*exp(im*(g.angle[1] - g.angle[2]))*sin(g.angle[3]/2) cos(g.angle[3]/2) 0.0;
+                                            -im*exp(im*(g.angle[1] + g.angle[2]))*sin(g.angle[3]/2) 0.0 0.0 cos(g.angle[3]/2)]))
+
+
 matrix_rep(g::PhaseShift) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * g.angle[1])])
 matrix_rep(g::XX) = SMatrix{4,4}(
     [
