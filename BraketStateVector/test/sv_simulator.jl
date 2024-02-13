@@ -175,11 +175,15 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 [0, 0, 0, 0, 0, 1, 0, 0],
             ),
         ]
-            simulation = f(StateVectorSimulator(qubit_count, 0))
-            simulation = evolve!(simulation, instructions)
-            @test state_vector ≈ collect(simulation.state_vector)
-            @test probability_amplitudes ≈
-                  collect(BraketStateVector.probabilities(simulation))
+            @testset "Simulator $sim" for sim in (StateVectorSimulator, DensityMatrixSimulator) 
+                simulation = f(sim(qubit_count, 0))
+                simulation = evolve!(simulation, instructions)
+                if sim == StateVectorSimulator
+                    @test state_vector ≈ collect(BraketStateVector.state_vector(simulation))
+                end
+                @test probability_amplitudes ≈
+                      collect(BraketStateVector.probabilities(simulation))
+            end
         end
         @testset "Apply observables $obs" for (obs, equivalent_gates, qubit_count) in [
             ([(Braket.Observables.X(), [0])], [Instruction(H(), [0])], 1),
