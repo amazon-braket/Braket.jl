@@ -33,16 +33,16 @@ import BraketStateVector:
     MultiRZ
 
 const pennylane = Ref{Py}()
-const numpy = Ref{Py}()
-const braket = Ref{Py}()
+const numpy     = Ref{Py}()
+const braket    = Ref{Py}()
 
 include("translation.jl")
 
 function __init__()
     # must set these when this code is actually loaded
-    braket[] = pyimport("braket")
+    braket[]    = pyimport("braket")
     pennylane[] = pyimport("pennylane")
-    numpy[] = pyimport("numpy")
+    numpy[]     = pyimport("numpy")
     PythonCall.pyconvert_add_rule(
         "pennylane.ops.op_math:Adjoint",
         Instruction,
@@ -209,6 +209,11 @@ function __init__()
         pennylane_convert_SingleExcitation,
     )
     PythonCall.pyconvert_add_rule(
+        "pennylane.numpy.tensor:tensor",
+        Union{Float64,FreeParameter},
+        pennylane_convert_tensor,
+    )
+    PythonCall.pyconvert_add_rule(
         "builtins:list",
         Union{Float64,FreeParameter},
         pennylane_convert_parameters,
@@ -218,7 +223,6 @@ function __init__()
         Union{Dict{String,Float64},Vector{Dict{String,Float64}}},
         pennylane_convert_inputs,
     )
-    #PythonCall.pyconvert_add_rule("pennylane:Hamiltonian", Observables.Observable, pennylane_convert_Hamiltonian)
     PythonCall.pyconvert_add_rule(
         "pennylane.ops.qubit.non_parametric_ops:PauliX",
         Observables.Observable,
@@ -339,8 +343,8 @@ function classical_shadow(
 end
 
 function (d::LocalSimulator)(
-    task_specs::Union{PyList{Any},NTuple{N,PyIterable}},
-    inputs::Union{PyList{Any},PyDict{Any,Any}},
+    task_specs::Union{PyList{Any},NTuple{N,PyIterable}, Py},
+    inputs::Union{PyList{Any},PyDict{Any,Any},Py},
     args...;
     kwargs...,
 ) where {N}

@@ -58,7 +58,6 @@ def get_lightning_device(n_wires: int, shots, noise: bool = False):
 def get_qiskit_device(n_wires: int, shots, noise: bool = False):
     print("USING QISKIT DEVICE")
     dev = qml.device('qiskit.aer', wires=n_wires, backend='aer_simulator_statevector', shots=shots, statevector_parallel_threshold=8)
-    dev.set_transpile_args(**{"optimization_level": 0})
     return dev
 
 def get_touched_qubits(ex):
@@ -164,7 +163,7 @@ def run_adapt(
 parser = argparse.ArgumentParser(description='Options for VQE circuit simulation.')
 parser.add_argument("--shot", type=int, default=100)
 parser.add_argument("--protocol", type=str, default="qwc")
-parser.add_argument("--mol", type=str, default="H10")
+parser.add_argument("--mol", type=str, default="H4")
 parser.add_argument('--noise', dest='noise', action='store_true')
 parser.add_argument('--no-noise', dest='noise', action='store_false')
 parser.add_argument('--prevprog', type=str, default="")

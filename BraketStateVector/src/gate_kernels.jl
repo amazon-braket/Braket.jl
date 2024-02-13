@@ -125,7 +125,7 @@ for (G, g_mat) in (
         (:T, matrix_rep(T())),
         (:Ti, matrix_rep(Ti())),
     ),
-    (is_conj, g00, g10, g01, g11) in ((false, g_mat...), (true, conj.(g_mat)...))
+    (is_conj, g00, g10, g01, g11) in ((false, g_mat...), (true, conj(g_mat)...))
 
     @eval begin
         @inline gate_kernel(

@@ -2,16 +2,15 @@ module BraketStateVector
 
 using Braket,
     Braket.Observables,
+    Dates,
     LinearAlgebra,
     StaticArrays,
     StatsBase,
     Combinatorics,
-    Dates,
     UUIDs,
     JSON3,
     Random,
-    Printf,
-    Profile
+    Printf
 
 import Braket:
     Instruction,

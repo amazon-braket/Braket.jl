@@ -1,3 +1,5 @@
+pennylane_convert_tensor(::Type{Float64}, x::Py) =
+    PythonCall.pyconvert_return(pyconvert(Float64, x.numpy()))
 pennylane_convert_parameters(::Type{Float64}, x::Py) =
     PythonCall.pyconvert_return(pyconvert(Float64, x[0]))
 pennylane_convert_parameters(::Type{FreeParameter}, x::Py) =
@@ -189,7 +191,6 @@ for (ir_typ, conv_fn, braket_name) in (
 end
 
 function pennylane_convert_QuantumScript(::Type{Program}, o)
-    start = time()
     instructions = [pyconvert(Instruction, i) for i in o.operations]
     results_list = [pyconvert(AbstractProgramResult, i) for i in o.measurements]
     instr_qubits = mapreduce(ix -> ix.target, union, instructions)
@@ -213,8 +214,6 @@ function pennylane_convert_QuantumScript(::Type{Program}, o)
         results_list,
         [],
     )
-    stop = time()
-    println("\tTime to convert QuantumScript->Julia: $(stop-start).")
     return PythonCall.pyconvert_return(prog)
 end
 

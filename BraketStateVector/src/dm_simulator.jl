@@ -110,7 +110,7 @@ function _evolve_op!(
 ) where {T<:Complex,S<:AbstractDensityMatrix{T},G<:Gate}
     reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
     apply_gate!(Val(false), op, reshaped_dm, target...)
-    apply_gate!(Val(true), op, reshaped_dm, (dms.qubit_count .+ target)...)
+    apply_gate!(Val(true),  op, reshaped_dm, (dms.qubit_count .+ target)...)
 end
 
 function _evolve_op!(
@@ -226,9 +226,9 @@ function expectation(
     dm_copy = apply_observable(observable, dms.density_matrix, targets...)
     return real(sum(diag(dm_copy)))
 end
-state_vector(dms::DensityMatrixSimulator) =
-    isdiag(dms.density_matrix) ? diag(dms.density_matrix) :
-    error("cannot express density matrix with off-diagonal elements as a pure state.")
+state_vector(dms::DensityMatrixSimulator) = diag(dms.density_matrix)
+#    isdiag(dms.density_matrix) ? diag(dms.density_matrix) :
+#    error("cannot express density matrix with off-diagonal elements as a pure state.")
 density_matrix(dms::DensityMatrixSimulator) = dms.density_matrix
 probabilities(dms::DensityMatrixSimulator) = real.(diag(dms.density_matrix))
 

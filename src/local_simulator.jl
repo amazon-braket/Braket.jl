@@ -34,14 +34,23 @@ end
 
 function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {T}
     is_single_task  = length(task_specs) == 1
-    is_single_input = inputs isa Dict{String, Float64}
+    is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
+    if is_single_input
+        if is_single_task 
+            inputs = [inputs]
+        elseif inputs isa Dict{String, Float64}
+            inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
+        else
+            inputs = [deepcopy(inputs[1]) for ix in 1:length(task_specs)]
+        end
+    end
     !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
-    is_single_input && (inputs = is_single_task ? [inputs] : fill(inputs, length(task_specs)))
     # let each thread pick up an idle simulator
     #sims     = Channel(Inf)
     #foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
 
     tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
+    # is this actually faster?
     todo_tasks_ch = Channel(length(tasks_and_inputs))
     for (ix, spec, input) in tasks_and_inputs
         if spec isa Circuit
@@ -51,8 +60,7 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
         end
 	put!(todo_tasks_ch, (ix, spec, input))
     end
-    println("Braket.jl: batch size is $(length(task_specs)). Starting run...")
-    flush(stdout)
+    @debug "batch size is $(length(task_specs)). Starting run..."
     n_task_threads = 32
     stats = @timed begin
 	    done_tasks_ch = Channel(length(tasks_and_inputs)) do ch
@@ -72,7 +80,7 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
 		r_ix += 1
 	    end
     end
-    println("Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime).")
+    @debug "batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
     return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
 

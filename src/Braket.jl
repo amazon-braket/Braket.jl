@@ -22,7 +22,6 @@ import AWS.Mocking: apply
 @service EcR use_response_type=true
 @service CLOUDWATCH_LOGS use_response_type=true
 
-using Profile
 using Base64
 using Compat
 using CSV
@@ -31,10 +30,10 @@ using Downloads
 using DecFP
 using Graphs
 using HTTP
+using StaticArrays
 using JSON3, StructTypes
 using LinearAlgebra
 using DataStructures
-using StaticArrays
 using NamedTupleTools
 using OrderedCollections
 using Tar
