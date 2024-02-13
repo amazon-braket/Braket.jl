@@ -93,7 +93,7 @@ function apply_noise_kernel!(
     ix_01 = flip_bit(padded_ix, endian_t1) + 1
     ix_10 = flip_bit(padded_ix, endian_t2) + 1
     ix_11 = flip_bit(flip_bit(padded_ix, endian_t2), endian_t1) + 1
-    ixs   = SVector{4,Int}(ix_00, ix_01, ix_10, ix_11)
+    ixs = SVector{4,Int}(ix_00, ix_01, ix_10, ix_11)
     @inbounds begin
         ρ = MMatrix{4,4,T}(undef)
         n = MMatrix{4,4,T}(undef)
@@ -101,14 +101,14 @@ function apply_noise_kernel!(
             ρ[ix, jx] = dm[ixs[ix], ixs[jx]]
         end
         k_ρ = zeros(MMatrix{4,4,T})
-	for ni in 1:div(size(n_mats, 1), 4)
-		for ix = 1:4, jx = 1:4
-		    @inbounds n[ix, jx] = n_mats[ix + (ni-1)*4, jx] 
-		end
-		for i = 1:4, j = 1:4, k = 1:4, l = 1:4
-		    @inbounds k_ρ[i, j] += n[i, k] * ρ[k, l] * conj(n[j, l])
-		end
-	end
+        for ni = 1:div(size(n_mats, 1), 4)
+            for ix = 1:4, jx = 1:4
+                @inbounds n[ix, jx] = n_mats[ix+(ni-1)*4, jx]
+            end
+            for i = 1:4, j = 1:4, k = 1:4, l = 1:4
+                @inbounds k_ρ[i, j] += n[i, k] * ρ[k, l] * conj(n[j, l])
+            end
+        end
         for ix = 1:4, jx = 1:4
             dm[ixs[ix], ixs[jx]] = k_ρ[ix, jx]
         end
@@ -121,22 +121,22 @@ function apply_noise_kernel!(
     ordered_ts::NTuple{N,Int},
     flip_masks::CuDeviceVector{Int},
     n_mats::CuDeviceMatrix{T},
-) where {N, T}
+) where {N,T}
     ix = (threadIdx().x - 1) + (blockIdx().x - 1) * blockDim().x
     padded_ix = pad_bits(ix, ordered_ts)
-    L   = 2^N
-    ixs = SVector{L,Int}((flip_masks[ii] ⊻ padded_ix) + 1 for ii in 1:L)
-    ρ   = MMatrix{L,L,T}(undef)
+    L = 2^N
+    ixs = SVector{L,Int}((flip_masks[ii] ⊻ padded_ix) + 1 for ii = 1:L)
+    ρ = MMatrix{L,L,T}(undef)
     k_ρ = MMatrix{L,L,T}(undef)
     @inbounds begin
         for ii = 1:L, jj = 1:L
-            ρ[ii, jj]   = dm[ixs[ii], ixs[jj]]
+            ρ[ii, jj] = dm[ixs[ii], ixs[jj]]
             k_ρ[ii, jj] = zero(T)
         end
-	for n in eachcol(n_mats), i = 1:L, j = 1:L, k = 1:L, l = 1:L
-	    c_n_ind = l + (j-1) * L
-	    n_ind   = i + (k-1) * L
-	    k_ρ[i, j] += n[n_ind] * ρ[k, l] * conj(n[c_n_ind])
+        for n in eachcol(n_mats), i = 1:L, j = 1:L, k = 1:L, l = 1:L
+            c_n_ind = l + (j - 1) * L
+            n_ind = i + (k - 1) * L
+            k_ρ[i, j] += n[n_ind] * ρ[k, l] * conj(n[c_n_ind])
         end
         for ii = 1:L, jj = 1:L
             dm[ixs[ii], ixs[jj]] = k_ρ[ii, jj]

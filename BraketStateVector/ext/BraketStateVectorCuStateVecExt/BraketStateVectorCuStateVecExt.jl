@@ -42,7 +42,7 @@ import BraketStateVector:
     reinit!
 
 const DEFAULT_THREAD_COUNT = 512
-const CuStateVectorSimulator{T}   = StateVectorSimulator{T,CuVector{T}}
+const CuStateVectorSimulator{T} = StateVectorSimulator{T,CuVector{T}}
 const CuDensityMatrixSimulator{T} = DensityMatrixSimulator{T,CuMatrix{T}}
 
 function get_launch_dims(total_ix::Int)
@@ -79,10 +79,10 @@ function StateVectorSimulator{T,CuVector{T}}(qubit_count::Int, shots::Int) where
     sv_size = iszero(qubit_count) ? 0 : 2^qubit_count
     sv = CuVector{T}(undef, sv_size)
     if sv_size > 0
-	    block_size = 512
-	    tc = sv_size >= block_size ? block_size : sv_size
-	    bc = sv_size >= block_size ? div(sv_size, block_size) : 1
-	    @cuda threads = tc blocks = bc init_zero_state_kernel!(sv)
+        block_size = 512
+        tc = sv_size >= block_size ? block_size : sv_size
+        bc = sv_size >= block_size ? div(sv_size, block_size) : 1
+        @cuda threads = tc blocks = bc init_zero_state_kernel!(sv)
     end
     return StateVectorSimulator{T,CuVector{T}}(sv, qubit_count, shots)
 end
@@ -90,10 +90,10 @@ function DensityMatrixSimulator{T,CuMatrix{T}}(qubit_count::Int, shots::Int) whe
     dm_size = iszero(qubit_count) ? 0 : 2^qubit_count
     dm = CuMatrix{T}(undef, dm_size, dm_size)
     if dm_size > 0
-	    block_size = 512
-	    tc = dm_size >= block_size ? block_size : dm_size
-	    bc = dm_size >= block_size ? div(dm_size, block_size) : 1
-	    @cuda threads = tc blocks = bc init_zero_state_kernel!(dm)
+        block_size = 512
+        tc = dm_size >= block_size ? block_size : dm_size
+        bc = dm_size >= block_size ? div(dm_size, block_size) : 1
+        @cuda threads = tc blocks = bc init_zero_state_kernel!(dm)
     end
     return DensityMatrixSimulator{T,CuMatrix{T}}(dm, qubit_count, shots)
 end
@@ -108,10 +108,10 @@ function reinit!(
         svs.state_vector = CuVector{T}(undef, sv_size)
     end
     if qubit_count > 0
-	    block_size = 512
-	    tc = sv_size >= block_size ? block_size : sv_size
-	    bc = sv_size >= block_size ? div(sv_size, block_size) : 1
-	    @cuda threads = tc blocks = bc init_zero_state_kernel!(svs.state_vector)
+        block_size = 512
+        tc = sv_size >= block_size ? block_size : sv_size
+        bc = sv_size >= block_size ? div(sv_size, block_size) : 1
+        @cuda threads = tc blocks = bc init_zero_state_kernel!(svs.state_vector)
     end
     svs.qubit_count = qubit_count
     svs.shots = shots
@@ -129,10 +129,12 @@ function reinit!(
         dms.density_matrix = CuMatrix{T}(undef, dm_size, dm_size)
     end
     if qubit_count > 0
-	    block_size = 512
-	    tc = dm_size >= block_size ? block_size : dm_size
-	    bc = dm_size >= block_size ? div(dm_size, block_size) : 1
-	    @cuda threads = (tc,tc) blocks = (bc,bc) init_zero_state_kernel!(dms.density_matrix)
+        block_size = 512
+        tc = dm_size >= block_size ? block_size : dm_size
+        bc = dm_size >= block_size ? div(dm_size, block_size) : 1
+        @cuda threads = (tc, tc) blocks = (bc, bc) init_zero_state_kernel!(
+            dms.density_matrix,
+        )
     end
     dms.qubit_count = qubit_count
     dms.shots = shots
@@ -156,7 +158,8 @@ function customApplyMatrix!(
     mat::Matrix{T},
     targets::Vector{Int},
     controls::Vector{Int},
-    adjoint::Bool=false) where {T}
+    adjoint::Bool = false,
+) where {T}
     n_bits = Int(log2(length(state)))
     function bufferSize()
         out = Ref{Csize_t}()
@@ -181,7 +184,7 @@ function customApplyMatrix!(
     else
         buffer = CuVector{UInt8}(undef, 0)
     end
-    endian_targets  = [n_bits - 1 - t for t in targets]
+    endian_targets = [n_bits - 1 - t for t in targets]
     endian_controls = [n_bits - 1 - c for c in controls]
     cuStateVec.custatevecApplyMatrix(
         cuStateVec.handle(),
@@ -192,9 +195,9 @@ function customApplyMatrix!(
         T,
         cuStateVec.CUSTATEVEC_MATRIX_LAYOUT_COL,
         Int32(adjoint),
-	convert(Vector{Int32}, endian_targets),
+        convert(Vector{Int32}, endian_targets),
         length(targets),
-	convert(Vector{Int32}, endian_controls),
+        convert(Vector{Int32}, endian_controls),
         ones(Int32, length(controls)),
         length(controls),
         cuStateVec.compute_type(T, T),
@@ -208,7 +211,7 @@ customApplyMatrix!(
     mat::AbstractMatrix{T},
     targets::Vector{Int},
     controls::Vector{Int},
-    adjoint::Bool=false,
+    adjoint::Bool = false,
 ) where {T} = customApplyMatrix!(state, Matrix{T}(mat), targets, controls, adjoint)
 
 function apply_observable!(
@@ -223,29 +226,29 @@ end
 apply_gate!(::Val{false}, g::I, state_vec::CuVector{T}, t::Int) where {T<:Complex} = return
 apply_gate!(::Val{true}, g::I, state_vec::CuVector{T}, t::Int) where {T<:Complex} = return
 function apply_gate!(
-            ::Val{false},
-            g::Unitary,
-            state_vec::CuVector{T},
-            t::Int,
-        ) where {T<:Complex}
-	g_mat = Matrix(matrix_rep(g))
-	return customApplyMatrix!(state_vec, g_mat, [t], Int[])
+    ::Val{false},
+    g::Unitary,
+    state_vec::CuVector{T},
+    t::Int,
+) where {T<:Complex}
+    g_mat = Matrix(matrix_rep(g))
+    return customApplyMatrix!(state_vec, g_mat, [t], Int[])
 end
 function apply_gate!(
-            ::Val{true},
-            g::Unitary,
-            state_vec::CuVector{T},
-            t::Int,
-        ) where {T<:Complex}
-	g_mat = conj(Matrix(matrix_rep(g)))
-	return customApplyMatrix!(state_vec, g_mat, [t], Int[])
+    ::Val{true},
+    g::Unitary,
+    state_vec::CuVector{T},
+    t::Int,
+) where {T<:Complex}
+    g_mat = conj(Matrix(matrix_rep(g)))
+    return customApplyMatrix!(state_vec, g_mat, [t], Int[])
 end
 function apply_gate!(
     ::Val{false},
     g::Unitary,
     state_vec::CuVector{T},
-    t::Vararg{Int, N},
-) where {T<:Complex, N}
+    t::Vararg{Int,N},
+) where {T<:Complex,N}
     g_mat = Matrix(matrix_rep(g))
     return customApplyMatrix!(state_vec, g_mat, reverse(collect(t)), Int[])
 end
@@ -253,8 +256,8 @@ function apply_gate!(
     ::Val{true},
     g::Unitary,
     state_vec::CuVector{T},
-    t::Vararg{Int, N},
-) where {T<:Complex, N}
+    t::Vararg{Int,N},
+) where {T<:Complex,N}
     g_mat = conj(Matrix(matrix_rep(g)))
     return customApplyMatrix!(state_vec, g_mat, reverse(collect(t)), Int[])
 end
@@ -293,7 +296,7 @@ for (V, f) in ((true, :conj), (false, :identity))
                 c::Int,
                 ts::Int...,
             ) where {T<:Complex}
-	        g_mat = $f(matrix_rep($tg()))
+                g_mat = $f(matrix_rep($tg()))
                 return customApplyMatrix!(state_vec, g_mat, collect(ts), [c])
             end
         end
@@ -308,7 +311,7 @@ for (V, f) in ((true, :conj), (false, :identity))
                 c2::Int,
                 ts::Int...,
             ) where {T<:Complex}
-	        g_mat = $f(matrix_rep($tg()))
+                g_mat = $f(matrix_rep($tg()))
                 return customApplyMatrix!(state_vec, g_mat, collect(ts), [c1, c2])
             end
         end
@@ -334,12 +337,12 @@ function apply_noise!(k::Kraus, dm::CuMatrix{T}, t1::Int, t2::Int) where {T}
     small_t, big_t = minmax(endian_t1, endian_t2)
     total_ix = div(n_amps, 4)
     tc, bc = get_launch_dims(total_ix)
-    h_mat  = Matrix{T}(undef, 4*length(k.matrices), 4)
+    h_mat = Matrix{T}(undef, 4 * length(k.matrices), 4)
     @views begin
-        for ci in 1:length(k.matrices)
-	     rows = (1 + (ci-1)*4):ci*4
-	     h_mat[rows, :] .= k.matrices[ci][:, :]
-	end
+        for ci = 1:length(k.matrices)
+            rows = (1+(ci-1)*4):ci*4
+            h_mat[rows, :] .= k.matrices[ci][:, :]
+        end
     end
     c_mat = CuMatrix{T}(h_mat)
     @cuda threads = tc blocks = bc apply_noise_kernel!(dm, endian_t1, endian_t2, c_mat)
@@ -360,11 +363,11 @@ function apply_noise!(k::Kraus, dm::CuMatrix{T}, ts::Vararg{Int,N}) where {T,N}
     end
     total_ix = div(n_amps, 2^N)
     tc, bc = get_launch_dims(total_ix)
-    h_mat  = Matrix{T}(undef, 2^(2N), length(k.matrices))
+    h_mat = Matrix{T}(undef, 2^(2N), length(k.matrices))
     @views begin
-        for ci in 1:length(k.matrices)
-	     h_mat[:, ci] .= k.matrices[ci][:]
-	end
+        for ci = 1:length(k.matrices)
+            h_mat[:, ci] .= k.matrices[ci][:]
+        end
     end
     c_mat = CuMatrix{T}(h_mat)
     @cuda threads = tc blocks = bc apply_noise_kernel!(
@@ -426,62 +429,95 @@ function marginal_probability(probs::CuVector{T}, qubit_count::Int, targets) whe
     return final_probs
 end
 
-function calculate(p::Braket.Probability, sim::S) where {S<:Union{CuStateVectorSimulator,CuDensityMatrixSimulator}}
+function calculate(
+    p::Braket.Probability,
+    sim::S,
+) where {S<:Union{CuStateVectorSimulator,CuDensityMatrixSimulator}}
     targets = p.targets
     probs = probabilities(sim)
     qc = qubit_count(sim)
-    (isempty(targets) || isnothing(targets) || collect(targets) == collect(0:qc-1)) && return collect(probs)
+    (isempty(targets) || isnothing(targets) || collect(targets) == collect(0:qc-1)) &&
+        return collect(probs)
     mp = marginal_probability(probs, qc, targets)
-    return collect(mp) 
+    return collect(mp)
 end
 
-Base.convert(::Type{CuStateVec{T}}, svs::StateVectorSimulator{T, CuVector{T}}) where {T} = CuStateVec{T}(svs.state_vector, svs.qubit_count)
-Base.convert(::Type{CuStateVec{T}}, dms::DensityMatrixSimulator{T, CuMatrix{T}}) where {T} = CuStateVec{T}(reshape(dms.density_matrix, length(dms.density_matrix)), 2*dms.qubit_count)
+Base.convert(::Type{CuStateVec{T}}, svs::StateVectorSimulator{T,CuVector{T}}) where {T} =
+    CuStateVec{T}(svs.state_vector, svs.qubit_count)
+Base.convert(::Type{CuStateVec{T}}, dms::DensityMatrixSimulator{T,CuMatrix{T}}) where {T} =
+    CuStateVec{T}(
+        reshape(dms.density_matrix, length(dms.density_matrix)),
+        2 * dms.qubit_count,
+    )
 
 function expectation(
-    svs::StateVectorSimulator{T, CuVector{T}},
+    svs::StateVectorSimulator{T,CuVector{T}},
     observable::Braket.Observables.HermitianObservable,
     targets::Int...,
 ) where {T}
     endian_bits = reverse(collect(svs.qubit_count .- 1 .- targets))
-    ev, norm = cuStateVec.expectation(CuStateVec{T}(svs.state_vector, svs.qubit_count), observable.matrix, endian_bits)
+    ev, norm = cuStateVec.expectation(
+        CuStateVec{T}(svs.state_vector, svs.qubit_count),
+        observable.matrix,
+        endian_bits,
+    )
     return real(ev)
 end
 function expectation(
-    dms::DensityMatrixSimulator{T, CuMatrix{T}},
+    dms::DensityMatrixSimulator{T,CuMatrix{T}},
     observable::Braket.Observables.HermitianObservable,
     targets::Int...,
-   ) where {T}
+) where {T}
     obs_targets = reverse(dms.qubit_count .+ targets)
-    dm_copy     = copy(dms.density_matrix)
+    dm_copy = copy(dms.density_matrix)
     customApplyMatrix!(dm_copy, transpose(observable.matrix), collect(obs_targets), Int[])
     return sum(real(diag(dm_copy)))
 end
 
-function expectation(svs::S, observable::Braket.Observables.TensorProduct, targets::Int...) where {T, S<:Union{StateVectorSimulator{T, CuVector{T}}, DensityMatrixSimulator{T, CuMatrix{T}}}}
+function expectation(
+    svs::S,
+    observable::Braket.Observables.TensorProduct,
+    targets::Int...,
+) where {
+    T,
+    S<:Union{StateVectorSimulator{T,CuVector{T}},DensityMatrixSimulator{T,CuMatrix{T}}},
+}
     ev = zero(T)
     norm = zero(T)
-    if any(o->o isa Braket.Observables.HermitianObservable, observable.factors) || any(o->o isa Braket.Observables.H, observable.factors)
-        mat = mapfoldl(o->convert(Matrix{ComplexF64}, o), kron, observable.factors, init=[1.0]) 
-	return expectation(svs, Braket.Observables.HermitianObservable(mat), targets...)
+    if any(o -> o isa Braket.Observables.HermitianObservable, observable.factors) ||
+       any(o -> o isa Braket.Observables.H, observable.factors)
+        mat = mapfoldl(
+            o -> convert(Matrix{ComplexF64}, o),
+            kron,
+            observable.factors,
+            init = [1.0],
+        )
+        return expectation(svs, Braket.Observables.HermitianObservable(mat), targets...)
     else
-	    # TODO: MAKE THIS A PROPER CONVERSION
-	    pauli_ops = map(observable.factors) do o
-		    o isa Braket.Observables.I && return cuStateVec.PauliI()
-		    o isa Braket.Observables.X && return cuStateVec.PauliX()
-		    o isa Braket.Observables.Z && return cuStateVec.PauliZ()
-		    o isa Braket.Observables.Y && return cuStateVec.PauliY()
-	    end
-        cu_sv       = convert(CuStateVec{T}, svs)
-	nq          = cu_sv.nbits
-	endian_bits = nq .- 1 .- collect(targets)
-	evs         = cuStateVec.expectationsOnPauliBasis(cu_sv, Vector{cuStateVec.Pauli}[pauli_ops], [endian_bits])
-	ev          = evs[1]
+        # TODO: MAKE THIS A PROPER CONVERSION
+        pauli_ops = map(observable.factors) do o
+            o isa Braket.Observables.I && return cuStateVec.PauliI()
+            o isa Braket.Observables.X && return cuStateVec.PauliX()
+            o isa Braket.Observables.Z && return cuStateVec.PauliZ()
+            o isa Braket.Observables.Y && return cuStateVec.PauliY()
+        end
+        cu_sv = convert(CuStateVec{T}, svs)
+        nq = cu_sv.nbits
+        endian_bits = nq .- 1 .- collect(targets)
+        evs = cuStateVec.expectationsOnPauliBasis(
+            cu_sv,
+            Vector{cuStateVec.Pauli}[pauli_ops],
+            [endian_bits],
+        )
+        ev = evs[1]
     end
     return real(ev)
 end
 
-function calculate(ex::Braket.Expectation, sim::S) where {S<:Union{CuStateVectorSimulator,CuDensityMatrixSimulator}}
+function calculate(
+    ex::Braket.Expectation,
+    sim::S,
+) where {S<:Union{CuStateVectorSimulator,CuDensityMatrixSimulator}}
     obs = ex.observable
     targets = isnothing(ex.targets) ? collect(0:qubit_count(sim)-1) : ex.targets
     obs_qc = qubit_count(obs)

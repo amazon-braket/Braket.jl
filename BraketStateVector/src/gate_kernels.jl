@@ -57,15 +57,20 @@ matrix_rep(g::Ry) = SMatrix{2,2}(
         ],
     ),
 )
-
-matrix_rep(g::GPi)  = SMatrix{2,2}(complex([0 exp(-im * g.angle[1]); exp(im * g.angle[1]) 0]))
-matrix_rep(g::GPi2) = SMatrix{2,2}(complex([1. -im*exp(-im*g.angle[1]); -im*exp(im*g.angle[1]) 1.]))
-matrix_rep(g::MS)   = SMatrix{4,4}(complex([cos(g.angle[3]/2.0) 0.0 0.0 -im * exp(-im*(g.angle[1] + g.angle[2])) * sin(g.angle[3] / 2);
-                                            0.0 cos(g.angle[3]/2) -im*exp(-im*(g.angle[1] - g.angle[2]))*sin(g.angle[3]/2) 0.0;
-                                            0.0 -im*exp(im*(g.angle[1] - g.angle[2]))*sin(g.angle[3]/2) cos(g.angle[3]/2) 0.0;
-                                            -im*exp(im*(g.angle[1] + g.angle[2]))*sin(g.angle[3]/2) 0.0 0.0 cos(g.angle[3]/2)]))
-
-
+matrix_rep(g::GPi) =
+    SMatrix{2,2}(complex([0 exp(-im * g.angle[1]); exp(im * g.angle[1]) 0]))
+matrix_rep(g::GPi2) =
+    SMatrix{2,2}(complex([1.0 -im*exp(-im * g.angle[1]); -im*exp(im * g.angle[1]) 1.0]))
+matrix_rep(g::MS) = SMatrix{4,4}(
+    complex(
+        [
+            cos(g.angle[3] / 2.0) 0.0 0.0 -im*exp(-im * (g.angle[1] + g.angle[2]))*sin(g.angle[3] / 2)
+            0.0 cos(g.angle[3] / 2) -im*exp(-im * (g.angle[1] - g.angle[2]))*sin(g.angle[3] / 2) 0.0
+            0.0 -im*exp(im * (g.angle[1] - g.angle[2]))*sin(g.angle[3] / 2) cos(g.angle[3] / 2) 0.0
+            -im*exp(im * (g.angle[1] + g.angle[2]))*sin(g.angle[3] / 2) 0.0 0.0 cos(g.angle[3] / 2)
+        ],
+    ),
+)
 matrix_rep(g::PhaseShift) = SMatrix{2,2}([1.0 0.0; 0.0 exp(im * g.angle[1])])
 matrix_rep(g::XX) = SMatrix{4,4}(
     [
@@ -103,8 +108,10 @@ matrix_rep(g::ECR) =
     SMatrix{4,4}([0.0 0.0 1.0 im; 0.0 0.0 im 1.0; 1.0 -im 0.0 0.0; -im 1.0 0.0 0.0])
 matrix_rep(g::Unitary) = g.matrix
 
-apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} = return
-apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} = return
+apply_gate!(::Val{false}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} =
+    return
+apply_gate!(::Val{true}, g::I, state_vec::StateVector{T}, qubit::Int) where {T<:Complex} =
+    return
 
 for (G, g_mat) in (
         (:X, matrix_rep(X())),
@@ -138,56 +145,69 @@ for (G, g_mat) in (
     end
 end
 
-function apply_gate!(g_mat::SMatrix{2, 2, T}, state_vec::StateVector{T}, qubit::Int) where {T<:Complex}
+function apply_gate!(
+    g_mat::SMatrix{2,2,T},
+    state_vec::StateVector{T},
+    qubit::Int,
+) where {T<:Complex}
     n_amps, endian_qubit = get_amps_and_qubits(state_vec, qubit)
-    chunk_size   = CHUNK_SIZE
-    n_tasks      = n_amps >> 1
-    n_chunks     = max(div(n_tasks, CHUNK_SIZE), 1)
-    flipper      = 1 << endian_qubit
+    n_tasks = n_amps >> 1
+    n_chunks = max(div(n_tasks, CHUNK_SIZE), 1)
+    flipper = 1 << endian_qubit
     is_small_target = flipper < CHUNK_SIZE
     g_00, g_10, g_01, g_11 = g_mat
     Threads.@threads for c_ix = 0:n_chunks-1
-        my_amps   = if n_chunks > 1
-                c_ix*CHUNK_SIZE:((c_ix+1)*CHUNK_SIZE - 1)
-            else 
-                0:n_tasks-1
-            end
-        lower_ix  = pad_bit(my_amps[1], endian_qubit) + 1
+        my_amps = if n_chunks > 1
+            c_ix*CHUNK_SIZE:((c_ix+1)*CHUNK_SIZE-1)
+        else
+            0:n_tasks-1
+        end
+        lower_ix = pad_bit(my_amps[1], endian_qubit) + 1
         higher_ix = lower_ix + flipper
-        for task_amp in 0:length(my_amps)-1
+        for task_amp = 0:length(my_amps)-1
             if is_small_target && div(task_amp, flipper) > 0 && mod(task_amp, flipper) == 0
-                lower_ix  = higher_ix
+                lower_ix = higher_ix
                 higher_ix = lower_ix + flipper
             end
             @inbounds begin
-                lower_amp  = state_vec[lower_ix]
+                lower_amp = state_vec[lower_ix]
                 higher_amp = state_vec[higher_ix]
-                state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
+                state_vec[lower_ix] = g_00 * lower_amp + g_01 * higher_amp
                 state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
             end
-            lower_ix  += 1
+            lower_ix += 1
             higher_ix += 1
         end
     end
 end
 
 # generic two-qubit non controlled unitaries
-function apply_gate!(g_mat::M, state_vec::StateVector{T}, t1::Int, t2::Int) where {T<:Complex, M<:Union{SMatrix{4, 4, T}, Diagonal{T, SVector{4,T}}}}
+function apply_gate!(
+    g_mat::M,
+    state_vec::StateVector{T},
+    t1::Int,
+    t2::Int,
+) where {T<:Complex,M<:Union{SMatrix{4,4,T},Diagonal{T,SVector{4,T}}}}
     n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
     small_t, big_t = minmax(endian_t1, endian_t2)
-    chunk_size   = CHUNK_SIZE
-    n_tasks      = n_amps >> 2
-    n_chunks     = max(div(n_tasks, CHUNK_SIZE), 1)
+    chunk_size = CHUNK_SIZE
+    n_tasks = n_amps >> 2
+    n_chunks = max(div(n_tasks, CHUNK_SIZE), 1)
     chunked_amps = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
     Threads.@threads for c_ix = 1:n_chunks
         for ix in chunked_amps[c_ix]
-            ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
-            ix_10   = flip_bit(ix_00, endian_t2)
-            ix_01   = flip_bit(ix_00, endian_t1)
-            ix_11   = flip_bit(ix_10, endian_t1)
+            ix_00 = pad_bit(pad_bit(ix, small_t), big_t)
+            ix_10 = flip_bit(ix_00, endian_t2)
+            ix_01 = flip_bit(ix_00, endian_t1)
+            ix_11 = flip_bit(ix_10, endian_t1)
             ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
             @inbounds begin
-                amps = SVector{4, T}(state_vec[ix_00+1], state_vec[ix_01+1], state_vec[ix_10+1], state_vec[ix_11+1])
+                amps = SVector{4,T}(
+                    state_vec[ix_00+1],
+                    state_vec[ix_01+1],
+                    state_vec[ix_10+1],
+                    state_vec[ix_11+1],
+                )
                 new_amps = g_mat * amps
                 state_vec[ind_vec[1]] = new_amps[1]
                 state_vec[ind_vec[2]] = new_amps[2]
@@ -215,7 +235,7 @@ for (V, f) in ((false, :identity), (true, :conj))
             state_vec::StateVector{T},
             qubit::Int,
         ) where {T<:Complex}
-            g_mat = SMatrix{2, 2, T}($f(matrix_rep(g)))
+            g_mat = SMatrix{2,2,T}($f(matrix_rep(g)))
             return apply_gate!(g_mat, state_vec, qubit)
         end
     end
@@ -226,9 +246,11 @@ apply_gate!(g::G, args...) where {G<:Gate} = apply_gate!(Val(false), g, args...)
 for (cph, ind) in
     ((:CPhaseShift, 4), (:CPhaseShift00, 1), (:CPhaseShift01, 3), (:CPhaseShift10, 2))
     @eval begin
-        matrix_rep(g::$cph) = Diagonal(SVector{4,ComplexF64}(
-            setindex!(ones(ComplexF64, 4), exp(im * g.angle[1]), $ind),
-           ))
+        matrix_rep(g::$cph) = Diagonal(
+            SVector{4,ComplexF64}(
+                setindex!(ones(ComplexF64, 4), exp(im * g.angle[1]), $ind),
+            ),
+        )
     end
 end
 
@@ -261,12 +283,12 @@ for (V, f) in ((true, :conj), (false, :identity))
                 ix_10 = flip_bit(ix_00, endian_control)
                 ix_01 = flip_bit(ix_00, endian_target)
                 ix_11 = flip_bit(ix_01, endian_control)
-                lower_ix  = ix_10 + 1
+                lower_ix = ix_10 + 1
                 higher_ix = ix_11 + 1
                 @inbounds begin
-                    lower_amp  = state_vec[lower_ix]
+                    lower_amp = state_vec[lower_ix]
                     higher_amp = state_vec[higher_ix]
-                    state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
+                    state_vec[lower_ix] = g_00 * lower_amp + g_01 * higher_amp
                     state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
                 end
             end
@@ -294,7 +316,7 @@ for (V, f) in ((true, :conj), (false, :identity))
                 ix_vec = SVector{4,Int}(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
                 @views begin
                     @inbounds begin
-                        amps = SVector{4, T}(state_vec[ix_vec])
+                        amps = SVector{4,T}(state_vec[ix_vec])
                         state_vec[ix_vec] = g_mat * amps
                     end
                 end
@@ -322,14 +344,14 @@ for (V, f) in ((true, :conj), (false, :identity))
                 # insert 0 at c1, 0 at c2, 0 at target
                 padded_ix = pad_bits(ix, [small_t, mid_t, big_t])
                 # flip c1 and c2
-                lower_ix  = flip_bit(flip_bit(padded_ix, endian_c1), endian_c2)
+                lower_ix = flip_bit(flip_bit(padded_ix, endian_c1), endian_c2)
                 # flip target
                 higher_ix = flip_bit(lower_ix, endian_target) + 1
                 lower_ix += 1
                 @inbounds begin
-                    lower_amp  = state_vec[lower_ix]
+                    lower_amp = state_vec[lower_ix]
                     higher_amp = state_vec[higher_ix]
-                    state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
+                    state_vec[lower_ix] = g_00 * lower_amp + g_01 * higher_amp
                     state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
                 end
             end
@@ -339,13 +361,15 @@ for (V, f) in ((true, :conj), (false, :identity))
 end
 
 for (cg, tg, nc) in (
-    (:CNot, :X, 1),
-    (:CY, :Y, 1),
-    (:CZ, :Z, 1),
-    (:CV, :V, 1),
-    (:CSwap, :Swap, 1),
-    (:CCNot, :X, 2),
-   ), (Vc, f) in ((false, :identity), (true, :conj))
+        (:CNot, :X, 1),
+        (:CY, :Y, 1),
+        (:CZ, :Z, 1),
+        (:CV, :V, 1),
+        (:CSwap, :Swap, 1),
+        (:CCNot, :X, 2),
+    ),
+    (Vc, f) in ((false, :identity), (true, :conj))
+
     @eval begin
         apply_gate!(
             ::Val{$Vc},
@@ -380,7 +404,7 @@ for (V, f) in ((false, :identity), (true, :conj))
                 ixs = SVector{2^nq,Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
                 @views begin
                     @inbounds begin
-                        amps = SVector{2^NQ, T}(state_vec[ixs])
+                        amps = SVector{2^NQ,T}(state_vec[ixs])
                         new_amps = g_mat * amps
                         state_vec[ixs] = new_amps
                     end

@@ -37,46 +37,42 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
     is_single_input = inputs isa Dict{String, Float64}
     !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
     is_single_input && (inputs = is_single_task ? [inputs] : fill(inputs, length(task_specs)))
+    # let each thread pick up an idle simulator
+    #sims     = Channel(Inf)
+    #foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
+
     tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
+    todo_tasks_ch = Channel(length(tasks_and_inputs))
     for (ix, spec, input) in tasks_and_inputs
         if spec isa Circuit
             param_names = Set(string(param.name) for param in spec.parameters)
             unbounded_params = setdiff(param_names, collect(keys(input)))
             !isempty(unbounded_params) && throw(ErrorException("cannot execute circuit with unbound parameters $unbounded_params."))
         end
+	put!(todo_tasks_ch, (ix, spec, input))
     end
-    results = Vector{GateModelQuantumTaskResult}(undef, length(task_specs))
-    # let each thread pick up an idle simulator
-    sims     = Channel(Threads.nthreads())
-    foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
-    max_qc   = maximum(qubit_count, task_specs)
-    do_chunk = max_qc <= 20 && length(task_specs) > Threads.nthreads()
-    println("Braket.jl: batch size is $(length(task_specs)). Chunking? $do_chunk. Starting run...")
-    #@profile begin
-        stats = @timed begin
-            if do_chunk
-                chunks = collect(Iterators.partition(tasks_and_inputs, div(length(tasks_and_inputs), Threads.nthreads())))
-                Threads.@threads for c_ix in 1:length(chunks)
-                    sim = take!(sims)
-                    for (ix, spec, input) in chunks[c_ix]
-                        println(spec)
-                        flush(stdout)
-                        results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
-                    end
-                    put!(sims, sim)
-                end
-            else
-                Threads.@threads for (ix, spec, input) in collect(tasks_and_inputs)
-                    sim = take!(sims)
-                    println("Thread $(Threads.threadid()) beginning task $ix.")
-                    results[ix] = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
-                    println("Thread $(Threads.threadid()) completed task $ix.")
-                    put!(sims, sim)
-                end
-            end
-        end
-        println("Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime).")
-    #end
+    println("Braket.jl: batch size is $(length(task_specs)). Starting run...")
+    flush(stdout)
+    n_task_threads = 32
+    stats = @timed begin
+	    done_tasks_ch = Channel(length(tasks_and_inputs)) do ch
+		function task_processor(input_tup)
+		    ix, spec, input = input_tup
+		    sim = copy(d._delegate)
+		    res = _run_internal(sim, spec, args...; inputs=input, shots=shots, kwargs...)
+		    put!(ch, (ix, res))
+		end
+		Threads.foreach(task_processor, todo_tasks_ch, ntasks=n_task_threads)
+	    end
+	    r_ix = 1
+	    results = Vector{GateModelQuantumTaskResult}(undef, length(task_specs))
+	    while r_ix <= length(task_specs)
+                ix, res = take!(done_tasks_ch)
+		results[ix] = res
+		r_ix += 1
+	    end
+    end
+    println("Braket.jl: batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime).")
     return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
 
@@ -104,8 +100,8 @@ function _run_internal(simulator, circuit::Program, args...; shots::Int=0, input
         program = circuit
         qubits  = qubit_count(circuit)
         r       = simulator(program, qubits, args...; shots=shots, kwargs...)
-        fr = format_result(r)
-        return fr
+	fr = format_result(r)
+	return fr
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end

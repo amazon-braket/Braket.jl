@@ -1,6 +1,14 @@
-function make_alias_table!(w::AbstractVector, wsum, a::AbstractVector{Float64}, alias::AbstractVector{Int}, larges::AbstractVector{Int}, smalls::AbstractVector{Int})
+function make_alias_table!(
+    w::AbstractVector,
+    wsum,
+    a::AbstractVector{Float64},
+    alias::AbstractVector{Int},
+    larges::AbstractVector{Int},
+    smalls::AbstractVector{Int},
+)
     n = length(w)
-    length(a) == length(alias) == n || throw(DimensionMismatch("Inconsistent array lengths."))
+    length(a) == length(alias) == n ||
+        throw(DimensionMismatch("Inconsistent array lengths."))
 
     ac = n / wsum
     a .= w .* ac
@@ -18,8 +26,10 @@ function make_alias_table!(w::AbstractVector, wsum, a::AbstractVector{Float64}, 
     end
 
     @inbounds while kl > 0 && ks > 0
-        s = smalls[ks]; ks -= 1  # pop from smalls
-        l = larges[kl]; kl -= 1  # pop from larges
+        s = smalls[ks]
+        ks -= 1  # pop from smalls
+        l = larges[kl]
+        kl -= 1  # pop from larges
         alias[s] = l
         al = a[l] = (a[l] - 1.0) + a[s]
         if al > 1.0
@@ -43,24 +53,24 @@ function alg3!(rng, n, x, p)
     for i ∈ n:-1:1
         ## sample from Beta(1, i)
         _p = rand(rng)
-        β = (1 - (1 - _p)^(1/i))
+        β = (1 - (1 - _p)^(1 / i))
         curX = muladd(β, (1 - curX), curX)
         while cumProbSum < curX
             cumProbSum += p[idx]
             idx += 1
         end
-        x[n - i + 1] = idx - 1
+        x[n-i+1] = idx - 1
     end
 end
 
 function samples(s::AbstractSimulator)
-    p   = probabilities(s)
-    wv  = Weights(p)
-    n   = 2^s.qubit_count
+    p = probabilities(s)
+    wv = Weights(p)
+    n = 2^s.qubit_count
     rng = Random.TaskLocalRNG()
     if s.qubit_count < 30 # build alias tables etc
-        inds  = 0:(n-1)
-        ap    = s._ap
+        inds = 0:(n-1)
+        ap = s._ap
         alias = s._alias
         larges = s._larges
         smalls = s._smalls
@@ -68,7 +78,7 @@ function samples(s::AbstractSimulator)
         sampler = Random.Sampler(rng, 1:n)
         for i = 1:s.shots
             j = rand(rng, sampler)
-            s.shot_buffer[i] = rand(rng) < ap[j] ? j-1 : alias[j]-1
+            s.shot_buffer[i] = rand(rng) < ap[j] ? j - 1 : alias[j] - 1
         end
     else
         # Direct sampling

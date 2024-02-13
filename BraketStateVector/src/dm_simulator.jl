@@ -15,15 +15,28 @@ mutable struct DensityMatrixSimulator{T,S} <:
         shots::Int,
     ) where {T,S<:AbstractDensityMatrix{T}}
         shot_buffer = Vector{Int}(undef, shots)
-        ap_len  = ap_size(shots, qubit_count)
-        _alias  = Vector{Int}(undef, ap_len)
-        _ap     = Vector{Float64}(undef, ap_len)
+        ap_len = ap_size(shots, qubit_count)
+        _alias = Vector{Int}(undef, ap_len)
+        _ap = Vector{Float64}(undef, ap_len)
         _larges = Vector{Int}(undef, ap_len)
         _smalls = Vector{Int}(undef, ap_len)
-        return new(density_matrix, qubit_count, shots, shot_buffer, _alias, _ap, _larges, _smalls, S(undef, 0, 0))
+        return new(
+            density_matrix,
+            qubit_count,
+            shots,
+            shot_buffer,
+            _alias,
+            _ap,
+            _larges,
+            _smalls,
+            S(undef, 0, 0),
+        )
     end
 end
-function init(::Type{DensityMatrixSimulator{T,S}}, qubit_count::Int) where {T,S<:AbstractMatrix{T}}
+function init(
+    ::Type{DensityMatrixSimulator{T,S}},
+    qubit_count::Int,
+) where {T,S<:AbstractMatrix{T}}
     dm = S(undef, 2^qubit_count, 2^qubit_count)
     fill!(dm, zero(T))
     dm[1, 1] = one(T)
@@ -34,7 +47,7 @@ function DensityMatrixSimulator{T,S}(
     shots::Int,
 ) where {T,S<:AbstractDensityMatrix{T}}
     dm = init(DensityMatrixSimulator{T,S}, qubit_count)
-    return DensityMatrixSimulator{T, S}(dm, qubit_count, shots)
+    return DensityMatrixSimulator{T,S}(dm, qubit_count, shots)
 end
 DensityMatrixSimulator(::Type{T}, qubit_count::Int, shots::Int) where {T<:Number} =
     DensityMatrixSimulator{T,DensityMatrix{T}}(qubit_count, shots)

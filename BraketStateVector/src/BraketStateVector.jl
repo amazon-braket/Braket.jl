@@ -38,9 +38,7 @@ ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubi
 include("validation.jl")
 
 const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
-
-const CHUNK_SIZE = 32
-
+const CHUNK_SIZE = 2^10
 
 function meminfo_julia()
     # @printf "GC total:  %9.3f MiB\n" Base.gc_total_bytes(Base.gc_num())/2^20
@@ -65,8 +63,8 @@ end
 
 function _formatted_measurements(d::D) where {D<:AbstractSimulator}
     sim_samples = samples(d)
-    qc          = qubit_count(d)
-    formatted   = [index_to_endian_bits(sample, qc) for sample in sim_samples]
+    qc = qubit_count(d)
+    formatted = [index_to_endian_bits(sample, qc) for sample in sim_samples]
     return formatted
 end
 

@@ -9,13 +9,13 @@ inverted_gate(g::DoubleExcitation) = DoubleExcitation(-g.angle[1])
 function matrix_rep(g::DoubleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
-    
+
     mat = diagm(ones(T, 16))
-    mat[4, 4]   = cosϕ
+    mat[4, 4] = cosϕ
     mat[13, 13] = cosϕ
-    mat[4, 13]  = -sinϕ
-    mat[13, 4]  = sinϕ
-    return SMatrix{32, 32, ComplexF64}(mat)
+    mat[4, 13] = -sinϕ
+    mat[13, 4] = sinϕ
+    return SMatrix{32,32,ComplexF64}(mat)
 end
 
 struct SingleExcitation <: AngledGate{1}
@@ -29,7 +29,7 @@ inverted_gate(g::SingleExcitation) = SingleExcitation(-g.angle[1])
 function matrix_rep(g::SingleExcitation)
     cosϕ = cos(g.angle[1] / 2.0)
     sinϕ = sin(g.angle[1] / 2.0)
-    return SMatrix{4, 4, ComplexF64}([1.0 0 0 0; 0 cosϕ -sinϕ 0; 0 sinϕ cosϕ 0; 0 0 0 1.0])
+    return SMatrix{4,4,ComplexF64}([1.0 0 0 0; 0 cosϕ -sinϕ 0; 0 sinϕ cosϕ 0; 0 0 0 1.0])
 end
 struct MultiRZ <: AngledGate{1}
     angle::NTuple{1,Union{Float64,FreeParameter}}
@@ -41,8 +41,12 @@ inverted_gate(g::MultiRZ) = MultiRZ(-g.angle[1])
 
 for (V, f) in ((true, :conj), (false, :identity))
     @eval begin
-        apply_gate!(::Val{$V}, g::MultiRZ, state_vec::StateVector{T}, t::Int) where {T<:Complex} =
-            apply_gate!(Val($V), Rz(g.angle), state_vec, t)
+        apply_gate!(
+            ::Val{$V},
+            g::MultiRZ,
+            state_vec::StateVector{T},
+            t::Int,
+        ) where {T<:Complex} = apply_gate!(Val($V), Rz(g.angle), state_vec, t)
         apply_gate!(
             ::Val{$V},
             g::MultiRZ,
@@ -64,7 +68,8 @@ for (V, f) in ((true, :conj), (false, :identity))
             end
             factor = -im * g.angle[1] / 2.0
             r_mat = Braket.PauliEigenvalues(Val(N))
-            g_mat = Diagonal($f(SVector{2^N,ComplexF64}(exp(factor * r_mat[i]) for i = 1:2^N)))
+            g_mat =
+                Diagonal($f(SVector{2^N,ComplexF64}(exp(factor * r_mat[i]) for i = 1:2^N)))
 
             Threads.@threads for ix = 0:div(n_amps, 2^N)-1
                 padded_ix = pad_bits(ix, ordered_ts)
