@@ -325,12 +325,13 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 end
                 return qft_ops
             end
-            qubit_count = 6
-            simulation = f(DensityMatrixSimulator(qubit_count, 0))
-            operations = qft_circuit_operations(qubit_count)
-            simulation = evolve!(simulation, operations)
-            @assert collect(BraketStateVector.probabilities(simulation)) ≈
-                    fill(1.0 / (2^qubit_count), 2^qubit_count)
+            @testset "Qubit count $qubit_count" for qubit_count in 2:15
+                simulation = f(DensityMatrixSimulator(qubit_count, 0))
+                operations = qft_circuit_operations(qubit_count)
+                simulation = evolve!(simulation, operations)
+                @assert collect(BraketStateVector.probabilities(simulation)) ≈
+                        fill(1.0 / (2^qubit_count), 2^qubit_count)
+            end
         end
         @testset "samples" begin
             simulation = f(DensityMatrixSimulator(2, 10000))
