@@ -9,13 +9,14 @@ local_dm         = pyimport("braket.default_simulator.density_matrix_simulation"
 qml              = pyimport("pennylane")
 np               = pyimport("numpy")
 pnp              = pyimport("pennylane.numpy")
+nx               = pyimport("networkx")
 
 suite = BenchmarkGroup()
-#include("gate_kernels.jl")
-#include("qaoa.jl")
+include("gate_kernels.jl")
+include("qaoa.jl")
 include("vqe.jl")
-#include("qft.jl")
-#include("ghz.jl")
+include("qft.jl")
+include("ghz.jl")
 
 # this is expensive! only do it if we're sure we need to regen parameters
 if !isfile("params.json")
