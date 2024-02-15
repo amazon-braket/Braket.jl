@@ -2,6 +2,7 @@ using Test, CUDA, cuStateVec, LinearAlgebra, Braket, BraketStateVector, DataStru
 
 import Braket: I, Instruction
 
+LARGE_TESTS = get(ENV, "BRAKET_SV_LARGE_TESTS", false)
 funcs = CUDA.functional() ? (identity, cu) : (identity,)
 
 @testset "Density matrix simulator" begin
@@ -325,7 +326,8 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 end
                 return qft_ops
             end
-            @testset "Qubit count $qubit_count" for qubit_count in 2:16
+            max_qc = LARGE_TESTS ? 16 : 10 
+            @testset "Qubit count $qubit_count" for qubit_count in 2:max_qc
                 simulation = f(DensityMatrixSimulator(qubit_count, 0))
                 operations = qft_circuit_operations(qubit_count)
                 simulation = evolve!(simulation, operations)
