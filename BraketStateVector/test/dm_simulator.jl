@@ -189,7 +189,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                     0.0,
                 ],
             ),
-            #=([Instruction(Kraus([matrix_5q]), [0, 1, 2, 3, 4])], 5, density_matrix_5q, [
+            ([Instruction(Kraus([matrix_5q]), [0, 1, 2, 3, 4])], 5, density_matrix_5q, [
                     0.0,
                     0.0,
                     0.0,
@@ -223,7 +223,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                     0.0,
                     0.0,
                 ],
-            ),=#
+            ),
         ]
             simulation = f(DensityMatrixSimulator(qubit_count, 0))
             simulation = evolve!(simulation, instructions)
@@ -325,7 +325,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 end
                 return qft_ops
             end
-            @testset "Qubit count $qubit_count" for qubit_count in 2:15
+            @testset "Qubit count $qubit_count" for qubit_count in 2:16
                 simulation = f(DensityMatrixSimulator(qubit_count, 0))
                 operations = qft_circuit_operations(qubit_count)
                 simulation = evolve!(simulation, operations)

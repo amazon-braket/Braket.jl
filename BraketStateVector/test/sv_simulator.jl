@@ -279,7 +279,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
                 end
                 return qft_ops
             end
-            @testset "Qubit count $qubit_count" for qubit_count in 2:30
+            @testset "Qubit count $qubit_count" for qubit_count in 30:32
                 simulation = f(StateVectorSimulator(qubit_count, 0))
                 operations = qft_circuit_operations(qubit_count)
                 simulation = BraketStateVector.evolve!(simulation, operations)
