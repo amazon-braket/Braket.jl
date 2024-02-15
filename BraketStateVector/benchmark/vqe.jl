@@ -1,7 +1,6 @@
 suite["vqe"] = BenchmarkGroup()
 
-for n_electrons in 4:2:4
-    @show n_electrons
+for n_electrons in 4:2:10
     mol = "H"*string(n_electrons)
     suite["vqe"][mol] = BenchmarkGroup()
     
@@ -16,11 +15,8 @@ for n_electrons in 4:2:4
     H, qubits   = qml.qchem.molecular_hamiltonian(symbols, coordinates, method="pyscf")
     coeffs, obs = H.coeffs, H.ops
     H           = qml.Hamiltonian(coeffs, obs, grouping_type="qwc")
-    println("Computed H with grouping indices...")
-    flush(stdout)
     singles, doubles = qml.qchem.excitations(n_electrons, qubits)
     all_exs = singles + doubles
-    #ops = [qml.BasisState(hf_state, wires=collect(0:n_qubits-1))]
     ops = [qml.PauliX(q) for q in 0:n_electrons-1]
     for (i, gate) in enumerate(all_exs)
         if length(gate) == 4
@@ -46,10 +42,7 @@ for n_electrons in 4:2:4
         compiled_tapes = qiskit_sim.compile_circuits(wider_tapes)
         append!(qiskit_tapes, compiled_tapes)
     end
-    println("Ready to actually launch benchmarks...")
-    flush(stdout)
     suite["vqe"][mol]["Julia"]           = @benchmarkable sim(pylist($tapes), input_dict, shots=100)         setup = (sim=LocalSimulator("braket_sv"); input_dict=pylist([pydict(Dict())]))
     suite["vqe"][mol]["Lightning.Qubit"] = @benchmarkable sim.batch_execute($tapes)                          setup = (sim=qml.device("lightning.qubit", wires=$n_qubits, shots=100))
     suite["vqe"][mol]["Qiskit.Aer"]      = @benchmarkable sim.backend.run($qiskit_tapes, shots=100).result() setup = (sim=qml.device("qiskit.aer", backend="aer_simulator_statevector", wires=$n_qubits, shots=100, statevector_parallel_threshold=8))
-    #suite["vqe"][mol]["BraketSV"] = @benchmarkable sim.batch_execute($expanded_tapes)        setup = (sim=qml.device("braket.local.qubit", wires=$n_qubits, shots=100))
 end
