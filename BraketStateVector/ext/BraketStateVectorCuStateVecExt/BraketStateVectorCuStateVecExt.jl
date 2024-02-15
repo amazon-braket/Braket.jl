@@ -21,13 +21,11 @@ import BraketStateVector:
     AbstractDensityMatrix,
     StateVectorSimulator,
     DensityMatrixSimulator,
-    get_amps_and_qubits,
     pad_bits,
     flip_bits,
     flip_bit,
     DoubleExcitation,
     SingleExcitation,
-    evolve!,
     apply_gate!,
     apply_noise!,
     pad_bit,
@@ -79,9 +77,7 @@ function StateVectorSimulator{T,CuVector{T}}(qubit_count::Int, shots::Int) where
     sv_size = iszero(qubit_count) ? 0 : 2^qubit_count
     sv = CuVector{T}(undef, sv_size)
     if sv_size > 0
-        block_size = 512
-        tc = sv_size >= block_size ? block_size : sv_size
-        bc = sv_size >= block_size ? div(sv_size, block_size) : 1
+        tc, bc = get_launch_dims(sv_size)
         @cuda threads = tc blocks = bc init_zero_state_kernel!(sv)
     end
     return StateVectorSimulator{T,CuVector{T}}(sv, qubit_count, shots)
@@ -90,9 +86,7 @@ function DensityMatrixSimulator{T,CuMatrix{T}}(qubit_count::Int, shots::Int) whe
     dm_size = iszero(qubit_count) ? 0 : 2^qubit_count
     dm = CuMatrix{T}(undef, dm_size, dm_size)
     if dm_size > 0
-        block_size = 512
-        tc = dm_size >= block_size ? block_size : dm_size
-        bc = dm_size >= block_size ? div(dm_size, block_size) : 1
+        tc, bc = get_launch_dims(dm_size)
         @cuda threads = tc blocks = bc init_zero_state_kernel!(dm)
     end
     return DensityMatrixSimulator{T,CuMatrix{T}}(dm, qubit_count, shots)
@@ -108,9 +102,7 @@ function reinit!(
         svs.state_vector = CuVector{T}(undef, sv_size)
     end
     if qubit_count > 0
-        block_size = 512
-        tc = sv_size >= block_size ? block_size : sv_size
-        bc = sv_size >= block_size ? div(sv_size, block_size) : 1
+        tc, bc = get_launch_dims(sv_size)
         @cuda threads = tc blocks = bc init_zero_state_kernel!(svs.state_vector)
     end
     svs.qubit_count = qubit_count
@@ -129,9 +121,7 @@ function reinit!(
         dms.density_matrix = CuMatrix{T}(undef, dm_size, dm_size)
     end
     if qubit_count > 0
-        block_size = 512
-        tc = dm_size >= block_size ? block_size : dm_size
-        bc = dm_size >= block_size ? div(dm_size, block_size) : 1
+        tc, bc = get_launch_dims(dm_size)
         @cuda threads = (tc, tc) blocks = (bc, bc) init_zero_state_kernel!(
             dms.density_matrix,
         )
@@ -141,16 +131,6 @@ function reinit!(
     dms.buffer = CuVector{UInt8}(undef, 0)
     dms._density_matrix_after_observables = CuMatrix{T}(undef, 0, 0)
     return
-end
-
-function evolve!(
-    svs::StateVectorSimulator{T,CuVector{T}},
-    operations::Vector{Instruction},
-) where {T<:Complex}
-    for (oix, op) in enumerate(operations)
-        apply_gate!(op.operator, svs.state_vector, op.target...)
-    end
-    return svs
 end
 
 function customApplyMatrix!(
@@ -184,7 +164,7 @@ function customApplyMatrix!(
     else
         buffer = CuVector{UInt8}(undef, 0)
     end
-    endian_targets = [n_bits - 1 - t for t in targets]
+    endian_targets  = [n_bits - 1 - t for t in targets]
     endian_controls = [n_bits - 1 - c for c in controls]
     cuStateVec.custatevecApplyMatrix(
         cuStateVec.handle(),
@@ -401,6 +381,7 @@ function density_matrix(svs::StateVectorSimulator{T,CuVector{T}}) where {T}
     adj_sv_mat = CuMatrix{T}(undef, 1, length(svs.state_vector))
     adj_sv_mat .= adjoint(svs.state_vector)
     dm = CUDA.zeros(T, length(svs.state_vector), length(svs.state_vector))
+    # TODO: fix this
     CUDA.@allowscalar begin
         kron!(dm, sv_mat, adj_sv_mat)
     end
@@ -474,6 +455,11 @@ function expectation(
     return sum(real(diag(dm_copy)))
 end
 
+Base.convert(::Type{cuStateVec.Pauli}, o::Braket.Observables.I) = cuStateVec.PauliI()
+Base.convert(::Type{cuStateVec.Pauli}, o::Braket.Observables.X) = cuStateVec.PauliX()
+Base.convert(::Type{cuStateVec.Pauli}, o::Braket.Observables.Y) = cuStateVec.PauliY()
+Base.convert(::Type{cuStateVec.Pauli}, o::Braket.Observables.Z) = cuStateVec.PauliZ()
+
 function expectation(
     svs::S,
     observable::Braket.Observables.TensorProduct,
@@ -494,15 +480,9 @@ function expectation(
         )
         return expectation(svs, Braket.Observables.HermitianObservable(mat), targets...)
     else
-        # TODO: MAKE THIS A PROPER CONVERSION
-        pauli_ops = map(observable.factors) do o
-            o isa Braket.Observables.I && return cuStateVec.PauliI()
-            o isa Braket.Observables.X && return cuStateVec.PauliX()
-            o isa Braket.Observables.Z && return cuStateVec.PauliZ()
-            o isa Braket.Observables.Y && return cuStateVec.PauliY()
-        end
-        cu_sv = convert(CuStateVec{T}, svs)
-        nq = cu_sv.nbits
+        pauli_ops = map(o->convert(cuStateVec.Pauli, o), observable.factors)
+        cu_sv     = convert(CuStateVec{T}, svs)
+        nq        = cu_sv.nbits
         endian_bits = nq .- 1 .- collect(targets)
         evs = cuStateVec.expectationsOnPauliBasis(
             cu_sv,
@@ -530,6 +510,7 @@ function samples(svs::StateVectorSimulator{T,CuVector{T}}) where {T}
     return sample(cu_sv, collect(0:svs.qubit_count-1), svs.shots)
 end
 function samples(dms::DensityMatrixSimulator{T,CuMatrix{T}}) where {T}
+    # this gives the *magnitude* of amplitudes but not their *phases*.
     ps = sqrt.(diag(dms.density_matrix))
     cu_sv = CuStateVec{T}(ps, dms.qubit_count)
     return sample(cu_sv, collect(0:dms.qubit_count-1), dms.shots)
