@@ -26,9 +26,11 @@ name(s::LocalSimulator) = name(s._delegate)
 device_id(s::String) = s
 
 function (d::LocalSimulator)(task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
-    sim = copy(d._delegate)
-    local_result = _run_internal(sim, task_spec, args...; inputs=inputs, shots=shots, kwargs...)
-    sim = nothing
+    sim = d._delegate
+    @debug "Single task. Starting run..."
+    stats = @timed _run_internal(sim, task_spec, args...; inputs=inputs, shots=shots, kwargs...)
+    @debug "Single task. Time to run internally: $(stats.time). GC time: $(stats.gctime)."
+    local_result = stats.value
     return LocalQuantumTask(local_result.task_metadata.id, local_result)
 end
 
@@ -37,7 +39,7 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
     is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
     if is_single_input
         if is_single_task 
-            inputs = [inputs]
+            return d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)
         elseif inputs isa Dict{String, Float64}
             inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
         else
@@ -58,7 +60,7 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
             unbounded_params = setdiff(param_names, collect(keys(input)))
             !isempty(unbounded_params) && throw(ErrorException("cannot execute circuit with unbound parameters $unbounded_params."))
         end
-	put!(todo_tasks_ch, (ix, spec, input))
+        put!(todo_tasks_ch, (ix, spec, input))
     end
     @debug "batch size is $(length(task_specs)). Starting run..."
     n_task_threads = 32
@@ -103,13 +105,19 @@ function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, input
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
 end
-function _run_internal(simulator, circuit::Program, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
+function _run_internal(simulator, program::Program, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
     if haskey(properties(simulator).action, "braket.ir.jaqcd.program")
-        program = circuit
-        qubits  = qubit_count(circuit)
-        r       = simulator(program, qubits, args...; shots=shots, kwargs...)
-	fr = format_result(r)
-	return fr
+        stats   = @timed qubit_count(program)
+        @debug "Time to get qubit count: $(stats.time)"
+        qubits  = stats.value
+        stats = @timed begin
+            simulator(program, qubits, args...; shots=shots, kwargs...)
+        end
+        @debug "Time to invoke simulator: $(stats.time)"
+        r       = stats.value
+        stats = @timed format_result(r)
+        @debug "Time to format results: $(stats.time)"
+        return stats.value
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end

@@ -267,7 +267,10 @@ function (d::AbstractSimulator)(
     operations = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
     _validate_operation_qubits(operations)
     reinit!(d, qc, shots)
-    d = evolve!(d, operations)
+    stats = @timed begin
+        d = evolve!(d, operations)
+    end
+    @debug "Time for evolution: $(stats.time)"
     results = Braket.ResultTypeValue[]
     if shots == 0 && !isempty(circuit_ir.results)
         result_types = _translate_result_types(circuit_ir.results, qc)
@@ -282,7 +285,9 @@ function (d::AbstractSimulator)(
             results = _generate_results(circuit_ir.results, result_types, d)
         end
     end
-    res = _bundle_results(results, circuit_ir, d)
+    stats = @timed _bundle_results(results, circuit_ir, d)
+    @debug "Time for results bundling: $(stats.time)"
+    res = stats.value
     return res
 end
 
