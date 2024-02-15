@@ -14,9 +14,9 @@ nx               = pyimport("networkx")
 suite = BenchmarkGroup()
 include("gate_kernels.jl")
 include("qaoa.jl")
-include("vqe.jl")
 include("qft.jl")
 include("ghz.jl")
+include("vqe.jl")
 
 # this is expensive! only do it if we're sure we need to regen parameters
 if !isfile("params.json")
