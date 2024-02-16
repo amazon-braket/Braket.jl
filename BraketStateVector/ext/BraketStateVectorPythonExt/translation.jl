@@ -38,6 +38,14 @@ function union_convert(union_type, x)
     return arg
 end
 
+function jl_convert_attr(n, t::Type{T}, attr) where {T<:Tuple}
+    if pyisinstance(attr, PythonCall.pybuiltins.float)
+        return (pyconvert(Float64, attr),)
+    else
+        return pyconvert(t, attr)
+    end
+end
+
 function jl_convert_attr(n, t, attr)
     if !(t isa Union)
         if pyisinstance(attr, PythonCall.pybuiltins.list)
