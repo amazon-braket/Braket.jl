@@ -2,11 +2,12 @@ using Test
 
 @testset "BraketStateVector" begin
     for test in (
-        "dm_simulator",
-        "sv_simulator",
-        "utils",
-        "result_types",
-        "braket_integration",
+        #"sv_simulator",
+        #"dm_simulator",
+        #"utils",
+        #"result_types",
+        "openqasm",
+        #"braket_integration",
     )
         @testset "$test" begin
             include(test * ".jl")

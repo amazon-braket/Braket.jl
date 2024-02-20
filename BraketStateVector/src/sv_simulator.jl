@@ -16,11 +16,11 @@ mutable struct StateVectorSimulator{T,S} <: AbstractSimulator
     ) where {T,S<:AbstractVector{T}}
         # careful here, need to dispatch on qubit count if it is large
         shot_buffer = Vector{Int}(undef, shots)
-        ap_len = ap_size(shots, qubit_count)
-        _alias = Vector{Int}(undef, ap_len)
-        _ap = Vector{Float64}(undef, ap_len)
-        _larges = Vector{Int}(undef, ap_len)
-        _smalls = Vector{Int}(undef, ap_len)
+        ap_len  = ap_size(shots, qubit_count)
+        _ap     = zeros(Float64, ap_len)
+        _alias  = zeros(Int, ap_len)
+        _larges = zeros(Int, ap_len)
+        _smalls = zeros(Int, ap_len)
         return new(
             state_vector,
             qubit_count,
@@ -84,18 +84,26 @@ function reinit!(
     shots::Int,
 ) where {T,S<:AbstractVector{T}}
     n = 2^qubit_count
+    ap_len = ap_size(shots, qubit_count)
     if length(svs.state_vector) != n
         resize!(svs.state_vector, n)
-        ap_len = ap_size(shots, qubit_count)
-        resize!(svs._alias, ap_len)
-        resize!(svs._ap, ap_len)
+        resize!(svs._alias,  ap_len)
+        resize!(svs._ap,     ap_len)
         resize!(svs._larges, ap_len)
         resize!(svs._smalls, ap_len)
     end
     if svs.shots != shots
+        resize!(svs._alias,  ap_len)
+        resize!(svs._ap,     ap_len)
+        resize!(svs._larges, ap_len)
+        resize!(svs._smalls, ap_len)
         resize!(svs.shot_buffer, shots)
     end
     svs.state_vector .= zero(T)
+    svs._ap          .= zero(Float64)
+    svs._alias       .= zero(Int)
+    svs._larges      .= zero(Int)
+    svs._smalls      .= zero(Int)
     svs.state_vector[1] = one(T)
     svs.qubit_count = qubit_count
     svs.shots = shots

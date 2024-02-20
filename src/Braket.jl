@@ -83,6 +83,8 @@ function __init__()
     _simulator_devices[] = Dict()
 end
 
+qubit_count(o) = 0
+
 """
     Device
 
@@ -91,7 +93,7 @@ Abstract type representing a generic device which tasks (local or managed) may b
 abstract type Device end
 
 
-qubit_count(t) = throw(MethodError(qubit_count, t))
+#qubit_count(t) = throw(MethodError(qubit_count, t))
 chars(t) = (string(t),) 
 
 include("qubit_set.jl")

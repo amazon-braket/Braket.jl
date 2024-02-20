@@ -486,11 +486,13 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     end
     measured_qubits = r.measuredQubits
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
-        result_types = calculate_result_types(JSON3.read(JSON3.write(addl_mtd.action)), measurements, measured_qubits)
+        rebuilt_action = JSON3.read(JSON3.write(addl_mtd.action))
+        result_types = calculate_result_types(rebuilt_action, measurements, measured_qubits)
     else
         if !isempty(r.resultTypes) && !isnothing(r.resultTypes[1])
-            json_ = Dict("results"=>[rt.type for rt in r.resultTypes])
-            result_types = calculate_result_types(JSON3.read(JSON3.write(json_)), measurements, measured_qubits)
+            json_          = Dict("results"=>[rt.type for rt in r.resultTypes])
+            rebuilt_action = JSON3.read(JSON3.write(json_))
+            result_types   = calculate_result_types(rebuilt_action, measurements, measured_qubits)
         else
             result_types = r.resultTypes
         end

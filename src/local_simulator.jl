@@ -87,20 +87,33 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
 end
 
 function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
-    #=if haskey(properties(simulator).action, "braket.ir.openqasm.program")
+    if haskey(properties(simulator).action, "braket.ir.openqasm.program")
         validate_circuit_and_shots(circuit, shots)
-        program = ir(circuit, Val(:OpenQASM))
-        full_inputs = isnothing(program.inputs) ? inputs : merge(program.inputs, inputs)
+        program      = ir(circuit, Val(:OpenQASM))
+        full_inputs  = isnothing(program.inputs) ? inputs : merge(program.inputs, inputs)
         full_program = OpenQasmProgram(program.braketSchemaHeader, program.source, full_inputs) 
-        r = simulator(full_program, shots, args...; kwargs...)
+        r = simulator(full_program, args...; shots=shots, kwargs...)
         return format_result(r) 
-    else=#
-    if haskey(properties(simulator).action, "braket.ir.jaqcd.program")
+    elseif haskey(properties(simulator).action, "braket.ir.jaqcd.program")
         validate_circuit_and_shots(circuit, shots) 
         program = ir(circuit, Val(:JAQCD))
         qubits  = qubit_count(circuit)
         r       = simulator(program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
         return format_result(r)
+    else
+        throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
+    end
+end
+function _run_internal(simulator, program::OpenQasmProgram, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
+    if haskey(properties(simulator).action, "braket.ir.openqasm.program")
+        stats = @timed begin
+            simulator(program; shots=shots, inputs=inputs, kwargs...)
+        end
+        @debug "Time to invoke simulator: $(stats.time)"
+        r     = stats.value
+        stats = @timed format_result(r)
+        @debug "Time to format results: $(stats.time)"
+        return stats.value
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
@@ -111,10 +124,10 @@ function _run_internal(simulator, program::Program, args...; shots::Int=0, input
         @debug "Time to get qubit count: $(stats.time)"
         qubits  = stats.value
         stats = @timed begin
-            simulator(program, qubits, args...; shots=shots, kwargs...)
+            simulator(program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
         end
         @debug "Time to invoke simulator: $(stats.time)"
-        r       = stats.value
+        r     = stats.value
         stats = @timed format_result(r)
         @debug "Time to format results: $(stats.time)"
         return stats.value

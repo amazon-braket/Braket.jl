@@ -7,6 +7,7 @@ using Braket,
     StaticArrays,
     StatsBase,
     Combinatorics,
+    OpenQASM3,
     UUIDs,
     JSON3,
     Random,
@@ -35,6 +36,8 @@ Braket.name(s::AbstractSimulator) = device_id(s)
 ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubit_count : 0
 
 include("validation.jl")
+include("builtins.jl")
+include("openqasm.jl")
 
 const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 const CHUNK_SIZE = 2^10
@@ -47,8 +50,14 @@ function meminfo_julia()
     @info @sprintf "Max. RSS:  %9.3f MiB\n" Sys.maxrss() / 2^20
 end
 
-function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulator}
 
+function parse_program(d::D, program::OpenQasmProgram) where {D<:AbstractSimulator}
+    parsed_prog      = OpenQASM3.parse(program.source)
+    interpreted_circ = interpret(parsed_prog, extern_lookup=program.inputs)
+    if d.shots > 0
+        Braket.basis_rotation_instructions!(interpreted_circ)
+    end
+    return convert(Braket.Program, interpreted_circ)
 end
 
 function index_to_endian_bits(ix::Int, qc::Int)
@@ -62,15 +71,15 @@ end
 
 function _formatted_measurements(d::D) where {D<:AbstractSimulator}
     sim_samples = samples(d)
-    qc = qubit_count(d)
-    formatted = [index_to_endian_bits(sample, qc) for sample in sim_samples]
+    qc          = qubit_count(d)
+    formatted   = [index_to_endian_bits(sample, qc) for sample in sim_samples]
     return formatted
 end
 
 _get_measured_qubits(qc::Int) = collect(0:qc-1)
 function _bundle_results(
     results::Vector{Braket.ResultTypeValue},
-    circuit_ir::Union{Program,OpenQasmProgram},
+    circuit_ir::Program,
     d::D,
 ) where {D<:AbstractSimulator}
     task_mtd = Braket.TaskMetadata(
@@ -95,7 +104,46 @@ function _bundle_results(
         nothing,
     )
     formatted_samples = d.shots > 0 ? _formatted_measurements(d) : Vector{Int}[]
-    measured_qubits = collect(0:qubit_count(d)-1)
+    measured_qubits   = collect(0:qubit_count(d)-1)
+    return Braket.GateModelTaskResult(
+        Braket.header_dict[Braket.GateModelTaskResult],
+        formatted_samples,
+        nothing,
+        results,
+        measured_qubits,
+        task_mtd,
+        addl_mtd,
+    )
+end
+
+function _bundle_results(
+    results::Vector{Braket.ResultTypeValue},
+    circuit_ir::OpenQasmProgram,
+    d::D,
+) where {D<:AbstractSimulator}
+    task_mtd = Braket.TaskMetadata(
+        Braket.header_dict[Braket.TaskMetadata],
+        string(uuid4()),
+        d.shots,
+        device_id(d),
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+    )
+    addl_mtd = Braket.AdditionalMetadata(
+        circuit_ir,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+    )
+    formatted_samples = d.shots > 0 ? _formatted_measurements(d) : Vector{Int}[]
+    measured_qubits   = collect(0:qubit_count(d)-1)
     return Braket.GateModelTaskResult(
         Braket.header_dict[Braket.GateModelTaskResult],
         formatted_samples,
@@ -179,32 +227,6 @@ function classical_shadow(
     return all_outcomes, all_recipes
 end
 
-function (d::AbstractSimulator)(
-    circuit_ir::OpenQasmProgram,
-    args...;
-    shots::Int = 0,
-    kwargs...,
-)
-    circuit, qubit_count = parse_program(circuit_ir)
-    _validate_ir_results_compatibility(d, circuit.results, Val(:OpenQASM))
-    _validate_ir_instructions_compatibility(d, circuit, Val(:OpenQASM))
-    _validate_input_provided(circuit)
-    _validate_shots_and_ir_results(shots, circuit_ir.results, qubit_count)
-    operations = circuit.instructions
-    _validate_operation_qubits(operations)
-    results = circuit.results
-    reinit!(d, qubit_count, shots)
-    d = evolve!(d, operations)
-    if shots == 0
-        result_types = _translate_result_types(results, qubit_count)
-        _validate_result_types_qubits_exist(result_types, qubit_count)
-        results = _generate_results(circuit.results, result_types, d)
-    else
-        d = evolve!(d, circuit.basis_rotation_instructions)
-    end
-    return _bundle_results(results, circuit_ir, d)
-end
-
 function compute_shadows(
     d::AbstractSimulator,
     circuit_ir::Program,
@@ -248,10 +270,53 @@ function compute_shadows(
     return measurements
 end
 
+function _compute_exact_results(d::AbstractSimulator, program::Program, qc::Int, inputs::Dict{String, Float64})
+    result_types = _translate_result_types(program.results, qc)
+    _validate_result_types_qubits_exist(result_types, qc)
+    if program.results[1] isa Braket.IR.AdjointGradient
+        rt = result_types[1]
+        ev, grad =
+            calculate(rt, Vector{Instruction}(program.instructions), inputs, d)
+        result_val = Dict{String,Any}("expectation" => ev, "gradient" => grad)
+        return [Braket.ResultTypeValue(program.results[1], result_val)]
+    else
+        return _generate_results(program.results, result_types, d)
+    end
+end
+
+function (d::AbstractSimulator)(
+    circuit_ir::OpenQasmProgram;
+    shots::Int = 0,
+    kwargs...,
+)
+    program = parse_program(d, circuit_ir)
+    qc      = qubit_count(program)
+    _validate_ir_results_compatibility(d, program.results, Val(:JAQCD))
+    _validate_ir_instructions_compatibility(d, program, Val(:JAQCD))
+    _validate_shots_and_ir_results(shots, program.results, qc)
+    operations = program.instructions
+    if shots > 0 && !isempty(program.basis_rotation_instructions)
+        operations = vcat(operations, program.basis_rotation_instructions)
+    end
+    inputs        = isnothing(circuit_ir.inputs) ? Dict{String, Float64}() : Dict{String, Float64}(k=>v for (k,v) in circuit_ir.inputs)
+    symbol_inputs = Dict{Symbol,Number}(Symbol(k) => v for (k, v) in inputs)
+    operations    = [bind_value!(Instruction(op), symbol_inputs) for op in operations]
+    _validate_operation_qubits(operations)
+    reinit!(d, qc, shots)
+    stats = @timed begin
+        d = evolve!(d, operations)
+    end
+    @debug "Time for evolution: $(stats.time)"
+    results = shots == 0 && !isempty(program.results) ? _compute_exact_results(d, program, qc, inputs) : [Braket.ResultTypeValue(rt, 0.0) for rt in program.results]
+    stats   = @timed _bundle_results(results, circuit_ir, d)
+    @debug "Time for results bundling: $(stats.time)"
+    res = stats.value
+    return res
+end
+
 function (d::AbstractSimulator)(
     circuit_ir::Program,
-    qc::Int,
-    args...;
+    qc::Int;
     shots::Int = 0,
     kwargs...,
 )
@@ -271,20 +336,7 @@ function (d::AbstractSimulator)(
         d = evolve!(d, operations)
     end
     @debug "Time for evolution: $(stats.time)"
-    results = Braket.ResultTypeValue[]
-    if shots == 0 && !isempty(circuit_ir.results)
-        result_types = _translate_result_types(circuit_ir.results, qc)
-        _validate_result_types_qubits_exist(result_types, qc)
-        if circuit_ir.results[1] isa Braket.IR.AdjointGradient
-            rt = result_types[1]
-            ev, grad =
-                calculate(rt, Vector{Instruction}(circuit_ir.instructions), inputs, d)
-            result_val = Dict{String,Any}("expectation" => ev, "gradient" => grad)
-            results = [Braket.ResultTypeValue(circuit_ir.results[1], result_val)]
-        else
-            results = _generate_results(circuit_ir.results, result_types, d)
-        end
-    end
+    results = shots == 0 && !isempty(circuit_ir.results) ? _compute_exact_results(d, circuit_ir, qc, inputs) : Braket.ResultTypeValue[]
     stats = @timed _bundle_results(results, circuit_ir, d)
     @debug "Time for results bundling: $(stats.time)"
     res = stats.value

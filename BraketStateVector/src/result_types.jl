@@ -8,7 +8,7 @@ function make_alias_table!(
 )
     n = length(w)
     length(a) == length(alias) == n ||
-        throw(DimensionMismatch("Inconsistent array lengths."))
+        throw(DimensionMismatch("Inconsistent array lengths. length(a) = $(length(a)), length(alias) = $(length(alias)), n = $n"))
 
     ac = n / wsum
     a .= w .* ac
@@ -64,14 +64,14 @@ function alg3!(rng, n, x, p)
 end
 
 function samples(s::AbstractSimulator)
-    p = probabilities(s)
-    wv = Weights(p)
-    n = 2^s.qubit_count
-    rng = Random.TaskLocalRNG()
+    p   = probabilities(s)
+    wv  = Weights(p)
+    n   = 2^s.qubit_count
+    rng = Random.Xoshiro()
     if s.qubit_count < 30 # build alias tables etc
-        inds = 0:(n-1)
-        ap = s._ap
-        alias = s._alias
+        inds   = 0:(n-1)
+        ap     = s._ap
+        alias  = s._alias
         larges = s._larges
         smalls = s._smalls
         make_alias_table!(wv, sum(wv), ap, alias, larges, smalls)

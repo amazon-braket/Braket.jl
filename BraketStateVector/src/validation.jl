@@ -1,5 +1,5 @@
 function _validate_amplitude_states(states::Vector{String}, qubit_count::Int)
-    !all(length(state) == qubit_count for state in states) && throw(ErrorException())
+    !all(length(state) == qubit_count for state in states) && error("all states in $states must have length $qubit_count.")
     return
 end
 
@@ -10,10 +10,9 @@ function _validate_ir_results_compatibility(
 ) where {D<:AbstractSimulator}
     isempty(results) && return
 
-    circuit_result_types_name = [string(typeof(rt)) for rt in results]
-    supported_result_types =
-        properties(d).action["braket.ir.openqasm.program"].supportedResultTypes
-    supported_result_types_names = [string(srt) for srt in supported_result_types]
+    circuit_result_types_name    = [rt.type for rt in results]
+    supported_result_types       = properties(d).action["braket.ir.openqasm.program"].supportedResultTypes
+    supported_result_types_names = [lowercase(string(srt.name)) for srt in supported_result_types]
     for name in circuit_result_types_name
         name ∉ supported_result_types_names &&
             throw(ErrorException("result type $name not supported by $D"))
@@ -54,11 +53,11 @@ function _validate_shots_and_ir_results(shots::Int, results, qubit_count::Int)
         end
     end
 end
-function _validate_input_provided(circuit::Circuit)
+function _validate_input_provided(circuit)
     for instruction in circuit.instructions
         possible_parameters = Symbol("_angle"), Symbol("_angle_1"), Symbol("_angle_2")
         for parameter_name in possible_parameters
-            if parameter_name ∈ propertynames(instruction.op)
+            if parameter_name ∈ propertynames(instruction.operator)
                 try
                     Float64(param)
                 catch ex
