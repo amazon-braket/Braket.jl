@@ -213,20 +213,19 @@ get_tol(shots::Int) = return (
                 qasm = """
                     input float x;
                     input float y;
-                    qubit q;
-                    rx(x) q;
-                    rx(arccos(x)) q;
-                    rx(arcsin(x)) q;
-                    rx(arctan(x)) q; 
-                    rx(ceiling(x)) q;
-                    rx(cos(x)) q;
-                    rx(exp(x)) q;
-                    rx(floor(x)) q;
-                    rx(log(x)) q;
-                    rx(mod(x, y)) q;
-                    rx(sin(x)) q;
-                    rx(sqrt(x)) q;
-                    rx(tan(x)) q;
+                    rx(x) \$0;
+                    rx(arccos(x)) \$0;
+                    rx(arcsin(x)) \$0;
+                    rx(arctan(x)) \$0; 
+                    rx(ceiling(x)) \$0;
+                    rx(cos(x)) \$0;
+                    rx(exp(x)) \$0;
+                    rx(floor(x)) \$0;
+                    rx(log(x)) \$0;
+                    rx(mod(x, y)) \$0;
+                    rx(sin(x)) \$0;
+                    rx(sqrt(x)) \$0;
+                    rx(tan(x)) \$0;
                     """
                 parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
                 x = 1.0
@@ -272,21 +271,23 @@ get_tol(shots::Int) = return (
             """
             parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
             circuit     = BraketStateVector.interpret(parsed_prog)
-            @test circuit.instructions == [
-                                           Instruction(BitFlip(0.5), [1]),
-                                           Instruction(PhaseFlip(0.5), [0]),
-                                           Instruction(PauliChannel(0.1, 0.2, 0.3), [0]),
-                                           Instruction(Depolarizing(0.5), [0]),
-                                           Instruction(TwoQubitDepolarizing(0.9), (0, 1)).
-                                           Instruction(TwoQubitDepolarizing(0.7), [1, 0]),
-                                           Instruction(TwoQubitDephasing(0.6), [0, 1]),
-                                           Instruction(AmplitudeDamping(0.2), [0]),
-                                           Instruction(GeneralizedAmplitudeDamping(0.2, 0.3), [1]),
-                                           Instruction(PhaseDamping(0.4), [0]),
-                                           Instruction(Kraus([[0.9486833im 0; 0 0.9486833im], [0 0.31622777; 0.31622777 0]]), [0]),
-                                           Kraus([diagm(fill(√0.9, 4)), √0.1*kron([1.0 0.0; 0.0 1.0], [0.0 1.0; 1.0 0.0])], [1, 0])
-                                          ]
-
+            inst_list   = [Instruction(BitFlip(0.5), [1]),
+                           Instruction(PhaseFlip(0.5), [0]),
+                           Instruction(PauliChannel(0.1, 0.2, 0.3), [0]),
+                           Instruction(Depolarizing(0.5), [0]),
+                           Instruction(TwoQubitDepolarizing(0.9), [0, 1]),
+                           Instruction(TwoQubitDepolarizing(0.7), [1, 0]),
+                           Instruction(TwoQubitDephasing(0.6), [0, 1]),
+                           Instruction(AmplitudeDamping(0.2), [0]),
+                           Instruction(GeneralizedAmplitudeDamping(0.2, 0.3), [1]),
+                           Instruction(PhaseDamping(0.4), [0]),
+                           Instruction(Kraus([[0.9486833im 0; 0 0.9486833im], [0 0.31622777; 0.31622777 0]]), [0]),
+                           Instruction(Kraus([diagm(fill(√0.9, 4)), √0.1*kron([1.0 0.0; 0.0 1.0], [0.0 1.0; 1.0 0.0])]), [1, 0]),
+                          ]
+            @testset "Operator $(typeof(ix.operator)), target $(ix.target)" for (cix, ix) in zip(circuit.instructions, inst_list)
+                @test cix.operator == ix.operator
+                @test cix.target == ix.target
+            end
         end
         @testset "Basis rotations" begin
             @testset "StandardObservables" begin
@@ -351,6 +352,42 @@ get_tol(shots::Int) = return (
                     @test ix.target == bix.target
                 end
             end
+        end
+        @testset "Output" begin
+            qasm = """
+                   output int[8] out_int;
+                   """
+            parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
+            @test_throws ErrorException("Output not supported.") BraketStateVector.interpret(parsed_prog)
+        end
+        @testset "Input" begin
+            qasm = """
+            input int[8] in_int;
+            input bit[8] in_bit;
+            int[8] doubled;
+
+            doubled = in_int * 2;
+            """
+            in_bit = 0b10110010
+            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+            @testset for in_int in (0, 1, -2, 5)
+                inputs     = Dict("in_int"=>in_int, "in_bit"=>in_bit)
+                global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(inputs)
+                wo = BraketStateVector.WalkerOutput()
+                BraketStateVector.interpret!(wo, parsed_qasm, global_ctx)
+                @test global_ctx.definitions["doubled"].value == in_int * 2
+                @test global_ctx.definitions["in_bit"].value == in_bit
+            end
+        end
+        @testset "Physical qubits" begin
+            qasm = """
+            h $0;
+            cnot $0, $1;
+            """
+            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+            circuit     = BraketStateVector.interpret(parsed_qasm)
+            expected_circuit = Circuit([(H, 0), (CNot, 0, 1)])
+            @test circuit == expected_circuit
         end
     end
 end
