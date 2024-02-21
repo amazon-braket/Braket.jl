@@ -5,6 +5,9 @@ function _check_annotations(node)
     return nothing
 end
 
+abstract type AbstractExtLookup end
+struct LookupScalar <: AbstractExtLookup end
+
 struct WalkerOutput
     ixs::Vector{Instruction}
     results::Vector{Braket.Result}
@@ -149,6 +152,7 @@ end
 
 const NumberLiteral = Union{OpenQASM3.IntegerLiteral, OpenQASM3.FloatLiteral, OpenQASM3.BooleanLiteral, OpenQASM3.BitstringLiteral}
 evaluate_classical_expression(node::T, _) where {T<:NumberLiteral} = node.value
+evaluate_classical_expression(node::T, _) where {T<:Number} = node
 _check_def_value(def::Nothing, name::String, span) = error("'$name' referenced in $span, but not defined.")
 _check_def_value(def, name::String, span) = ismissing(def.value) ? error("Uninitialized variable `$name` used in $span.") : nothing
 function evaluate_classical_expression(node::OpenQASM3.Identifier, ctx::AbstractQASMContext)
@@ -358,10 +362,11 @@ end
 
 function parse_pragma(::Val{:noise}, output::WalkerOutput, body::String, ctx::AbstractQASMContext)
     stripped_body, arg = get_pragma_arg(String(chopprefix(body, "noise ")))
-    split_body = split(stripped_body, " ")
+    split_body = filter(!isempty, split(stripped_body, " "))
     qubits = map(split_body[2:end]) do q_name
-        clean_name =  String(replace(q_name, ","=>""))
-        return [ctx.qubit_mapping[q] for q in resolve_qubit(clean_name, ctx)]
+        clean_name = String(replace(q_name, ","=>""))
+        r_qubits   = resolve_qubit(clean_name, ctx)
+        return [ctx.qubit_mapping[q] for q in r_qubits]
     end
     targets    = collect(Iterators.flatten(qubits))
     raw_op     = split_body[1]
@@ -419,7 +424,7 @@ interpret!(output::WalkerOutput, node::OpenQASM3.ClassicalDeclaration, ctx::Abst
 interpret!(output::WalkerOutput, node::OpenQASM3.ConstantDeclaration, ctx::AbstractQASMContext) = interpret!(output, node, node.type, ctx)
 
 function _lookup_ext_scalar(name, ctx::QASMGlobalContext)
-    val = ctx.ext_lookup(LookupScalar(), name)
+    val = ctx.ext_lookup[name]
     isnothing(val) || val isa Number || error("QASM program expects '$name' to be a scalar. Got '$val'.")
     return val
 end
@@ -433,7 +438,7 @@ function interpret!(output::WalkerOutput, node::OpenQASM3.IODeclaration, ctx::Ab
         if node.type isa OpenQASM3.ClassicalType
             val = _lookup_ext_scalar(name, ctx)
             isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
-            scalar_matches_type(node.type, i, "Input variable $name at $(node.span): type does not match ")
+            scalar_matches_type(node.type, val, "Input variable $name at $(node.span): type does not match ")
             _check_undefined(node, name, ctx)
             ctx.definitions[name] = ClassicalDef(val, node.type, ClassicalInput)
             return nothing
@@ -463,7 +468,13 @@ function interpret!(output::WalkerOutput, node::OpenQASM3.QuantumGate, ctx::Abst
     resolved_qubits  = [resolve_qubit(q, ctx) for q in node.qubits]
     gate_qubits      = [ctx.qubit_mapping[q] for q in Iterators.flatten(resolved_qubits)]
     gate_mods        = node.modifiers
-    gate_args        = map(a->evaluate_classical_expression(a, ctx), node.arguments)
+    gate_args        = map(node.arguments) do a
+        if a isa OpenQASM3.FunctionCall
+            return interpret!(output, a, ctx)
+        else
+            return evaluate_classical_expression(a, ctx)
+        end
+    end
     braket_gate_type = Braket.StructTypes.subtypes(Braket.Gate)[Symbol(gate_name)]
     braket_gate      = braket_gate_type(gate_args...)
     if qubit_count(braket_gate) == 1 && length(gate_qubits) > 1
@@ -642,6 +653,17 @@ function resolve_qubit(node::OpenQASM3.IndexedIdentifier, ctx::AbstractQASMConte
 end
 function resolve_qubit(q::String, ctx::AbstractQASMContext, span=())
     _is_hardware_qubit(q) && return [q]
+    # indexed with range
+    if occursin(":", q)
+        ix_range = chop(match(r"\[([^\)]+)\]", q).match, head=1, tail=1)
+        ixs = split(ix_range, ":")
+        ix_stop  = tryparse(Int, ixs[end])
+        ix_start = tryparse(Int, ixs[1])
+        ix_step  = length(ixs) == 3 ? tryparse(Int, ixs[2]) : 1
+        stripped_q = replace(q, r"\[([^\)]+)\]"=>"")
+        full_qs = [resolve_qubit(stripped_q * "[$i]", ctx, span) for i in range(ix_start, ix_stop, step=ix_step)]
+        return collect(Iterators.flatten(full_qs)) 
+    end
     def = lookup_def(QubitDef, q, ctx; span=span)
     isnothing(def) && error("Qubit $q not defined.")
     if length(def) == 1
@@ -733,6 +755,7 @@ function interpret!(wo::WalkerOutput, node::OpenQASM3.QubitDeclaration, ctx::QAS
     if num_qubits == 1
         ctx.qubit_mapping[qname] = ctx.n_qubits
         ctx.n_qubits += 1
+        ctx.definitions[qname] = QubitDef(1)
     else
         for q in 0:num_qubits-1
             ctx.definitions[qname*"[$q]"] = QubitDef(1)

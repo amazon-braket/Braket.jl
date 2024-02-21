@@ -1,5 +1,7 @@
 using Test, Statistics, LinearAlgebra, BraketStateVector.OpenQASM3, BraketStateVector, Braket, Braket.Observables
 
+using Braket: Instruction
+
 get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
 )
@@ -211,20 +213,20 @@ get_tol(shots::Int) = return (
                 qasm = """
                     input float x;
                     input float y;
-
-                    rx(x) \$0;
-                    rx(arccos(x)) \$0;
-                    rx(arcsin(x)) \$0;
-                    rx(arctan(x)) \$0;
-                    rx(ceiling(x)) \$0;
-                    rx(cos(x)) \$0;
-                    rx(exp(x)) \$0;
-                    rx(floor(x)) \$0;
-                    rx(log(x)) \$0;
-                    rx(mod(x, y)) \$0;
-                    rx(sin(x)) \$0;
-                    rx(sqrt(x)) \$0;
-                    rx(tan(x)) \$0;
+                    qubit q;
+                    rx(x) q;
+                    rx(arccos(x)) q;
+                    rx(arcsin(x)) q;
+                    rx(arctan(x)) q; 
+                    rx(ceiling(x)) q;
+                    rx(cos(x)) q;
+                    rx(exp(x)) q;
+                    rx(floor(x)) q;
+                    rx(log(x)) q;
+                    rx(mod(x, y)) q;
+                    rx(sin(x)) q;
+                    rx(sqrt(x)) q;
+                    rx(tan(x)) q;
                     """
                 parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
                 x = 1.0
@@ -298,7 +300,13 @@ get_tol(shots::Int) = return (
                 """
                 parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
                 circuit      = BraketStateVector.interpret(parsed_prog)
-                @test circuit.basis_rotation_instructions == vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
+                Braket.basis_rotation_instructions!(circuit)
+                c_bris = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketStateVector.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
+                bris   = vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
+                for (ix, bix) in zip(c_bris, bris)
+                    @test BraketStateVector.matrix_rep(ix.operator) ≈ transpose(BraketStateVector.matrix_rep(bix.operator))
+                    @test ix.target == bix.target
+                end
             end
             @testset "Identity" begin
                 qasm = """
@@ -311,7 +319,13 @@ get_tol(shots::Int) = return (
                 """
                 parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
                 circuit      = BraketStateVector.interpret(parsed_prog)
-                @test circuit.basis_rotation_instructions == vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
+                Braket.basis_rotation_instructions!(circuit)
+                c_bris = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketStateVector.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
+                bris   = vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
+                for (ix, bix) in zip(c_bris, bris)
+                    @test BraketStateVector.matrix_rep(ix.operator) ≈ transpose(BraketStateVector.matrix_rep(bix.operator))
+                    @test ix.target == bix.target
+                end
             end
             @testset "Hermitian" begin
                 qasm = """
@@ -325,12 +339,17 @@ get_tol(shots::Int) = return (
                 """
                 parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
                 circuit      = BraketStateVector.interpret(parsed_prog)
+                Braket.basis_rotation_instructions!(circuit)
                 arr = [-6 2+1im -3 -5+2im;
                         2-1im 0 2-1im -5+4im;
                        -3 2+1im 0 -4+3im;
                        -5-2im -5-4im -4-3im -6]
                 h = Braket.Observables.HermitianObservable(arr)
-                @test circuit.basis_rotation_instructions == vcat(Instruction(H(), [2]), BraketStateVector.diagonalizing_gates(h, [0, 1]))
+                bris = vcat(BraketStateVector.diagonalizing_gates(h, [0, 1]), Instruction(H(), [2]))
+                for (ix, bix) in zip(circuit.basis_rotation_instructions, bris)
+                    @test BraketStateVector.matrix_rep(ix.operator) ≈ adjoint(BraketStateVector.matrix_rep(bix.operator))
+                    @test ix.target == bix.target
+                end
             end
         end
     end

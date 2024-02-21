@@ -118,7 +118,7 @@ using LinearAlgebra: eigvals
     end
     @testset "OpenQASM" begin
         @testset for ir_bolus in [
-            (Observables.I(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [3], "i(q[3])"),
+            ( Observables.I(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [3], "i(q[3])"),
             ( Observables.I(), OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), [3], "i(\$3)"),
             ( Observables.I(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), nothing, "i all"),
             ( Observables.X(), OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), [3], "x(q[3])"),
