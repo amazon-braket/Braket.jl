@@ -191,23 +191,22 @@ get_tol(shots::Int) = return (
                 """
             parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
             global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
-            wo = BraketStateVector.WalkerOutput()
-            BraketStateVector.interpret!(wo, parsed_qasm, global_ctx)
-            @test global_ctx.definitions["arccos_result"].value == acos(1)
-            @test global_ctx.definitions["arcsin_result"].value == asin(1)
-            @test global_ctx.definitions["arctan_result"].value == atan(1)
-            @test global_ctx.definitions["ceiling_result"].value == 4
-            @test global_ctx.definitions["cos_result"].value == cos(1)
-            @test global_ctx.definitions["exp_result"].value == exp(2)
-            @test global_ctx.definitions["floor_result"].value == 3
-            @test global_ctx.definitions["log_result"].value == 1
-            @test global_ctx.definitions["mod_int_result"].value == 1
-            @test global_ctx.definitions["mod_float_result"].value == mod(5.2, 2.5)
-            @test global_ctx.definitions["popcount_bit_result"].value == 4
-            @test global_ctx.definitions["popcount_int_result"].value == 4
-            @test global_ctx.definitions["sin_result"].value == sin(1)
-            @test global_ctx.definitions["sqrt_result"].value == sqrt(2)
-            @test global_ctx.definitions["tan_result"].value == tan(1)
+            global_ctx(parsed_qasm)
+            @test global_ctx.definitions["arccos_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(acos(1))
+            @test global_ctx.definitions["arcsin_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(asin(1))
+            @test global_ctx.definitions["arctan_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(atan(1))
+            @test global_ctx.definitions["ceiling_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
+            @test global_ctx.definitions["cos_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(cos(1))
+            @test global_ctx.definitions["exp_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(exp(2))
+            @test global_ctx.definitions["floor_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(3)
+            @test global_ctx.definitions["log_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(1.0)
+            @test global_ctx.definitions["mod_int_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(1)
+            @test global_ctx.definitions["mod_float_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(mod(5.2, 2.5))
+            @test global_ctx.definitions["popcount_bit_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
+            @test global_ctx.definitions["popcount_int_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
+            @test global_ctx.definitions["sin_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(sin(1))
+            @test global_ctx.definitions["sqrt_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(sqrt(2))
+            @test global_ctx.definitions["tan_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(tan(1))
 
             @testset "Symbolic" begin
                 qasm = """
@@ -373,8 +372,7 @@ get_tol(shots::Int) = return (
             @testset for in_int in (0, 1, -2, 5)
                 inputs     = Dict("in_int"=>in_int, "in_bit"=>in_bit)
                 global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(inputs)
-                wo = BraketStateVector.WalkerOutput()
-                BraketStateVector.interpret!(wo, parsed_qasm, global_ctx)
+                global_ctx(parsed_qasm)
                 @test global_ctx.definitions["doubled"].value == in_int * 2
                 @test global_ctx.definitions["in_bit"].value == in_bit
             end
@@ -504,8 +502,7 @@ get_tol(shots::Int) = return (
             """
             parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
             global_ctx  = BraketStateVector.QASMGlobalContext{Braket.Operator}()
-            wo          = BraketStateVector.WalkerOutput()
-            BraketStateVector.interpret!(wo, parsed_qasm, global_ctx)
+            global_ctx(parsed_qasm)
             @test global_ctx.definitions["total_1"].value == 15
             @test global_ctx.definitions["total_2"].value == 55
         end
@@ -528,8 +525,7 @@ get_tol(shots::Int) = return (
             """
             parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
             global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
-            wo = BraketStateVector.WalkerOutput()
-            BraketStateVector.interpret!(wo, parsed_qasm, global_ctx)
+            global_ctx(parsed_qasm)
             @test global_ctx.definitions["array_1"].value == zeros(Int, 5) 
             @test global_ctx.definitions["array_2"].value == zeros(Int, 10) 
             @test global_ctx.definitions["array_3"].value == [1, 2, 3, 4, 0, 6, 0, 8, 0, 10]
