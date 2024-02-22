@@ -48,6 +48,7 @@ for gate_def in (
             $G(angle::T) where {T<:NTuple{$n_angle, Union{Float64, FreeParameter}}} = new(angle)
         end
         $G(angles::Vararg{Union{Float64, FreeParameter}}) = $G(tuple(angles...))
+        $G(angles::Vararg{Number}) = $G((Float64(a) for a in angles)...)
         chars(::Type{$G}) = $c
         qubit_count(::Type{$G}) = $qc
     end

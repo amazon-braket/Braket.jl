@@ -61,7 +61,7 @@ Base.push!(m::Moments, ixs::Vector{Instruction}, mt::MomentType_enum=mtGateNoise
 
 function add_noise!(m::Moments, ix::Instruction, input_type::String="noise", noise_index::Int=0)
     qubits = QubitSet(ix.target)
-    time = max(0, prod(get(m._max_times, q, -1) for q in qubits))
+    time   = max(0, prod(get(m._max_times, q, -1) for q in qubits, init=1))
     if MomentType_toenum[input_type] == mtInitializationNoise
         time = 0
     end

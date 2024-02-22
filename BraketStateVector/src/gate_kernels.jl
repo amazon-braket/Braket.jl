@@ -146,7 +146,7 @@ for (G, g_mat) in (
 end
 
 function apply_gate!(
-    g_mat::SMatrix{2,2,T},
+    g_mat::Union{SMatrix{2,2,T}, Diagonal{T,SVector{2,T}}},
     state_vec::StateVector{T},
     qubit::Int,
 ) where {T<:Complex}

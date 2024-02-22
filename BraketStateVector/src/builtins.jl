@@ -1,6 +1,5 @@
-
-Base.sizeof(array::OpenQASM3.ArrayLiteral, dim::OpenQASM3.IntegerLiteral = OpenQASM3.IntegerLiteral(0)) = return dim.value == 0 ? OpenQASM3.IntegerLiteral(length(array.values)) : sizeof(array.values[1], OpenQASM3.IntegerLiteral(dim.value - 1))
-Base.sizeof(array::OpenQASM3.ArrayLiteral, ::Nothing) = return OpenQASM3.IntegerLiteral(length(array.values))
+Base.size(array::OpenQASM3.ArrayLiteral, dim::OpenQASM3.IntegerLiteral = OpenQASM3.IntegerLiteral(0)) = return dim.value == 0 ? OpenQASM3.IntegerLiteral(length(array.values)) : size(array.values[1], OpenQASM3.IntegerLiteral(dim.value - 1))
+Base.size(array::OpenQASM3.ArrayLiteral, ::Nothing) = return OpenQASM3.IntegerLiteral(length(array.values))
 Base.acos(x::OpenQASM3.FloatLiteral) = OpenQASM3.FloatLiteral(acos(x.value))
 Base.asin(x::OpenQASM3.FloatLiteral) = OpenQASM3.FloatLiteral(asin(x.value))
 Base.atan(x::OpenQASM3.FloatLiteral) = OpenQASM3.FloatLiteral(atan(x.value))
@@ -30,7 +29,7 @@ popcount(x::OpenQASM3.IntegerLiteral)   = OpenQASM3.IntegerLiteral(count('1', bi
 popcount(x::OpenQASM3.BitstringLiteral) = OpenQASM3.IntegerLiteral(count('1', bitstring(x.value)))
 popcount(x::Real) = count('1', bitstring(x))
 
-const builtin_functions = Dict{String, Function}("sizeof"=>sizeof,
+const builtin_functions = Dict{String, Function}("sizeof"=>size,
                                                  "arccos"=>acos,
                                                  "arcsin"=>asin,
                                                  "arctan"=>atan,
