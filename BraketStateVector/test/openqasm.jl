@@ -251,6 +251,21 @@ get_tol(shots::Int) = return (
                 @test circuit == c
             end
         end
+        @testset "Adjoint Gradient pragma" begin
+            qasm = """
+            input float theta;
+            qubit[4] q;
+            rx(theta) q[0];
+            #pragma braket result adjoint_gradient expectation(-6 * y(q[0]) @ i(q[1]) + 0.75 * y(q[2]) @ z(q[3])) theta
+            """
+            parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+            circuit     = BraketStateVector.interpret(parsed_prog, extern_lookup=Dict("theta"=>0.1))
+            θ           = FreeParameter("theta")
+            obs         = -2 * Braket.Observables.Y() * (3 * Braket.Observables.I()) + 0.75 * Braket.Observables.Y() * Braket.Observables.Z()
+            @test circuit.result_types[1].observable == obs
+            @test circuit.result_types[1].targets == [QubitSet([0, 1]), QubitSet([2, 3])]
+            @test circuit.result_types[1].parameters == ["theta"]
+        end
         @testset "Noise" begin
             qasm = """
             qubit[2] qs;

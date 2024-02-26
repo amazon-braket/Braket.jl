@@ -238,11 +238,11 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.IndexExpression)
     return collect(Iterators.flatten(mapped_pairs))
 end
 
-#=function (ctx::AbstractQASMContext)(node::OpenQASM3.ExpressionStatement)
+function (ctx::AbstractQASMContext)(node::OpenQASM3.ExpressionStatement)
     _check_annotations(node)
     ctx(node.expression)
     return
-end=#
+end
 
 function (ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression)
     left   = ctx(node.lhs)
@@ -262,7 +262,7 @@ end
 
 function (ctx::AbstractQASMContext)(node::OpenQASM3.UnaryExpression)
     operand = ctx(node.expression)
-    opname = id(node.op)
+    opname  = id(node.op)
     opname != "-" && error("Unary op $(node.op) not yet implemented.")
     return -operand
 end
@@ -303,7 +303,22 @@ function get_pragma_arg(body::String)
 end
 get_pragma_arg(body) = get_pragma_arg(String(body))
 function (ctx::AbstractQASMContext)(::Val{:adjoint_gradient}, body::AbstractString)
-
+    chopped_body = replace(chopprefix(body, "adjoint_gradient "), "\""=>"")
+    segment_start = findfirst('(', chopped_body)
+    segment_end   = findlast(')', chopped_body)
+    # handle arg as OQ3 string 
+    op_chunk = split(chopped_body[segment_start+1:segment_end-1], '+')
+    ops = []
+    targets = Vector{Int}[]
+    for chunk in op_chunk
+        op, qubit = ctx(Val(:operator), String(chunk))
+        push!(ops, op) 
+        push!(targets, qubit) 
+    end
+    params_str = chopped_body[segment_end+1:end]
+    params     = filter(!isempty, String.(split(params_str, " ")))
+    push!(ctx, Braket.AdjointGradient(sum(ops), targets, params))
+    return
 end
 
 function (ctx::AbstractQASMContext)(::Val{:amplitude}, body::AbstractString)
@@ -345,6 +360,21 @@ function parse_hermitian(arg)
     return mat
 end
 
+function parse_standard_op(str::AbstractString)
+    if occursin('*', str)
+        clean_str = replace(str, " "=>"")
+        coeff = tryparse(Float64, split(clean_str, '*')[1])
+        op = Braket.StructTypes.constructfrom(Braket.Observables.Observable, string(split(clean_str, '*')[end]))
+    elseif occursin('-', str)
+        coeff = -1.0
+        op = Braket.StructTypes.constructfrom(Braket.Observables.Observable, string(split(str, '-')[end]))
+    else
+        coeff = 1.0
+        op = Braket.StructTypes.constructfrom(Braket.Observables.Observable, string(str[1]))
+    end
+    return coeff * op
+end
+
 function parse_individual_op(op_str::AbstractString, ctx::AbstractQASMContext)
     head_chop = startswith(op_str, ' ') ? 1 : 0
     tail_chop = endswith(op_str, ' ') ? 1 : 0
@@ -352,7 +382,7 @@ function parse_individual_op(op_str::AbstractString, ctx::AbstractQASMContext)
     stripped_op, arg = get_pragma_arg(clean_op)
     clean_arg        = isnothing(arg) ? nothing : replace(arg, "("=>"", ")"=>"")
     is_hermitian     = startswith(stripped_op, "hermitian")
-    op = is_hermitian ? parse_hermitian(clean_arg) : Braket.StructTypes.constructfrom(Braket.Observables.Observable, string(stripped_op[1]))
+    op = is_hermitian ? parse_hermitian(clean_arg) : parse_standard_op(stripped_op)
     qubits = nothing
     if is_hermitian || !isnothing(arg)
         qubit_str = is_hermitian ? replace(stripped_op, "hermitian "=>"") : clean_arg
@@ -513,14 +543,12 @@ end
 
 function (ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration, name::String)
     if node.io_identifier == OpenQASM3.IOKeyword.input
-        if node.type isa OpenQASM3.ClassicalType
-            val = _lookup_ext_scalar(name, ctx)
-            isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
-            scalar_matches_type(node.type, val, "Input variable $name at $(node.span): type does not match ")
-            ctx.definitions[name] = ClassicalDef(val, node.type, ClassicalInput)
-            return nothing
-        end
-        error("Unsupported input type at $(node.span).")
+        !(node.type isa OpenQASM3.ClassicalType) && error("Unsupported input type at $(node.span).")
+        val = _lookup_ext_scalar(name, ctx)
+        isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
+        scalar_matches_type(node.type, val, "Input variable $name at $(node.span): type does not match ")
+        ctx.definitions[name] = ClassicalDef(val, node.type, ClassicalInput)
+        return nothing
     elseif node.io_identifier == OpenQASM3.IOKeyword.output
         error("Output not supported.")
     end
@@ -719,6 +747,10 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.WhileLoop)
             end
         end
     end
+    # update variables in the parent defs
+    for k in intersect(keys(ctx.definitions), keys(block_ctx.definitions))
+        ctx.definitions[k] = block_ctx.definitions[k]
+    end
     return nothing
 end
 
@@ -780,7 +812,7 @@ function (ctx::AbstractQASMContext)(node::Union{OpenQASM3.QuantumMeasurement, Op
     return nothing
 end
 
-function (ctx::QASMSubroutineContext)(node::Union{OpenQASM3.ReturnStatement, OpenQASM3.ExpressionStatement})
+function (ctx::QASMSubroutineContext)(node::OpenQASM3.ReturnStatement)
     _check_annotations(node)
     return ctx(node.expression)
 end
@@ -867,18 +899,13 @@ end
 function Base.collect(ctx::QASMGlobalContext)
     c = Circuit()
     wo = output(ctx)
-    for ix in wo.ixs
-        Braket.add_instruction!(c, ix)
-    end
-    for rt in wo.results
-        Braket.add_result_type!(c, rt)
-    end
+    foreach(ix->Braket.add_instruction!(c, ix), wo.ixs)
+    foreach(rt->Braket.add_result_type!(c, rt), wo.results)
     return c
 end
 function interpret(program::OpenQASM3.Program; extern_lookup=Dict{String,Float64}())
     global_ctx = QASMGlobalContext{Braket.Operator}(extern_lookup)
     # walk the nodes recursively
     global_ctx(program)
-    c = collect(global_ctx)
-    return c
+    return collect(global_ctx)
 end
