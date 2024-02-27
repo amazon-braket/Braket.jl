@@ -20,6 +20,7 @@ import Braket:
     OpenQasmProgram,
     apply_gate!,
     apply_noise!,
+    qubit_count,
     I,
     device_id,
     bind_value!

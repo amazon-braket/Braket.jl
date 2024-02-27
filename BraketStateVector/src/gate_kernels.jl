@@ -384,6 +384,13 @@ end
 # arbitrary number of targets
 for (V, f) in ((false, :identity), (true, :conj))
     @eval begin
+        apply_gate!(
+            ::Val{$V},
+            g::Control{G, B},
+            state_vec::StateVector{T},
+            qubits::Int...,
+        ) where {T<:Complex, G<:Gate, B} =
+            apply_controlled_gate!(Val($V), Val(B), g, g.g, state_vec, qubits...)
         function apply_gate!(
             ::Val{$V},
             g::Unitary,

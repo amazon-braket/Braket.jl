@@ -83,7 +83,7 @@ function __init__()
     _simulator_devices[] = Dict()
 end
 
-qubit_count(o) = 0
+qubit_count(o) = throw(MethodError(qubit_count, (o,)))
 
 """
     Device

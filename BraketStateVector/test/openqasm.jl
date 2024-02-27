@@ -6,30 +6,32 @@ get_tol(shots::Int) = return (
     shots > 0 ? Dict("atol" => 0.1, "rtol" => 0.15) : Dict("atol" => 0.01, "rtol" => 0)
 )
 @testset "OpenQASM" begin
-    qasm_str = """
-    OPENQASM 3.0;
-    def bell(qubit q0, qubit q1) {
-        h q0;
-        cnot q0, q1;
-    }
-    def n_bells(int[32] n, qubit q0, qubit q1) {
-        for int i in [0:n - 1] {
+    @testset "For loop and subroutines" begin
+        qasm_str = """
+        OPENQASM 3.0;
+        def bell(qubit q0, qubit q1) {
             h q0;
             cnot q0, q1;
         }
-    }
-    qubit[4] __qubits__;
-    bell(__qubits__[0], __qubits__[1]);
-    n_bells(5, __qubits__[2], __qubits__[3]);
-    bit[4] __bit_0__ = "0000";
-    __bit_0__[0] = measure __qubits__[0];
-    __bit_0__[1] = measure __qubits__[1];
-    __bit_0__[2] = measure __qubits__[2];
-    __bit_0__[3] = measure __qubits__[3];
-    """
-    braket_circ = Circuit([(H, 0), (CNot, 0, 1), (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3)])
-    parsed_circ = BraketStateVector.interpret(BraketStateVector.OpenQASM3.parse(qasm_str), extern_lookup=Dict("theta"=>0.2))
-    @test ir(parsed_circ, Val(:JAQCD)) == Braket.Program(braket_circ)
+        def n_bells(int[32] n, qubit q0, qubit q1) {
+            for int i in [0:n - 1] {
+                h q0;
+                cnot q0, q1;
+            }
+        }
+        qubit[4] __qubits__;
+        bell(__qubits__[0], __qubits__[1]);
+        n_bells(5, __qubits__[2], __qubits__[3]);
+        bit[4] __bit_0__ = "0000";
+        __bit_0__[0] = measure __qubits__[0];
+        __bit_0__[1] = measure __qubits__[1];
+        __bit_0__[2] = measure __qubits__[2];
+        __bit_0__[3] = measure __qubits__[3];
+        """
+        braket_circ = Circuit([(H, 0), (CNot, 0, 1), (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3),  (H, 2), (CNot, 2, 3)])
+        parsed_circ = BraketStateVector.interpret(BraketStateVector.OpenQASM3.parse(qasm_str), extern_lookup=Dict("theta"=>0.2))
+        @test ir(parsed_circ, Val(:JAQCD)) == Braket.Program(braket_circ)
+    end
     @testset "Parsing Hermitian observables" begin
         three_qubit_circuit(
             θ::Float64,
@@ -167,383 +169,427 @@ get_tol(shots::Int) = return (
                 end
             end
         end
-        @testset "Builtin functions" begin
-            qasm = """
-                const float[64] arccos_result = arccos(1);
-                const float[64] arcsin_result = arcsin(1);
-                const float[64] arctan_result = arctan(1);
-                const int[64] ceiling_result = ceiling(π);
-                const float[64] cos_result = cos(1);
-                const float[64] exp_result = exp(2);
-                const int[64] floor_result = floor(π);
-                const float[64] log_result = log(ℇ);
-                const int[64] mod_int_result = mod(4, 3);
-                const float[64] mod_float_result = mod(5.2, 2.5);
-                const int[64] popcount_bit_result = popcount("1001110");
-                const int[64] popcount_int_result = popcount(78);
-                // parser gets confused by pow
-                // const int[64] pow_int_result = pow(3, 3);
-                // const float[64] pow_float_result = pow(2.5, 2.5);
-                // add rotl, rotr
-                const float[64] sin_result = sin(1);
-                const float[64] sqrt_result = sqrt(2);
-                const float[64] tan_result = tan(1);
-                """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
-            global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
-            global_ctx(parsed_qasm)
-            @test global_ctx.definitions["arccos_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(acos(1))
-            @test global_ctx.definitions["arcsin_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(asin(1))
-            @test global_ctx.definitions["arctan_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(atan(1))
-            @test global_ctx.definitions["ceiling_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
-            @test global_ctx.definitions["cos_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(cos(1))
-            @test global_ctx.definitions["exp_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(exp(2))
-            @test global_ctx.definitions["floor_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(3)
-            @test global_ctx.definitions["log_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(1.0)
-            @test global_ctx.definitions["mod_int_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(1)
-            @test global_ctx.definitions["mod_float_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(mod(5.2, 2.5))
-            @test global_ctx.definitions["popcount_bit_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
-            @test global_ctx.definitions["popcount_int_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
-            @test global_ctx.definitions["sin_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(sin(1))
-            @test global_ctx.definitions["sqrt_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(sqrt(2))
-            @test global_ctx.definitions["tan_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(tan(1))
-
-            @testset "Symbolic" begin
-                qasm = """
-                    input float x;
-                    input float y;
-                    rx(x) \$0;
-                    rx(arccos(x)) \$0;
-                    rx(arcsin(x)) \$0;
-                    rx(arctan(x)) \$0; 
-                    rx(ceiling(x)) \$0;
-                    rx(cos(x)) \$0;
-                    rx(exp(x)) \$0;
-                    rx(floor(x)) \$0;
-                    rx(log(x)) \$0;
-                    rx(mod(x, y)) \$0;
-                    rx(sin(x)) \$0;
-                    rx(sqrt(x)) \$0;
-                    rx(tan(x)) \$0;
-                    """
-                parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
-                x = 1.0
-                y = 2.0
-                inputs      = Dict("x"=>x, "y"=>y)
-                circuit     = BraketStateVector.interpret(parsed_qasm, extern_lookup=inputs)
-                ixs = [Braket.Instruction(Rx(x), 0),  
-                       Braket.Instruction(Rx(acos(x)), 0),  
-                       Braket.Instruction(Rx(asin(x)), 0),  
-                       Braket.Instruction(Rx(atan(x)), 0),  
-                       Braket.Instruction(Rx(ceil(x)), 0),  
-                       Braket.Instruction(Rx(cos(x)), 0),  
-                       Braket.Instruction(Rx(exp(x)), 0),  
-                       Braket.Instruction(Rx(floor(x)), 0),  
-                       Braket.Instruction(Rx(log(x)), 0),  
-                       Braket.Instruction(Rx(mod(x, y)), 0),  
-                       Braket.Instruction(Rx(sin(x)), 0),  
-                       Braket.Instruction(Rx(sqrt(x)), 0),  
-                       Braket.Instruction(Rx(tan(x)), 0)]
-                c = Circuit()
-                for ix in ixs
-                    Braket.add_instruction!(c, ix)
-                end
-                @test circuit == c
-            end
-        end
-        @testset "Adjoint Gradient pragma" begin
-            qasm = """
-            input float theta;
-            qubit[4] q;
-            rx(theta) q[0];
-            #pragma braket result adjoint_gradient expectation(-6 * y(q[0]) @ i(q[1]) + 0.75 * y(q[2]) @ z(q[3])) theta
+    end
+    @testset "Builtin functions" begin
+        qasm = """
+            const float[64] arccos_result = arccos(1);
+            const float[64] arcsin_result = arcsin(1);
+            const float[64] arctan_result = arctan(1);
+            const int[64] ceiling_result = ceiling(π);
+            const float[64] cos_result = cos(1);
+            const float[64] exp_result = exp(2);
+            const int[64] floor_result = floor(π);
+            const float[64] log_result = log(ℇ);
+            const int[64] mod_int_result = mod(4, 3);
+            const float[64] mod_float_result = mod(5.2, 2.5);
+            const int[64] popcount_bit_result = popcount("1001110");
+            const int[64] popcount_int_result = popcount(78);
+            // parser gets confused by pow
+            // const int[64] pow_int_result = pow(3, 3);
+            // const float[64] pow_float_result = pow(2.5, 2.5);
+            // add rotl, rotr
+            const float[64] sin_result = sin(1);
+            const float[64] sqrt_result = sqrt(2);
+            const float[64] tan_result = tan(1);
             """
-            parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
-            circuit     = BraketStateVector.interpret(parsed_prog, extern_lookup=Dict("theta"=>0.1))
-            θ           = FreeParameter("theta")
-            obs         = -2 * Braket.Observables.Y() * (3 * Braket.Observables.I()) + 0.75 * Braket.Observables.Y() * Braket.Observables.Z()
-            @test circuit.result_types[1].observable == obs
-            @test circuit.result_types[1].targets == [QubitSet([0, 1]), QubitSet([2, 3])]
-            @test circuit.result_types[1].parameters == ["theta"]
-        end
-        @testset "Noise" begin
-            qasm = """
-            qubit[2] qs;
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
+        global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["arccos_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(acos(1))
+        @test global_ctx.definitions["arcsin_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(asin(1))
+        @test global_ctx.definitions["arctan_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(atan(1))
+        @test global_ctx.definitions["ceiling_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
+        @test global_ctx.definitions["cos_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(cos(1))
+        @test global_ctx.definitions["exp_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(exp(2))
+        @test global_ctx.definitions["floor_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(3)
+        @test global_ctx.definitions["log_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(1.0)
+        @test global_ctx.definitions["mod_int_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(1)
+        @test global_ctx.definitions["mod_float_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(mod(5.2, 2.5))
+        @test global_ctx.definitions["popcount_bit_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
+        @test global_ctx.definitions["popcount_int_result"].value == BraketStateVector.OpenQASM3.IntegerLiteral(4)
+        @test global_ctx.definitions["sin_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(sin(1))
+        @test global_ctx.definitions["sqrt_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(sqrt(2))
+        @test global_ctx.definitions["tan_result"].value == BraketStateVector.OpenQASM3.FloatLiteral(tan(1))
 
-            #pragma braket noise bit_flip(.5) qs[1]
-            #pragma braket noise phase_flip(.5) qs[0]
-            #pragma braket noise pauli_channel(.1, .2, .3) qs[0]
-            #pragma braket noise depolarizing(.5) qs[0]
-            #pragma braket noise two_qubit_depolarizing(.9) qs
-            #pragma braket noise two_qubit_depolarizing(.7) qs[1], qs[0]
-            #pragma braket noise two_qubit_dephasing(.6) qs
-            #pragma braket noise amplitude_damping(.2) qs[0]
-            #pragma braket noise generalized_amplitude_damping(.2, .3)  qs[1]
-            #pragma braket noise phase_damping(.4) qs[0]
-            #pragma braket noise kraus([[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]) qs[0]
-            #pragma braket noise kraus([[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]) qs[{1, 0}]
-            """
-            parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
-            circuit     = BraketStateVector.interpret(parsed_prog)
-            inst_list   = [Instruction(BitFlip(0.5), [1]),
-                           Instruction(PhaseFlip(0.5), [0]),
-                           Instruction(PauliChannel(0.1, 0.2, 0.3), [0]),
-                           Instruction(Depolarizing(0.5), [0]),
-                           Instruction(TwoQubitDepolarizing(0.9), [0, 1]),
-                           Instruction(TwoQubitDepolarizing(0.7), [1, 0]),
-                           Instruction(TwoQubitDephasing(0.6), [0, 1]),
-                           Instruction(AmplitudeDamping(0.2), [0]),
-                           Instruction(GeneralizedAmplitudeDamping(0.2, 0.3), [1]),
-                           Instruction(PhaseDamping(0.4), [0]),
-                           Instruction(Kraus([[0.9486833im 0; 0 0.9486833im], [0 0.31622777; 0.31622777 0]]), [0]),
-                           Instruction(Kraus([diagm(fill(√0.9, 4)), √0.1*kron([1.0 0.0; 0.0 1.0], [0.0 1.0; 1.0 0.0])]), [1, 0]),
-                          ]
-            @testset "Operator $(typeof(ix.operator)), target $(ix.target)" for (cix, ix) in zip(circuit.instructions, inst_list)
-                @test cix.operator == ix.operator
-                @test cix.target == ix.target
-            end
-        end
-        @testset "Basis rotations" begin
-            @testset "StandardObservables" begin
-                qasm = """
-                qubit[3] q;
-                i q;
-                
-                #pragma braket result expectation z(q[2]) @ x(q[0])
-                #pragma braket result variance x(q[0]) @ y(q[1])
-                #pragma braket result sample x(q[0])
-                """
-                parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
-                circuit      = BraketStateVector.interpret(parsed_prog)
-                Braket.basis_rotation_instructions!(circuit)
-                c_bris = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketStateVector.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
-                bris   = vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
-                for (ix, bix) in zip(c_bris, bris)
-                    @test BraketStateVector.matrix_rep(ix.operator) ≈ transpose(BraketStateVector.matrix_rep(bix.operator))
-                    @test ix.target == bix.target
-                end
-            end
-            @testset "Identity" begin
-                qasm = """
-                qubit[3] q;
-                i q;
-                
-                #pragma braket result expectation z(q[2]) @ x(q[0])
-                #pragma braket result variance x(q[0]) @ y(q[1])
-                #pragma braket result sample i(q[0])
-                """
-                parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
-                circuit      = BraketStateVector.interpret(parsed_prog)
-                Braket.basis_rotation_instructions!(circuit)
-                c_bris = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketStateVector.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
-                bris   = vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
-                for (ix, bix) in zip(c_bris, bris)
-                    @test BraketStateVector.matrix_rep(ix.operator) ≈ transpose(BraketStateVector.matrix_rep(bix.operator))
-                    @test ix.target == bix.target
-                end
-            end
-            @testset "Hermitian" begin
-                qasm = """
-                qubit[3] q;
-                i q;
-                #pragma braket result expectation x(q[2])
-                // # noqa: E501
-                #pragma braket result expectation hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
-                // # noqa: E501
-                #pragma braket result expectation x(q[2]) @ hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
-                """
-                parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
-                circuit      = BraketStateVector.interpret(parsed_prog)
-                Braket.basis_rotation_instructions!(circuit)
-                arr = [-6 2+1im -3 -5+2im;
-                        2-1im 0 2-1im -5+4im;
-                       -3 2+1im 0 -4+3im;
-                       -5-2im -5-4im -4-3im -6]
-                h = Braket.Observables.HermitianObservable(arr)
-                bris = vcat(BraketStateVector.diagonalizing_gates(h, [0, 1]), Instruction(H(), [2]))
-                for (ix, bix) in zip(circuit.basis_rotation_instructions, bris)
-                    @test BraketStateVector.matrix_rep(ix.operator) ≈ adjoint(BraketStateVector.matrix_rep(bix.operator))
-                    @test ix.target == bix.target
-                end
-            end
-        end
-        @testset "Output" begin
+        @testset "Symbolic" begin
             qasm = """
-                   output int[8] out_int;
-                   """
-            parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
-            @test_throws ErrorException("Output not supported.") BraketStateVector.interpret(parsed_prog)
-        end
-        @testset "Input" begin
-            qasm = """
-            input int[8] in_int;
-            input bit[8] in_bit;
-            int[8] doubled;
-
-            doubled = in_int * 2;
-            """
-            in_bit = 0b10110010
+                input float x;
+                input float y;
+                rx(x) \$0;
+                rx(arccos(x)) \$0;
+                rx(arcsin(x)) \$0;
+                rx(arctan(x)) \$0; 
+                rx(ceiling(x)) \$0;
+                rx(cos(x)) \$0;
+                rx(exp(x)) \$0;
+                rx(floor(x)) \$0;
+                rx(log(x)) \$0;
+                rx(mod(x, y)) \$0;
+                rx(sin(x)) \$0;
+                rx(sqrt(x)) \$0;
+                rx(tan(x)) \$0;
+                """
             parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
-            @testset for in_int in (0, 1, -2, 5)
-                inputs     = Dict("in_int"=>in_int, "in_bit"=>in_bit)
-                global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(inputs)
-                global_ctx(parsed_qasm)
-                @test global_ctx.definitions["doubled"].value == in_int * 2
-                @test global_ctx.definitions["in_bit"].value == in_bit
+            x = 1.0
+            y = 2.0
+            inputs      = Dict("x"=>x, "y"=>y)
+            circuit     = BraketStateVector.interpret(parsed_qasm, extern_lookup=inputs)
+            ixs = [Braket.Instruction(Rx(x), 0),  
+                   Braket.Instruction(Rx(acos(x)), 0),  
+                   Braket.Instruction(Rx(asin(x)), 0),  
+                   Braket.Instruction(Rx(atan(x)), 0),  
+                   Braket.Instruction(Rx(ceil(x)), 0),  
+                   Braket.Instruction(Rx(cos(x)), 0),  
+                   Braket.Instruction(Rx(exp(x)), 0),  
+                   Braket.Instruction(Rx(floor(x)), 0),  
+                   Braket.Instruction(Rx(log(x)), 0),  
+                   Braket.Instruction(Rx(mod(x, y)), 0),  
+                   Braket.Instruction(Rx(sin(x)), 0),  
+                   Braket.Instruction(Rx(sqrt(x)), 0),  
+                   Braket.Instruction(Rx(tan(x)), 0)]
+            c = Circuit()
+            for ix in ixs
+                Braket.add_instruction!(c, ix)
             end
+            @test circuit == c
         end
-        @testset "Physical qubits" begin
-            qasm = """
-            h \$0;
-            cnot \$0, \$1;
-            """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
-            circuit     = BraketStateVector.interpret(parsed_qasm)
-            expected_circuit = Circuit([(H, 0), (CNot, 0, 1)])
-            @test circuit == expected_circuit
-        end
-        @testset "Gate on qubit registers" begin 
-            qasm = """
-            qubit[3] qs;
-            qubit q;
+    end
+    @testset "Adjoint Gradient pragma" begin
+        qasm = """
+        input float theta;
+        qubit[4] q;
+        rx(theta) q[0];
+        #pragma braket result adjoint_gradient expectation(-6 * y(q[0]) @ i(q[1]) + 0.75 * y(q[2]) @ z(q[3])) theta
+        """
+        parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_prog, extern_lookup=Dict("theta"=>0.1))
+        θ           = FreeParameter("theta")
+        obs         = -2 * Braket.Observables.Y() * (3 * Braket.Observables.I()) + 0.75 * Braket.Observables.Y() * Braket.Observables.Z()
+        @test circuit.result_types[1].observable == obs
+        @test circuit.result_types[1].targets == [QubitSet([0, 1]), QubitSet([2, 3])]
+        @test circuit.result_types[1].parameters == ["theta"]
+    end
+    @testset "Pow" begin
+        qasm = """
+        int[8] two = 2;
+        gate x a { U(π, 0, π) a; }
+        gate cx c, a {
+            pow(1) @ ctrl @ x c, a;
+        }
+        gate cxx_1 c, a {
+            pow(two) @ cx c, a;
+        }
+        gate cxx_2 c, a {
+            pow(1/2) @ pow(4) @ cx c, a;
+        }
+        gate cxxx c, a {
+            pow(1) @ pow(two) @ cx c, a;
+        }
 
-            x qs[{0, 2}];
-            h q;
-            cphaseshift(1) qs, q;
-            phaseshift(-2) q;
-            """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
-            circuit     = BraketStateVector.interpret(parsed_qasm)
-            simulation  = BraketStateVector.StateVectorSimulator(4, 0)
-            BraketStateVector.evolve!(simulation, circuit.instructions)
-            @test simulation.state_vector ≈ [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1/√2, 1/√2, 0, 0, 0, 0]
+        qubit q1;
+        qubit q2;
+        qubit q3;
+        qubit q4;
+        qubit q5;
+
+        pow(1/2) @ x q1;       // half flip
+        pow(1/2) @ x q1;       // half flip
+        cx q1, q2;   // flip
+        cxx_1 q1, q3;    // don't flip
+        cxx_2 q1, q4;    // don't flip
+        cnot q1, q5;    // flip
+        x q3;       // flip
+        x q4;       // flip
+
+        s q1;   // sqrt z
+        s q1;   // again
+        inv @ z q1; // inv z
+        """
+        parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit      = BraketStateVector.interpret(parsed_prog)
+        simulation  = BraketStateVector.StateVectorSimulator(5, 0)
+        BraketStateVector.evolve!(simulation, circuit.instructions)
+        sv = zeros(32)
+        sv[end] = 1.0
+        @test simulation.state_vector ≈ sv 
+    end
+    @testset "Noise" begin
+        qasm = """
+        qubit[2] qs;
+
+        #pragma braket noise bit_flip(.5) qs[1]
+        #pragma braket noise phase_flip(.5) qs[0]
+        #pragma braket noise pauli_channel(.1, .2, .3) qs[0]
+        #pragma braket noise depolarizing(.5) qs[0]
+        #pragma braket noise two_qubit_depolarizing(.9) qs
+        #pragma braket noise two_qubit_depolarizing(.7) qs[1], qs[0]
+        #pragma braket noise two_qubit_dephasing(.6) qs
+        #pragma braket noise amplitude_damping(.2) qs[0]
+        #pragma braket noise generalized_amplitude_damping(.2, .3)  qs[1]
+        #pragma braket noise phase_damping(.4) qs[0]
+        #pragma braket noise kraus([[0.9486833im, 0], [0, 0.9486833im]], [[0, 0.31622777], [0.31622777, 0]]) qs[0]
+        #pragma braket noise kraus([[0.9486832980505138, 0, 0, 0], [0, 0.9486832980505138, 0, 0], [0, 0, 0.9486832980505138, 0], [0, 0, 0, 0.9486832980505138]], [[0, 0.31622776601683794, 0, 0], [0.31622776601683794, 0, 0, 0], [0, 0, 0, 0.31622776601683794], [0, 0, 0.31622776601683794, 0]]) qs[{1, 0}]
+        """
+        parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_prog)
+        inst_list   = [Instruction(BitFlip(0.5), [1]),
+                       Instruction(PhaseFlip(0.5), [0]),
+                       Instruction(PauliChannel(0.1, 0.2, 0.3), [0]),
+                       Instruction(Depolarizing(0.5), [0]),
+                       Instruction(TwoQubitDepolarizing(0.9), [0, 1]),
+                       Instruction(TwoQubitDepolarizing(0.7), [1, 0]),
+                       Instruction(TwoQubitDephasing(0.6), [0, 1]),
+                       Instruction(AmplitudeDamping(0.2), [0]),
+                       Instruction(GeneralizedAmplitudeDamping(0.2, 0.3), [1]),
+                       Instruction(PhaseDamping(0.4), [0]),
+                       Instruction(Kraus([[0.9486833im 0; 0 0.9486833im], [0 0.31622777; 0.31622777 0]]), [0]),
+                       Instruction(Kraus([diagm(fill(√0.9, 4)), √0.1*kron([1.0 0.0; 0.0 1.0], [0.0 1.0; 1.0 0.0])]), [1, 0]),
+                      ]
+        @testset "Operator $(typeof(ix.operator)), target $(ix.target)" for (cix, ix) in zip(circuit.instructions, inst_list)
+            @test cix.operator == ix.operator
+            @test cix.target == ix.target
         end
-        @testset "Unitary pragma" begin
+    end
+    @testset "Basis rotations" begin
+        @testset "StandardObservables" begin
             qasm = """
             qubit[3] q;
-
-            x q[0];
-            h q[1];
-
-            // unitary pragma for t gate
-            #pragma braket unitary([[1.0, 0], [0, 0.70710678 + 0.70710678im]]) q[0]
-            ti q[0];
-
-            // unitary pragma for h gate (with phase shift)
-            #pragma braket unitary([[0.70710678im, 0.70710678im], [0 - -0.70710678im, -0.0 - 0.70710678im]]) q[1]
-            gphase(-π/2) q[1];
-            h q[1];
-
-            // unitary pragma for ccnot gate
-            #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
+            i q;
+            
+            #pragma braket result expectation z(q[2]) @ x(q[0])
+            #pragma braket result variance x(q[0]) @ y(q[1])
+            #pragma braket result sample x(q[0])
             """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
-            circuit     = BraketStateVector.interpret(parsed_qasm)
-            simulation  = BraketStateVector.StateVectorSimulator(3, 0)
-            BraketStateVector.evolve!(simulation, circuit.instructions)
-            @test simulation.state_vector ≈ [0, 0, 0, 0, 0.70710678, 0, 0, 0.70710678]
+            parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
+            circuit      = BraketStateVector.interpret(parsed_prog)
+            Braket.basis_rotation_instructions!(circuit)
+            c_bris = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketStateVector.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
+            bris   = vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
+            for (ix, bix) in zip(c_bris, bris)
+                @test BraketStateVector.matrix_rep(ix.operator) ≈ transpose(BraketStateVector.matrix_rep(bix.operator))
+                @test ix.target == bix.target
+            end
         end
-        @testset "Verbatim" begin
-            with_verbatim = """
-            OPENQASM 3.0;
-            bit[2] b;
-            qubit[2] q;
-            #pragma braket verbatim
-            box{
-            cnot q[0], q[1];
-            cnot q[0], q[1];
-            rx(1.57) q[0];
-            }
-            b[0] = measure q[0];
-            b[1] = measure q[1];
-            """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(with_verbatim)
-            circuit     = BraketStateVector.interpret(parsed_qasm)
-            sim_w_verbatim = BraketStateVector.StateVectorSimulator(2, 0)
-            BraketStateVector.evolve!(sim_w_verbatim, circuit.instructions)
-
-            without_verbatim = """
-            OPENQASM 3.0;
-            bit[2] b;
-            qubit[2] q;
-            box{
-            cnot q[0], q[1];
-            cnot q[0], q[1];
-            rx(1.57) q[0];
-            }
-            b[0] = measure q[0];
-            b[1] = measure q[1];
-            """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(without_verbatim)
-            circuit     = BraketStateVector.interpret(parsed_qasm)
-            sim_wo_verbatim = BraketStateVector.StateVectorSimulator(2, 0)
-            BraketStateVector.evolve!(sim_wo_verbatim, circuit.instructions)
-
-            @test sim_w_verbatim.state_vector ≈ sim_wo_verbatim.state_vector
-        end
-        @testset "Void subroutine" begin
+        @testset "Identity" begin
             qasm = """
-                   def flip(qubit q) {
-                     x q;
-                   }
-                   qubit[2] qs;
-                   flip(qs[0]);
-                   """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
-            circuit     = BraketStateVector.interpret(parsed_qasm)
-            simulation  = BraketStateVector.StateVectorSimulator(2, 0)
-            BraketStateVector.evolve!(simulation, circuit.instructions)
-            @test simulation.state_vector ≈ [0, 0, 1, 0]
-        end
-        @testset "Array ref subroutine" begin
-            qasm = """
-            int[16] total_1;
-            int[16] total_2;
-
-            def sum(readonly array[int[8], #dim = 1] arr) -> int[16] {
-                int[16] size = sizeof(arr);
-                int[16] x = 0;
-                for int[8] i in [0:size - 1] {
-                    x += arr[i];
-                }
-                return x;
-            }
-
-            array[int[8], 5] array_1 = {1, 2, 3, 4, 5};
-            array[int[8], 10] array_2 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-
-            total_1 = sum(array_1);
-            total_2 = sum(array_2);
+            qubit[3] q;
+            i q;
+            
+            #pragma braket result expectation z(q[2]) @ x(q[0])
+            #pragma braket result variance x(q[0]) @ y(q[1])
+            #pragma braket result sample i(q[0])
             """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
-            global_ctx  = BraketStateVector.QASMGlobalContext{Braket.Operator}()
+            parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
+            circuit      = BraketStateVector.interpret(parsed_prog)
+            Braket.basis_rotation_instructions!(circuit)
+            c_bris = [circuit.basis_rotation_instructions[1], Instruction(Unitary(Matrix(mapreduce(ix->BraketStateVector.matrix_rep(ix.operator), *, circuit.basis_rotation_instructions[2:end]))), [1])]
+            bris   = vcat(Instruction(H(), [0]), BraketStateVector.diagonalizing_gates(Braket.Observables.Y(), [1]))
+            for (ix, bix) in zip(c_bris, bris)
+                @test BraketStateVector.matrix_rep(ix.operator) ≈ transpose(BraketStateVector.matrix_rep(bix.operator))
+                @test ix.target == bix.target
+            end
+        end
+        @testset "Hermitian" begin
+            qasm = """
+            qubit[3] q;
+            i q;
+            #pragma braket result expectation x(q[2])
+            // # noqa: E501
+            #pragma braket result expectation hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
+            // # noqa: E501
+            #pragma braket result expectation x(q[2]) @ hermitian([[-6+0im, 2+1im, -3+0im, -5+2im], [2-1im, 0im, 2-1im, -5+4im], [-3+0im, 2+1im, 0im, -4+3im], [-5-2im, -5-4im, -4-3im, -6+0im]]) q[0:1]
+            """
+            parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
+            circuit      = BraketStateVector.interpret(parsed_prog)
+            Braket.basis_rotation_instructions!(circuit)
+            arr = [-6 2+1im -3 -5+2im;
+                    2-1im 0 2-1im -5+4im;
+                   -3 2+1im 0 -4+3im;
+                   -5-2im -5-4im -4-3im -6]
+            h = Braket.Observables.HermitianObservable(arr)
+            bris = vcat(BraketStateVector.diagonalizing_gates(h, [0, 1]), Instruction(H(), [2]))
+            for (ix, bix) in zip(circuit.basis_rotation_instructions, bris)
+                @test BraketStateVector.matrix_rep(ix.operator) ≈ adjoint(BraketStateVector.matrix_rep(bix.operator))
+                @test ix.target == bix.target
+            end
+        end
+    end
+    @testset "Output" begin
+        qasm = """
+               output int[8] out_int;
+               """
+        parsed_prog  = BraketStateVector.OpenQASM3.parse(qasm)
+        @test_throws ErrorException("Output not supported.") BraketStateVector.interpret(parsed_prog)
+    end
+    @testset "Input" begin
+        qasm = """
+        input int[8] in_int;
+        input bit[8] in_bit;
+        int[8] doubled;
+
+        doubled = in_int * 2;
+        """
+        in_bit = 0b10110010
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        @testset for in_int in (0, 1, -2, 5)
+            inputs     = Dict("in_int"=>in_int, "in_bit"=>in_bit)
+            global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(inputs)
             global_ctx(parsed_qasm)
-            @test global_ctx.definitions["total_1"].value == 15
-            @test global_ctx.definitions["total_2"].value == 55
+            @test global_ctx.definitions["doubled"].value == in_int * 2
+            @test global_ctx.definitions["in_bit"].value == in_bit
         end
-        @testset "Array ref subroutine with mutation" begin
-            qasm = """
-            def mutate_array(mutable array[int[8], #dim = 1] arr) {
-                int[16] size = sizeof(arr);
-                for int[8] i in [0:size - 1] {
-                    arr[i] = 0;
-                }
+    end
+    @testset "Physical qubits" begin
+        qasm = """
+        h \$0;
+        cnot \$0, \$1;
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_qasm)
+        expected_circuit = Circuit([(H, 0), (CNot, 0, 1)])
+        @test circuit == expected_circuit
+    end
+    @testset "Gate on qubit registers" begin 
+        qasm = """
+        qubit[3] qs;
+        qubit q;
+
+        x qs[{0, 2}];
+        h q;
+        cphaseshift(1) qs, q;
+        phaseshift(-2) q;
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_qasm)
+        simulation  = BraketStateVector.StateVectorSimulator(4, 0)
+        BraketStateVector.evolve!(simulation, circuit.instructions)
+        @test simulation.state_vector ≈ [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1/√2, 1/√2, 0, 0, 0, 0]
+    end
+    @testset "Unitary pragma" begin
+        qasm = """
+        qubit[3] q;
+
+        x q[0];
+        h q[1];
+
+        // unitary pragma for t gate
+        #pragma braket unitary([[1.0, 0], [0, 0.70710678 + 0.70710678im]]) q[0]
+        ti q[0];
+
+        // unitary pragma for h gate (with phase shift)
+        #pragma braket unitary([[0.70710678im, 0.70710678im], [0 - -0.70710678im, -0.0 - 0.70710678im]]) q[1]
+        gphase(-π/2) q[1];
+        h q[1];
+
+        // unitary pragma for ccnot gate
+        #pragma braket unitary([[1.0, 0, 0, 0, 0, 0, 0, 0], [0, 1.0, 0, 0, 0, 0, 0, 0], [0, 0, 1.0, 0, 0, 0, 0, 0], [0, 0, 0, 1.0, 0, 0, 0, 0], [0, 0, 0, 0, 1.0, 0, 0, 0], [0, 0, 0, 0, 0, 1.0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 1.0], [0, 0, 0, 0, 0, 0, 1.0, 0]]) q
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_qasm)
+        simulation  = BraketStateVector.StateVectorSimulator(3, 0)
+        BraketStateVector.evolve!(simulation, circuit.instructions)
+        @test simulation.state_vector ≈ [0, 0, 0, 0, 0.70710678, 0, 0, 0.70710678]
+    end
+    @testset "Verbatim" begin
+        with_verbatim = """
+        OPENQASM 3.0;
+        bit[2] b;
+        qubit[2] q;
+        #pragma braket verbatim
+        box{
+        cnot q[0], q[1];
+        cnot q[0], q[1];
+        rx(1.57) q[0];
+        }
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(with_verbatim)
+        circuit     = BraketStateVector.interpret(parsed_qasm)
+        sim_w_verbatim = BraketStateVector.StateVectorSimulator(2, 0)
+        BraketStateVector.evolve!(sim_w_verbatim, circuit.instructions)
+
+        without_verbatim = """
+        OPENQASM 3.0;
+        bit[2] b;
+        qubit[2] q;
+        box{
+        cnot q[0], q[1];
+        cnot q[0], q[1];
+        rx(1.57) q[0];
+        }
+        b[0] = measure q[0];
+        b[1] = measure q[1];
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(without_verbatim)
+        circuit     = BraketStateVector.interpret(parsed_qasm)
+        sim_wo_verbatim = BraketStateVector.StateVectorSimulator(2, 0)
+        BraketStateVector.evolve!(sim_wo_verbatim, circuit.instructions)
+
+        @test sim_w_verbatim.state_vector ≈ sim_wo_verbatim.state_vector
+    end
+    @testset "Void subroutine" begin
+        qasm = """
+               def flip(qubit q) {
+                 x q;
+               }
+               qubit[2] qs;
+               flip(qs[0]);
+               """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_qasm)
+        simulation  = BraketStateVector.StateVectorSimulator(2, 0)
+        BraketStateVector.evolve!(simulation, circuit.instructions)
+        @test simulation.state_vector ≈ [0, 0, 1, 0]
+    end
+    @testset "Array ref subroutine" begin
+        qasm = """
+        int[16] total_1;
+        int[16] total_2;
+
+        def sum(readonly array[int[8], #dim = 1] arr) -> int[16] {
+            int[16] size = sizeof(arr);
+            int[16] x = 0;
+            for int[8] i in [0:size - 1] {
+                x += arr[i];
             }
+            return x;
+        }
 
-            array[int[8], 5] array_1 = {1, 2, 3, 4, 5};
-            array[int[8], 10] array_2 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-            array[int[8], 10] array_3 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+        array[int[8], 5] array_1 = {1, 2, 3, 4, 5};
+        array[int[8], 10] array_2 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
-            mutate_array(array_1);
-            mutate_array(array_2);
-            mutate_array(array_3[4:2:-1]);
-            """
-            parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
-            global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
-            global_ctx(parsed_qasm)
-            @test global_ctx.definitions["array_1"].value == zeros(Int, 5) 
-            @test global_ctx.definitions["array_2"].value == zeros(Int, 10) 
-            @test global_ctx.definitions["array_3"].value == [1, 2, 3, 4, 0, 6, 0, 8, 0, 10]
-        end
+        total_1 = sum(array_1);
+        total_2 = sum(array_2);
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
+        global_ctx  = BraketStateVector.QASMGlobalContext{Braket.Operator}()
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["total_1"].value == 15
+        @test global_ctx.definitions["total_2"].value == 55
+    end
+    @testset "Array ref subroutine with mutation" begin
+        qasm = """
+        def mutate_array(mutable array[int[8], #dim = 1] arr) {
+            int[16] size = sizeof(arr);
+            for int[8] i in [0:size - 1] {
+                arr[i] = 0;
+            }
+        }
+
+        array[int[8], 5] array_1 = {1, 2, 3, 4, 5};
+        array[int[8], 10] array_2 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+        array[int[8], 10] array_3 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
+        mutate_array(array_1);
+        mutate_array(array_2);
+        mutate_array(array_3[4:2:-1]);
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
+        global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["array_1"].value == zeros(Int, 5) 
+        @test global_ctx.definitions["array_2"].value == zeros(Int, 10) 
+        @test global_ctx.definitions["array_3"].value == [1, 2, 3, 4, 0, 6, 0, 8, 0, 10]
     end
 end

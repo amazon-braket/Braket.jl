@@ -1,6 +1,6 @@
 for G in (:X, :Y, :Z, :H, :I, :Swap, :CNot, :CY, :CZ, :CCNot, :CSwap, :GPi)
     @eval begin
-        inverted_gate(g::$G) = g
+        Base.inv(g::$G) = g
     end
 end
 for G in (
@@ -19,16 +19,16 @@ for G in (
     :XY,
 )
     @eval begin
-        inverted_gate(g::$G) = $G(-g.angle[1])
+        Base.inv(g::$G) = $G(-g.angle[1])
     end
 end
 for (G, Gi) in ((:V, :Vi), (:S, :Si), (:T, :Ti))
     @eval begin
-        inverted_gate(g::$G) = $Gi()
+        Base.inv(g::$G) = $Gi()
     end
 end
 
-function inverted_gate(g::ISwap)
+function Base.inv(g::ISwap)
     u_mat = zeros(ComplexF64, 4, 4)
     u_mat[1, 1] = 1.0
     u_mat[4, 4] = 1.0
@@ -37,7 +37,7 @@ function inverted_gate(g::ISwap)
     return Unitary(u_mat)
 end
 
-function inverted_gate(g::ECR)
+function Base.inv(g::ECR)
     u_mat = zeros(ComplexF64, 4, 4)
     u_mat[1, 3] = 1 / √2
     u_mat[2, 4] = 1 / √2
@@ -50,7 +50,7 @@ function inverted_gate(g::ECR)
     return Unitary(transpose(u_mat))
 end
 
-function inverted_gate(g::GPi2)
+function Base.inv(g::GPi2)
     ϕ = g.angle[1]
     cosϕ = cos(ϕ)
     sinϕ = sin(ϕ)
@@ -58,7 +58,7 @@ function inverted_gate(g::GPi2)
     return Unitary(u_mat)
 end
 
-function inverted_gate(g::MS)
+function Base.inv(g::MS)
     ϕ1, ϕ2, ϕ3 = g.angle
     sin_ϕ3 = sin(ϕ3 / 2)
     cos_ϕ3 = cos(ϕ3 / 2)

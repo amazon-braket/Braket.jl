@@ -169,3 +169,27 @@ for V in (false, true)
         end
     end
 end
+
+struct Control{G<:Gate, B} <: Gate
+    g::G
+    bitvals::NTuple{B, Int}
+    Control{G, B}(g::G, bitvals::NTuple{B, Int}) where {B, G} = new(g, bitvals)
+end
+Control(g::G, bitvals::NTuple{B, Int}) where {G<:Gate, B} = Control{G, B}(g, bitvals)
+Control(g::Control{G, BC}, bitvals::NTuple{B, Int}) where {G<:Gate, BC, B} = Control(g.g, (g.bitvals..., bitvals...))
+Braket.qubit_count(c::Control{G, B}) where {G<:Gate, B} = qubit_count(c.g) + B
+function matrix_rep(c::Control{G, B}) where {G<:Gate, B}
+    inner_mat = matrix_rep(c.g)
+    inner_qc  = qubit_count(c.g)
+    total_qc  = qubit_count(c.g) + B
+    full_mat  = diagm(ones(ComplexF64, 2^total_qc))
+    ctrl_ix   = 0
+    for (b_ix, b) in enumerate(c.bitvals)
+        ctrl_ix += b << (b_ix + inner_qc - 1)
+    end
+    for inner_ix in 1:2^qubit_count(c.g), inner_jx in 1:2^qubit_count(c.g)
+        full_mat[ctrl_ix + inner_ix, ctrl_ix + inner_jx] = inner_mat[inner_ix, inner_jx]
+    end
+    return full_mat
+end
+
