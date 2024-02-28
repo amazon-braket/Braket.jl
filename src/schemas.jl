@@ -66,6 +66,10 @@ function Instruction(x)
 end
 StructTypes.constructfrom(::Type{Instruction}, x::Union{Dict{Symbol, Any}, NamedTuple}) = Instruction(x)
 Base.:(==)(ix1::Instruction, ix2::Instruction) = (ix1.operator == ix2.operator && ix1.target == ix2.target)
+qubits(ix::Instruction) = ix.target
+qubit_count(ix::Instruction) = length(ix.target)
+qubits(ixs::Vector{Instruction}) = mapreduce(ix->ix.target, union!, ixs, init=Set{Int}())
+qubit_count(ixs::Vector{Instruction}) = length(qubits(ixs)) 
 
 bind_value!(ix::Instruction, param_values::Dict{Symbol, Number}) = Instruction(bind_value!(ix.operator, param_values), ix.target)
 

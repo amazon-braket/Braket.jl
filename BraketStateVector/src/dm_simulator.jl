@@ -119,7 +119,12 @@ function _evolve_op!(
 ) where {T<:Complex,S<:AbstractDensityMatrix{T},G<:Gate}
     reshaped_dm = reshape(dms.density_matrix, length(dms.density_matrix))
     apply_gate!(Val(false), op, reshaped_dm, target...)
+    #display(reshaped_dm)
+    #println()
     apply_gate!(Val(true),  op, reshaped_dm, (dms.qubit_count .+ target)...)
+    #display(reshaped_dm)
+    #println()
+    return
 end
 
 function _evolve_op!(

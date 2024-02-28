@@ -269,6 +269,118 @@ get_tol(shots::Int) = return (
         @test circuit.result_types[1].targets == [QubitSet([0, 1]), QubitSet([2, 3])]
         @test circuit.result_types[1].parameters == ["theta"]
     end
+    @testset "Assignment operators" begin
+        qasm = """
+        int[16] x;
+        bit[4] xs;
+
+        x = 0;
+        xs = "0000";
+
+        x += 1; // 1
+        x *= 2; // 2
+        x /= 2; // 1
+        x -= 5; // -4
+
+        xs[2:] |= "11";
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        global_ctx  = BraketStateVector.QASMGlobalContext{Braket.Operator}()
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["x"].value  == -4
+        @test global_ctx.definitions["xs"].value == BitVector([0,0,1,1])
+    end
+    @testset "Bit operators" begin
+        qasm = """
+        bit[4] and;
+        bit[4] or;
+        bit[4] xor;
+        bit[4] lshift;
+        bit[4] rshift;
+        bit[4] flip;
+        bit gt;
+        bit lt;
+        bit ge;
+        bit le;
+        bit eq;
+        bit neq;
+        bit not;
+        bit not_zero;
+
+        bit[4] x = "0101";
+        bit[4] y = "1100";
+
+        and = x & y;
+        or = x | y;
+        xor = x ^ y;
+        lshift = x << 2;
+        rshift = y >> 2;
+        flip = ~x;
+        gt = x > y;
+        lt = x < y;
+        ge = x >= y;
+        le = x <= y;
+        eq = x == y;
+        neq = x != y;
+        not = !x;
+        not_zero = !(x << 4);
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}()
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["x"].value == BitVector([0,1,0,1])
+        @test global_ctx.definitions["y"].value == BitVector([1,1,0,0])
+        @test global_ctx.definitions["and"].value == BitVector([0,1,0,0])
+        @test global_ctx.definitions["or"].value == BitVector([1,1,0,1])
+        @test global_ctx.definitions["xor"].value == BitVector([1,0,0,1])
+        @test global_ctx.definitions["lshift"].value == BitVector([0,1,0,0])
+        @test global_ctx.definitions["rshift"].value == BitVector([0,0,1,1])
+        @test global_ctx.definitions["flip"].value == BitVector([1,0,1,0])
+        @test global_ctx.definitions["gt"].value == false
+        @test global_ctx.definitions["lt"].value == true
+        @test global_ctx.definitions["ge"].value == false
+        @test global_ctx.definitions["le"].value == true
+        @test global_ctx.definitions["eq"].value == false
+        @test global_ctx.definitions["neq"].value == true
+        @test global_ctx.definitions["not"].value == false
+        @test global_ctx.definitions["not_zero"].value == true
+    end
+    @testset "If" begin
+        qasm = """
+        int[8] two = 2;
+        bit[3] m = "000";
+
+        if (two + 1) {
+            m[0] = 1;
+        } else {
+            m[1] = 1;
+        }
+
+        if (!bool(two - 2)) {
+            m[2] = 1;
+        }
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm)
+        global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}()
+        global_ctx(parsed_qasm)
+        bit_vec = BitVector([1,0,1])
+        @test global_ctx.definitions["m"].value == bit_vec
+    end
+    @testset "Global gate control" begin
+        qasm = """
+        qubit q1;
+        qubit q2;
+
+        h q1;
+        h q2;
+        ctrl @ s q1, q2;
+        """
+        parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_prog)
+        simulation  = BraketStateVector.StateVectorSimulator(2, 0)
+        BraketStateVector.evolve!(simulation, circuit.instructions)
+        @test simulation.state_vector ≈ [0.5, 0.5, 0.5, 0.5im]
+    end
     @testset "Pow" begin
         qasm = """
         int[8] two = 2;
@@ -311,6 +423,149 @@ get_tol(shots::Int) = return (
         BraketStateVector.evolve!(simulation, circuit.instructions)
         sv = zeros(32)
         sv[end] = 1.0
+        @test simulation.state_vector ≈ sv 
+    end
+    @testset "Gate control" begin
+        qasm = """
+        int[8] two = 2;
+        gate x a { U(π, 0, π) a; }
+        gate cx c, a {
+            ctrl @ x c, a;
+        }
+        gate ccx_1 c1, c2, a {
+            ctrl @ ctrl @ x c1, c2, a;
+        }
+        gate ccx_2 c1, c2, a {
+            ctrl(two) @ x c1, c2, a;
+        }
+        gate ccx_3 c1, c2, a {
+            ctrl @ cx c1, c2, a;
+        }
+
+        qubit q1;
+        qubit q2;
+        qubit q3;
+        qubit q4;
+        qubit q5;
+
+        // doesn't flip q2
+        cx q1, q2;
+        // flip q1
+        x q1;
+        // flip q2
+        cx q1, q2;
+        // doesn't flip q3, q4, q5
+        ccx_1 q1, q4, q3;
+        ccx_2 q1, q3, q4;
+        ccx_3 q1, q3, q5;
+        // flip q3, q4, q5;
+        ccx_1 q1, q2, q3;
+        ccx_2 q1, q2, q4;
+        ccx_2 q1, q2, q5;
+        """
+        parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_prog)
+        simulation  = BraketStateVector.StateVectorSimulator(5, 0)
+        sv = zeros(ComplexF64, 32)
+        sv[end] = 1.0
+        canonical_circuit     = Circuit([(CNot, 0, 1), (X, 0), (CNot, 0, 1), (CCNot, 0, 3, 2), (CCNot, 0, 2, 3), (CCNot, 0, 2, 4), (CCNot, 0, 1, 2), (CCNot, 0, 1, 3), (CCNot, 0, 1, 4)])
+        canonical_simulation  = BraketStateVector.StateVectorSimulator(5, 0)
+        ii = 1
+        @testset for (ix, c_ix) in zip(circuit.instructions, canonical_circuit.instructions)
+            BraketStateVector.evolve!(simulation, [ix])
+            BraketStateVector.evolve!(canonical_simulation, [c_ix])
+            for jj in 1:32
+                @test simulation.state_vector[jj] ≈ canonical_simulation.state_vector[jj] atol=1e-10
+            end
+            @test simulation.state_vector ≈ canonical_simulation.state_vector atol=1e-10
+            ii += 1
+        end
+        @test canonical_simulation.state_vector ≈ sv rtol=1e-10
+        @test simulation.state_vector ≈ sv rtol=1e-10
+    end
+    @testset "Gate inverses" begin
+        qasm = """
+        gate rand_u_1 a { U(1, 2, 3) a; }
+        gate rand_u_2 a { U(2, 3, 4) a; }
+        gate rand_u_3 a { inv @ U(3, 4, 5) a; }
+
+        gate both a {
+            rand_u_1 a;
+            rand_u_2 a;
+        }
+        gate both_inv a {
+            inv @ both a;
+        }
+        gate all_3 a {
+            rand_u_1 a;
+            rand_u_2 a;
+            rand_u_3 a;
+        }
+        gate all_3_inv a {
+            inv @ inv @ inv @ all_3 a;
+        }
+
+        gate apply_phase a {
+            gphase(1);
+        }
+
+        gate apply_phase_inv a {
+            inv @ gphase(1);
+        }
+
+        qubit q;
+
+        both q;
+        both_inv q;
+
+        all_3 q;
+        all_3_inv q;
+
+        apply_phase q;
+        apply_phase_inv q;
+
+        U(1, 2, 3) q;
+        inv @ U(1, 2, 3) q;
+
+        s q;
+        inv @ s q;
+
+        t q;
+        inv @ t q;
+        """
+        parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_prog)
+        collapsed   = prod(BraketStateVector.matrix_rep(ix.operator) for ix in circuit.instructions)
+        @test collapsed ≈ diagm(ones(ComplexF64, 2^qubit_count(circuit)))
+    end
+    @testset "GPhase" begin
+        qasm = """
+        qubit[2] qs;
+
+        int[8] two = 2;
+
+        gate x a { U(π, 0, π) a; }
+        gate cx c, a { ctrl @ x c, a; }
+        gate phase c, a {
+            gphase(π/2);
+            ctrl(two) @ gphase(π) c, a;
+        }
+        gate h a { U(π/2, 0, π) a; }
+
+        h qs[0];
+        
+        cx qs[0], qs[1];
+        phase qs[0], qs[1];
+        
+        gphase(π);
+        inv @ gphase(π / 2);
+        negctrl @ ctrl @ gphase(2 * π) qs[0], qs[1];
+        """
+        parsed_prog = BraketStateVector.OpenQASM3.parse(qasm)
+        circuit     = BraketStateVector.interpret(parsed_prog)
+        simulation  = BraketStateVector.StateVectorSimulator(2, 0)
+        BraketStateVector.evolve!(simulation, circuit.instructions)
+        sv = 1/√2 * [-1; 0; 0; 1]
         @test simulation.state_vector ≈ sv 
     end
     @testset "Noise" begin

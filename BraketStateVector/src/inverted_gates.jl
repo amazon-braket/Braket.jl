@@ -37,6 +37,9 @@ function Base.inv(g::ISwap)
     return Unitary(u_mat)
 end
 
+Base.inv(g::Unitary) = Unitary(inv(g.matrix))
+Base.inv(g::U)       = Unitary(Matrix(inv(matrix_rep(g))))
+
 function Base.inv(g::ECR)
     u_mat = zeros(ComplexF64, 4, 4)
     u_mat[1, 3] = 1 / √2

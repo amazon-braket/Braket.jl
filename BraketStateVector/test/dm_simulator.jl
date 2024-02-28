@@ -11,6 +11,7 @@ funcs = CUDA.functional() ? (identity, cu) : (identity,)
         si = ComplexF64[1 0; 0 1]
         matrix_1q = sx
         matrix_2q = kron(sx, si)
+        #matrix_2q = kron(si, sx)
         matrix_3q = kron(sx, kron(si, si))
         matrix_4q = kron(kron(sx, si), kron(si, si))
         matrix_5q = kron(sx, kron(kron(sx, si), kron(si, si)))

@@ -38,7 +38,10 @@ ap_size(shots::Int, qubit_count::Int) = (shots > 0 && qubit_count < 30) ? 2^qubi
 
 include("validation.jl")
 include("builtins.jl")
+include("custom_gates.jl")
 include("openqasm.jl")
+
+const BuiltinGates = merge(Braket.StructTypes.subtypes(Braket.Gate), custom_gates) 
 
 const OBS_LIST = (Observables.X(), Observables.Y(), Observables.Z())
 const CHUNK_SIZE = 2^10
@@ -344,7 +347,6 @@ function (d::AbstractSimulator)(
     return res
 end
 
-include("custom_gates.jl")
 include("gate_kernels.jl")
 include("noise_kernels.jl")
 include("observables.jl")
@@ -352,6 +354,7 @@ include("result_types.jl")
 include("properties.jl")
 include("derivative_gates.jl")
 include("inverted_gates.jl")
+include("pow_gates.jl")
 include("sv_simulator.jl")
 include("dm_simulator.jl")
 include("precompile.jl")

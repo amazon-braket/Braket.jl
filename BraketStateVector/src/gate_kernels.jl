@@ -190,16 +190,16 @@ function apply_gate!(
 ) where {T<:Complex,M<:Union{SMatrix{4,4,T},Diagonal{T,SVector{4,T}}}}
     n_amps, (endian_t1, endian_t2) = get_amps_and_qubits(state_vec, t1, t2)
     small_t, big_t = minmax(endian_t1, endian_t2)
-    chunk_size = CHUNK_SIZE
-    n_tasks = n_amps >> 2
-    n_chunks = max(div(n_tasks, CHUNK_SIZE), 1)
-    chunked_amps = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
+    chunk_size     = CHUNK_SIZE
+    n_tasks        = n_amps >> 2
+    n_chunks       = max(div(n_tasks, CHUNK_SIZE), 1)
+    chunked_amps   = collect(Iterators.partition(0:n_tasks-1, CHUNK_SIZE))
     Threads.@threads for c_ix = 1:n_chunks
         for ix in chunked_amps[c_ix]
-            ix_00 = pad_bit(pad_bit(ix, small_t), big_t)
-            ix_10 = flip_bit(ix_00, endian_t2)
-            ix_01 = flip_bit(ix_00, endian_t1)
-            ix_11 = flip_bit(ix_10, endian_t1)
+            ix_00   = pad_bit(pad_bit(ix, small_t), big_t)
+            ix_10   = flip_bit(ix_00, endian_t2)
+            ix_01   = flip_bit(ix_00, endian_t1)
+            ix_11   = flip_bit(ix_10, endian_t1)
             ind_vec = SVector(ix_00 + 1, ix_01 + 1, ix_10 + 1, ix_11 + 1)
             @inbounds begin
                 amps = SVector{4,T}(
@@ -238,8 +238,19 @@ for (V, f) in ((false, :identity), (true, :conj))
             g_mat = SMatrix{2,2,T}($f(matrix_rep(g)))
             return apply_gate!(g_mat, state_vec, qubit)
         end
+        function apply_gate!(
+            ::Val{$V},
+            g::Unitary,
+            state_vec::StateVector{T},
+            q1::Int,
+            q2::Int,
+        ) where {T<:Complex}
+            g_mat = SMatrix{4,4,T}($f(matrix_rep(g)))
+            return apply_gate!(g_mat, state_vec, q2, q1)
+        end
     end
 end
+
 apply_gate!(g::G, args...) where {G<:Gate} = apply_gate!(Val(false), g, args...)
 
 # controlled unitaries
@@ -270,25 +281,28 @@ for (V, f) in ((true, :conj), (false, :identity))
             g::G,
             tg::TG,
             state_vec::StateVector{T},
+            control_bits::NTuple{1,Int},
             control::Int,
             target::Int,
         ) where {G<:Gate,TG<:Gate,T<:Complex}
             n_amps, (endian_control, endian_target) =
                 get_amps_and_qubits(state_vec, control, target)
+            
             small_t, big_t = minmax(endian_control, endian_target)
             g_mat = $f(matrix_rep(tg))
+            c_bit = control_bits[1] == 1
             g_00, g_10, g_01, g_11 = g_mat
             Threads.@threads for ix = 0:div(n_amps, 4)-1
                 ix_00 = pad_bit(pad_bit(ix, small_t), big_t)
                 ix_10 = flip_bit(ix_00, endian_control)
                 ix_01 = flip_bit(ix_00, endian_target)
                 ix_11 = flip_bit(ix_01, endian_control)
-                lower_ix = ix_10 + 1
-                higher_ix = ix_11 + 1
+                lower_ix  = c_bit ? ix_10 + 1 : ix_00 + 1
+                higher_ix = c_bit ? ix_11 + 1 : ix_01 + 1
                 @inbounds begin
-                    lower_amp = state_vec[lower_ix]
+                    lower_amp  = state_vec[lower_ix]
                     higher_amp = state_vec[higher_ix]
-                    state_vec[lower_ix] = g_00 * lower_amp + g_01 * higher_amp
+                    state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
                     state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
                 end
             end
@@ -300,16 +314,22 @@ for (V, f) in ((true, :conj), (false, :identity))
             g::G,
             tg::TG,
             state_vec::StateVector{T},
+            control_bits::NTuple{1,Int},
             control::Int,
             t1::Int,
             t2::Int,
+            control_bit::Int=1,
         ) where {G<:Gate,TG<:Gate,T<:Complex}
             n_amps, (endian_control, endian_t1, endian_t2) =
                 get_amps_and_qubits(state_vec, control, t1, t2)
             small_t, mid_t, big_t = sort([endian_control, endian_t1, endian_t2])
             g_mat = $f(matrix_rep(tg))
+            c_bit = control_bits[1] == 1
             Threads.@threads for ix = 0:div(n_amps, 8)-1
-                ix_00 = flip_bit(pad_bits(ix, [small_t, mid_t, big_t]), endian_control)
+                ix_00 = pad_bits(ix, [small_t, mid_t, big_t])
+                if c_bit
+                    ix_00 = flip_bit(ix_00, endian_control)
+                end
                 ix_10 = flip_bit(ix_00, endian_t2)
                 ix_01 = flip_bit(ix_00, endian_t1)
                 ix_11 = flip_bit(ix_01, endian_t2)
@@ -331,6 +351,7 @@ for (V, f) in ((true, :conj), (false, :identity))
             g::G,
             tg::TG,
             state_vec::StateVector{T},
+            control_bits::NTuple{2,Int},
             c1::Int,
             c2::Int,
             t::Int,
@@ -343,15 +364,18 @@ for (V, f) in ((true, :conj), (false, :identity))
             Threads.@threads for ix = 0:div(n_amps, 8)-1
                 # insert 0 at c1, 0 at c2, 0 at target
                 padded_ix = pad_bits(ix, [small_t, mid_t, big_t])
-                # flip c1 and c2
-                lower_ix = flip_bit(flip_bit(padded_ix, endian_c1), endian_c2)
+                # flip c1 and c2 if needed
+                lower_ix = padded_ix
+                for (c_val, c_bit) in zip(control_bits, (endian_c1, endian_c2))
+                    c_val == 1 && (lower_ix = flip_bit(lower_ix, c_bit))
+                end
                 # flip target
                 higher_ix = flip_bit(lower_ix, endian_target) + 1
                 lower_ix += 1
                 @inbounds begin
-                    lower_amp = state_vec[lower_ix]
+                    lower_amp  = state_vec[lower_ix]
                     higher_amp = state_vec[higher_ix]
-                    state_vec[lower_ix] = g_00 * lower_amp + g_01 * higher_amp
+                    state_vec[lower_ix]  = g_00 * lower_amp + g_01 * higher_amp
                     state_vec[higher_ix] = g_10 * lower_amp + g_11 * higher_amp
                 end
             end
@@ -377,7 +401,7 @@ for (cg, tg, nc) in (
             state_vec::StateVector{T},
             qubits::Int...,
         ) where {T<:Complex} =
-            apply_controlled_gate!(Val($Vc), Val($nc), g, $tg(), state_vec, qubits...)
+            apply_controlled_gate!(Val($Vc), Val($nc), g, $tg(), state_vec, ntuple(i->1, Val($nc)), qubits...)
     end
 end
 
@@ -390,34 +414,55 @@ for (V, f) in ((false, :identity), (true, :conj))
             state_vec::StateVector{T},
             qubits::Int...,
         ) where {T<:Complex, G<:Gate, B} =
-            apply_controlled_gate!(Val($V), Val(B), g, g.g, state_vec, qubits...)
+            apply_controlled_gate!(Val($V), Val(B), g, g.g, state_vec, g.bitvals, qubits...)
+        function apply_gate!(
+            ::Val{$V},
+            g::Control{MultiQubitPhaseShift{N}, B},
+            state_vec::StateVector{T},
+            qubits::Int...,
+        ) where {T<:Complex, N, B}
+            bvs = g.bitvals
+            g_mat = ones(ComplexF64, 2^N)
+            ix = 0
+            for (bi, bv) in enumerate(bvs)
+                ix += bv << (bi - 1)
+            end
+            ix += 1
+            g_mat[ix] = $f(exp(im*g.g.angle[1]))
+            apply_gate!(Diagonal(SVector{2^N, ComplexF64}(g_mat)), state_vec, qubits...)
+        end
         function apply_gate!(
             ::Val{$V},
             g::Unitary,
             state_vec::StateVector{T},
             ts::Vararg{Int,NQ},
         ) where {T<:Complex,NQ}
-            n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
-            endian_ts isa Int && (endian_ts = (endian_ts,))
-            ordered_ts = sort(collect(endian_ts))
-            nq = NQ
-            g_mat = $f(SMatrix{2^nq,2^nq,ComplexF64}(matrix_rep(g)))
-            flip_list = map(0:2^nq-1) do t
-                f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:nq-1]
-                return ordered_ts[f_vals]
-            end
-            Threads.@threads for ix = 0:div(n_amps, 2^nq)-1
-                padded_ix = pad_bits(ix, ordered_ts)
-                ixs = SVector{2^nq,Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
-                @views begin
-                    @inbounds begin
-                        amps = SVector{2^NQ,T}(state_vec[ixs])
-                        new_amps = g_mat * amps
-                        state_vec[ixs] = new_amps
-                    end
-                end
-            end
-            return
+            apply_gate!($f(SMatrix{2^NQ, 2^NQ, ComplexF64}(matrix_rep(g))), state_vec, ts...)
         end
     end
+end
+function apply_gate!(
+    g_mat::Union{SMatrix{N, N, T}, Diagonal{T, SVector{N, T}}},
+    state_vec::StateVector{T},
+    ts::Vararg{Int,NQ},
+) where {T<:Complex,NQ,N}
+    n_amps, endian_ts = get_amps_and_qubits(state_vec, ts...)
+    endian_ts isa Int && (endian_ts = (endian_ts,))
+    ordered_ts = sort(collect(endian_ts))
+    flip_list = map(0:N-1) do t
+        f_vals = Bool[(((1 << f_ix) & t) >> f_ix) for f_ix = 0:NQ-1]
+        return ordered_ts[f_vals]
+    end
+    Threads.@threads for ix = 0:div(n_amps, N)-1
+        padded_ix = pad_bits(ix, ordered_ts)
+        ixs = SVector{N,Int}(flip_bits(padded_ix, f) + 1 for f in flip_list)
+        @views begin
+            @inbounds begin
+                amps = SVector{N,T}(state_vec[ixs])
+                new_amps = g_mat * amps
+                state_vec[ixs] = new_amps
+            end
+        end
+    end
+    return
 end
