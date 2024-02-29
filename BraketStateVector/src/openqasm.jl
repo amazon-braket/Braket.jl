@@ -883,7 +883,7 @@ end
 function (ctx::AbstractQASMContext)(node::OpenQASM3.WhileLoop)
     _check_annotations(node)
     block_ctx = _new_inner_scope(ctx)
-    while ctx(node.while_condition)
+    while block_ctx(node.while_condition)
         for subnode in node.block
             maybe_break_or_continue = block_ctx(subnode)
             if maybe_break_or_continue isa OpenQASM3.BreakStatement

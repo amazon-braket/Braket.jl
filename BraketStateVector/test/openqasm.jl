@@ -32,6 +32,41 @@ get_tol(shots::Int) = return (
         parsed_circ = BraketStateVector.interpret(BraketStateVector.OpenQASM3.parse(qasm_str), extern_lookup=Dict("theta"=>0.2))
         @test ir(parsed_circ, Val(:JAQCD)) == Braket.Program(braket_circ)
     end
+    @testset "For Loop" begin
+        qasm = """
+        int[8] x = 0;
+        int[8] y = -100;
+        int[8] ten = 10;
+
+        for uint[8] i in [0:2:ten - 3] {
+            x += i;
+        }
+
+        for int[8] i in {2, 4, 6} {
+            y += i;
+        }
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
+        global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["x"].value == sum((0, 2, 4, 6))
+        @test global_ctx.definitions["y"].value == sum((-100, 2, 4, 6))
+    end
+    @testset "While Loop" begin
+        qasm = """
+        int[8] x = 0;
+        int[8] i = 0;
+
+        while (i < 7) {
+            x += i;
+            i += 1;
+        }
+        """
+        parsed_qasm = BraketStateVector.OpenQASM3.parse(qasm) 
+        global_ctx = BraketStateVector.QASMGlobalContext{Braket.Operator}(Dict{String,Float64}())
+        global_ctx(parsed_qasm)
+        @test global_ctx.definitions["x"].value == sum(0:6)
+    end
     @testset "Parsing Hermitian observables" begin
         three_qubit_circuit(
             θ::Float64,
