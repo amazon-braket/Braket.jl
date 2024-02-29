@@ -202,9 +202,9 @@ id(node::OpenQASM3.ClassicalAssignment)   = id(node.lvalue)
 id(node::OpenQASM3.QubitDeclaration)      = id(node.qubit)
 id(node::OpenQASM3.ConstantDeclaration)   = id(node.identifier)
 id(node::OpenQASM3.ForInLoop)             = id(node.identifier)
-id(node::OpenQASM3.UnaryOperator)         = node.name
 id(node::OpenQASM3.QuantumGateModifier)   = node.modifier
-id(node::OpenQASM3.BinaryOperator)        = node.name
+id(node::OpenQASM3.UnaryOperator{O}) where {O} = O
+id(node::OpenQASM3.BinaryOperator{O}) where {O} = O
 id(node::Tuple{String, <:Any})            = node[1]
 id(node::String)                          = node
 
@@ -265,13 +265,9 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.RangeDefinition, len::Int)
     return range(start, step=step, stop=stop)
 end
 
-function _get_indices(node::OpenQASM3.RangeDefinition, name::AbstractString, ctx::AbstractQASMContext)
-    def = lookup_def(QASMDefinition, name, ctx)
-    return ctx(node, length(def))
-end
-_get_indices(node::Vector{OpenQASM3.RangeDefinition}, name::AbstractString, ctx::AbstractQASMContext) = _get_indices(node[1], name, ctx)
-_get_indices(node, name::AbstractString, ctx::AbstractQASMContext) = ctx(node)
-
+_get_indices(node::OpenQASM3.RangeDefinition{R, S, T}, name::AbstractString, ctx::AbstractQASMContext) where {R, S, T} = ctx(node, length(lookup_def(QASMDefinition, name, ctx)))
+_get_indices(node::Vector{OpenQASM3.RangeDefinition{R, S, T}}, name::AbstractString, ctx::AbstractQASMContext) where {R, S, T} = _get_indices(node[1], name, ctx)
+_get_indices(node::T, name::AbstractString, ctx::AbstractQASMContext) where {T} = ctx(node)
 function _lookup_name(node::OpenQASM3.IndexExpression, ctx::AbstractQASMContext)
     name    = id(node)
     indices = _get_indices(node.index, name, ctx)
@@ -297,39 +293,31 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.ExpressionStatement)
     return
 end
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression)
-    left   = ctx(node.lhs)
-    right  = ctx(node.rhs)
-    opname = id(node.op)
-    opname == "+" && return left + right
-    opname == "*" && return left * right
-    opname == "&" && return (&).(left, right)
-    opname == "|" && return (|).(left, right)
-    opname == "^" && return (⊻).(left, right)
-    opname == "<<" && return left << right
-    opname == ">>" && return left >> right
-    opname == "**" && return left ^ right
-    opname == "-" && return left - right
-    opname == "/" && return left / right
-    opname == "<" && return scalar_cast(OpenQASM3.BoolType, left < right)
-    opname == ">" && return scalar_cast(OpenQASM3.BoolType, left > right)
-    opname == "!=" && return scalar_cast(OpenQASM3.BoolType, left != right)
-    opname == "==" && return scalar_cast(OpenQASM3.BoolType, left == right)
-    opname == ">=" && return scalar_cast(OpenQASM3.BoolType, left >= right)
-    opname == "<=" && return scalar_cast(OpenQASM3.BoolType, left <= right)
-    return error("Binary op $(node.op) not yet implemented.")
-end
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:+}}) = ctx(node.lhs) + ctx(node.rhs)
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:-}}) = ctx(node.lhs) - ctx(node.rhs)
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:*}}) = ctx(node.lhs) * ctx(node.rhs)
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:/}}) = ctx(node.lhs) / ctx(node.rhs)
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:&}}) = (&).(ctx(node.lhs), ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:|}}) = (|).(ctx(node.lhs), ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:^}}) = (⊻).(ctx(node.lhs), ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:<<}}) = ctx(node.lhs) << ctx(node.rhs)
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:>>}}) = ctx(node.lhs) >> ctx(node.rhs)
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{Symbol("**")}}) = ctx(node.lhs) ^ ctx(node.rhs)
+    
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:<}}) = scalar_cast(OpenQASM3.BoolType, ctx(node.lhs) < ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:>}}) = scalar_cast(OpenQASM3.BoolType, ctx(node.lhs) > ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:(!=)}}) = scalar_cast(OpenQASM3.BoolType, ctx(node.lhs) != ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:(==)}}) = scalar_cast(OpenQASM3.BoolType, ctx(node.lhs) == ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:(<=)}}) = scalar_cast(OpenQASM3.BoolType, ctx(node.lhs) <= ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{Val{:(>=)}}) = scalar_cast(OpenQASM3.BoolType, ctx(node.lhs) >= ctx(node.rhs))
+(ctx::AbstractQASMContext)(node::OpenQASM3.BinaryExpression{O}) where O = error("Binary op $O not yet implemented.")
 
-(ctx::AbstractQASMContext)(node::OpenQASM3.Cast) = scalar_cast(node.type, ctx(node.argument))
+(ctx::AbstractQASMContext)(node::OpenQASM3.Cast{T}) where {T} = scalar_cast(T, ctx(node.argument))
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.UnaryExpression)
-    operand = ctx(node.expression)
-    opname  = id(node.op)
-    opname == "-" && return -operand
-    opname == "!" && return !scalar_cast(OpenQASM3.BoolType, operand)
-    opname == "~" && return (!).(operand)
-    error("Unary op $(node.op) not yet implemented.")
-end
+(ctx::AbstractQASMContext)(node::OpenQASM3.UnaryExpression{Val{:-}}) = -ctx(node.expression)
+(ctx::AbstractQASMContext)(node::OpenQASM3.UnaryExpression{Val{:!}}) = !scalar_cast(OpenQASM3.BoolType, ctx(node.expression))
+(ctx::AbstractQASMContext)(node::OpenQASM3.UnaryExpression{Val{:~}}) = (!).(ctx(node.expression))
+(ctx::AbstractQASMContext)(node::OpenQASM3.UnaryExpression{O}) where {O} = error("Unary op $(node.op) not yet implemented.")
 (ctx::AbstractQASMContext)(nodes::Vector{T}) where {T} = map(ctx, nodes)
 (ctx::AbstractQASMContext)(nodes::Vector{IntegerLiteral}, len::Int) = map(ctx, nodes)
 (ctx::AbstractQASMContext)(nodes::Vector{T}, len::Int) where {T} = map(ctx, nodes, len)
@@ -479,6 +467,8 @@ function (ctx::AbstractQASMContext)(::Val{:operator}, op_str::String)
     end
 end
 
+lookup_mapping(q::String, ctx) = ctx.qubit_mapping[q]
+lookup_mapping(q::Tuple{String, T}, ctx) where {T} = [ctx.qubit_mapping[q[1]][q_+1] for q_ in q[2]]
 function (ctx::AbstractQASMContext)(::Val{:pragma}, ::Val{:qubits}, body::AbstractString)
     (body == "all" || isempty(body)) && return nothing
     has_brakets = occursin('[', body)
@@ -491,7 +481,8 @@ function (ctx::AbstractQASMContext)(::Val{:pragma}, ::Val{:qubits}, body::Abstra
             oq3_chunk = raw_chunk * ";\n"
             parsed_chunk = OpenQASM3.parse(oq3_chunk)
             for node in parsed_chunk.statements
-                append!(qubits, [ctx.qubit_mapping[q] for q in ctx(node.expression)])
+                expr = ctx(node.expression)
+                append!(qubits, Iterators.flatten([lookup_mapping(q, ctx) for q in expr]))
             end
             segment_start = segment_end + 1
             !isnothing(segment_start) && (segment_start += 1)
@@ -594,11 +585,6 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.Box)
 end
 (ctx::AbstractQASMContext)(node::OpenQASM3.Pragma) = ctx(Val(:pragma), node.command)
 
-# NOTE: `node.type` cannot be inferred. Could avoid runtime dispatch here
-#       by branching on allowed types (i.e. manual dispatch).
-(ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalDeclaration) = ctx(node, node.type)
-(ctx::AbstractQASMContext)(node::OpenQASM3.ConstantDeclaration) = ctx(node, node.type)
-
 function _lookup_ext_scalar(name, ctx::QASMGlobalContext)
     val = ctx.ext_lookup[name]
     isnothing(val) || val isa Number || error("QASM program expects '$name' to be a scalar. Got '$val'.")
@@ -606,6 +592,8 @@ function _lookup_ext_scalar(name, ctx::QASMGlobalContext)
 end
 _lookup_ext_scalar(name, ctx::AbstractQASMContext) = _lookup_ext_scalar(name, parent(ctx))
 
+# NOTE: `node.type` cannot be inferred. Could avoid runtime dispatch here
+#       by branching on allowed types (i.e. manual dispatch).
 function (ctx::AbstractQASMContext)(node::N, args...) where {N <: OpenQASM3.QASMNode}
     _check_annotations(node)
     name = id(node)
@@ -613,18 +601,14 @@ function (ctx::AbstractQASMContext)(node::N, args...) where {N <: OpenQASM3.QASM
     return ctx(node, name, args...)
 end
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration, name::String)
-    if node.io_identifier == OpenQASM3.IOKeyword.input
-        !(node.type isa OpenQASM3.ClassicalType) && error("Unsupported input type at $(node.span).")
-        val = _lookup_ext_scalar(name, ctx)
-        isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
-        scalar_matches_type(node.type, val, "Input variable $name at $(node.span): type does not match ")
-        ctx.definitions[name] = ClassicalDef(val, node.type, ClassicalInput)
-        return nothing
-    elseif node.io_identifier == OpenQASM3.IOKeyword.output
-        error("Output not supported.")
-    end
-    error("IO type $(node.io_identifier) not supported at $(node.span).")
+(ctx::AbstractQASMContext)(node::OpenQASM3.NothingExpression) = nothing
+(ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration{T, OpenQASM3.output}, name::String) where {T} = error("Output not supported.")
+(ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration{T, IT}, name::String) where {T, IT} = error("IO type $IT not supported at $(node.span).")
+function (ctx::AbstractQASMContext)(node::OpenQASM3.IODeclaration{T, OpenQASM3.input}, name::String) where {T<:OpenQASM3.ClassicalType}
+    val = _lookup_ext_scalar(name, ctx)
+    isnothing(val) && error("Input variable $name was not supplied at $(node.span).")
+    scalar_matches_type(T, val, "Input variable $name at $(node.span): type does not match ")
+    ctx.definitions[name] = ClassicalDef(val, T, ClassicalInput)
     return nothing
 end
 
@@ -669,27 +653,26 @@ function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGateDefinition, name:
     return
 end
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.QuantumGateModifier, g::G, args...) where {G<:Braket.Gate}
-    arg = isnothing(node.argument) ? nothing : ctx(node.argument)
-    gate = g
-    name = node.modifier
-    name == GateModifierName.inv && return inv(gate)
-    name == GateModifierName.pow && return g ^ arg
-    n_arg = isnothing(arg) ? 1 : arg
-    bit_val = if name == GateModifierName.ctrl
-        1
-    elseif name == GateModifierName.negctrl
-        0
-    end
-    bit_tup = ntuple(i->bit_val, n_arg)
-    return Control(gate, bit_tup)
+(ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Inv}, g::G) where {G<:Braket.Gate} = inv(g)
+(ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Pow}, g::G) where {G<:Braket.Gate} = g ^ ctx(node.argument)
+function (ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.Ctrl}, g::G) where {G<:Braket.Gate}
+    arg     = ctx(node.argument)
+    n_arg   = isnothing(arg) ? 1 : arg
+    bit_tup = ntuple(i->1, n_arg)
+    return Control(g, bit_tup)
+end
+function (ctx::AbstractQASMContext)(node::QuantumGateModifier{OpenQASM3.NegCtrl}, g::G) where {G<:Braket.Gate}
+    arg     = ctx(node.argument)
+    n_arg   = isnothing(arg) ? 1 : arg
+    bit_tup = ntuple(i->0, n_arg)
+    return Control(g, bit_tup)
 end
 
 pad_qubits(op::Control, qc_diff::Int, target) = vcat(collect(0:qc_diff-1), target .+ qc_diff)
 pad_qubits(op, qc_diff::Int, target) = target
 # GateDef
-function (ctx::AbstractQASMContext)(mod::OpenQASM3.QuantumGateModifier, braket_gate::Vector{Instruction}, args...)
-    to_map = mod.modifier == GateModifierName.inv ? reverse(braket_gate) : braket_gate
+function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{OpenQASM3.Inv}, braket_gate::Vector{Instruction})
+    to_map = reverse(braket_gate)
     braket_gate = map(to_map) do ix
         old_qc  = qubit_count(ix.operator)
         new_op  = ctx(mod, ix.operator)
@@ -699,7 +682,17 @@ function (ctx::AbstractQASMContext)(mod::OpenQASM3.QuantumGateModifier, braket_g
     end
     return braket_gate
 end
-function (ctx::AbstractQASMContext)(mods::Vector{OpenQASM3.QuantumGateModifier}, braket_gate)
+function (ctx::AbstractQASMContext)(mod::QuantumGateModifier{T}, braket_gate::Vector{Instruction}) where {T<:OpenQASM3.GateModifierName}
+    braket_gate = map(braket_gate) do ix
+        old_qc  = qubit_count(ix.operator)
+        new_op  = ctx(mod, ix.operator)
+        new_qc  = qubit_count(new_op)
+        qc_diff = new_qc - old_qc
+        new_ix  = Instruction(new_op, pad_qubits(new_op, qc_diff, ix.target))
+    end
+    return braket_gate
+end
+function (ctx::AbstractQASMContext)(mods::Vector{<:OpenQASM3.QuantumGateModifier}, braket_gate)
     for mod in mods
         braket_gate = ctx(mod, braket_gate)
     end
@@ -750,43 +743,36 @@ function (ctx::QASMSubroutineContext)(node::QuantumArgument, name::String, ix::I
     return ix
 end
 
-function (ctx::QASMSubroutineContext)(node::ClassicalArgument, name::String, ix::Int)
-    ctx.definitions[name] = ClassicalDef(undef, node.type, ClassicalVar) 
+function (ctx::QASMSubroutineContext)(node::ClassicalArgument{T, AT}, name::String, ix::Int) where {T, AT}
+    ctx.definitions[name] = ClassicalDef(undef, T, ClassicalVar) 
     return ix
 end
 
-function _map_arguments_back(::Val{true}, arg_passed::IndexExpression, arg_defined::OpenQASM3.ClassicalArgument, fn_ctx)
-    outer_id = id(arg_passed)
-    inner_id = id(arg_defined)
-    ctx       = parent(fn_ctx)
-    outer_arg = ctx.definitions[outer_id]
+function _map_arguments_back(arg_passed::IndexExpression, arg_defined::OpenQASM3.ClassicalArgument{T, OpenQASM3.mutable}, fn_ctx) where {T}
+    outer_id   = id(arg_passed)
+    inner_id   = id(arg_defined)
+    ctx        = parent(fn_ctx)
+    outer_arg  = ctx.definitions[outer_id]
     name, inds = _lookup_name(arg_passed, ctx)
     for (aix, ind) in enumerate(inds)
-        ctx.definitions[name].value[ind+1] = fn_ctx.definitions[inner_id].value[aix]
+        ctx.definitions[name].value[ind.+1] = fn_ctx.definitions[inner_id].value[aix]
     end
     return
 end
-function _map_arguments_back(::Val{true}, arg_passed::Identifier, arg_defined::OpenQASM3.ClassicalArgument, fn_ctx)
+function _map_arguments_back(arg_passed::Identifier, arg_defined::OpenQASM3.ClassicalArgument{T, OpenQASM3.mutable}, fn_ctx) where {T}
     outer_id = id(arg_passed)
     inner_id = id(arg_defined)
     ctx      = parent(fn_ctx)
     ctx.definitions[outer_id] = fn_ctx.definitions[inner_id]
     return
 end
-_map_arguments_back(::Val{false}, arg_passed, arg_defined::OpenQASM3.ClassicalArgument, fn_ctx) = return
-function _map_arguments_back(arg_passed::T, arg_defined::OpenQASM3.ClassicalArgument, fn_ctx) where {T<:Union{OpenQASM3.Identifier, OpenQASM3.IndexExpression}}
-    is_mutable = !(arg_defined.access == OpenQASM3.AccessControl.readonly)
-    _map_arguments_back(Val(is_mutable), arg_passed, arg_defined, fn_ctx)
-    return
-end
+_map_arguments_back(arg_passed, arg_defined::OpenQASM3.ClassicalArgument{T, OpenQASM3.readonly}, fn_ctx) where {T} = return
 _map_arguments_back(arg_passed, arg_defined, fn_ctx) = return
 
-function _map_arguments_forward(arg_passed, arg_defined::OpenQASM3.ClassicalArgument, qubit_alias::Dict, fn_ctx)
+function _map_arguments_forward(arg_passed, arg_defined::OpenQASM3.ClassicalArgument{T, AT}, qubit_alias::Dict, fn_ctx) where {T, AT}
     ctx       = parent(fn_ctx)
-    arg_type  = arg_defined.type
-    arg_const = arg_defined.access == OpenQASM3.AccessControl.readonly
     arg_value = ctx(arg_passed)
-    fn_ctx.definitions[id(arg_defined)] = ClassicalDef(arg_value, arg_type, ClassicalVar)
+    fn_ctx.definitions[id(arg_defined)] = ClassicalDef(arg_value, T, ClassicalVar)
     return
 end
 
@@ -965,22 +951,19 @@ function (ctx::QASMSubroutineContext)(node::OpenQASM3.ReturnStatement)
     return ctx(node.expression)
 end
 
-_process_init_expression(::Nothing, type::OpenQASM3.ClassicalType, name::String, ctx::AbstractQASMContext) = missing
-function _process_init_expression(expr::OpenQASM3.Expression, type::OpenQASM3.ClassicalType, name::String, ctx::AbstractQASMContext)
-    val = ctx(expr)
-    scalar_matches_type(type, val, "In expression for `$name`, value `$val` does not match declared type:")
-    return val
-end
+_process_init_expression(::Nothing, type::T, name::String, ctx::AbstractQASMContext) where {T} = nothing
+_process_init_expression(::OpenQASM3.NothingExpression, type::T, name::String, ctx::AbstractQASMContext) where {T} = nothing
+_process_init_expression(expr::OpenQASM3.Expression, type::T, name::String, ctx::AbstractQASMContext) where {T} = ctx(expr)
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalDeclaration, name::String, type::OpenQASM3.ClassicalType)
-    val  = _process_init_expression(node.init_expression, type, name, ctx)
-    ctx.definitions[name] = ClassicalDef(val, type, ClassicalVar)
+function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalDeclaration{T}, name::String) where {T}
+    val  = _process_init_expression(node.init_expression, T, name, ctx)
+    ctx.definitions[name] = ClassicalDef(val, T, ClassicalVar)
     return nothing
 end
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.ConstantDeclaration, name::String, type::OpenQASM3.ClassicalType)
-    val  = _process_init_expression(node.init_expression, type, name, ctx)
-    ctx.definitions[name] = ClassicalDef(val, type, ClassicalConst)
+function (ctx::AbstractQASMContext)(node::OpenQASM3.ConstantDeclaration{T}, name::String) where {T}
+    val  = _process_init_expression(node.init_expression, T, name, ctx)
+    ctx.definitions[name] = ClassicalDef(val, T, ClassicalConst)
     return nothing
 end
 
@@ -990,19 +973,17 @@ _check_lval(lv::T) where {T} = error("Assignment not implemented for $T.")
 _check_node_op(op::OpenQASM3.AssignmentOperator) = return
 _check_node_op(op) = error("Unknown op $op in assigment.")
 
-function _assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, op::String, ctx::AbstractQASMContext)
-    op == "="  && return r_val
-    op == "+=" && return d_value + r_val
-    op == "-=" && return d_value - r_val
-    op == "*=" && return d_value * r_val
-    op == "/=" && return d_value / r_val
-    op == "|=" && return d_value | r_val
-    op == "&=" && return d_value & r_val
-    op == "^=" && return d_value ⊻ r_val
-    error("Operation $op not defined.")
-end
-_assign_lvalue(lvalue::Identifier, r_val::Vector, d_value::Number, op::String, ctx::AbstractQASMContext) = _assign_lvalue(lvalue, r_val[1], d_value, op, ctx)
-function _assign_lvalue(lvalue::IndexedIdentifier, r_val::AbstractVector, d_value::AbstractVector, op::String, ctx::AbstractQASMContext)
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(=)}, ctx::AbstractQASMContext) = r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(+=)}, ctx::AbstractQASMContext) = d_value + r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(-=)}, ctx::AbstractQASMContext) = d_value - r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(*=)}, ctx::AbstractQASMContext) = d_value * r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(/=)}, ctx::AbstractQASMContext) = d_value / r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(|=)}, ctx::AbstractQASMContext) = d_value | r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(&=)}, ctx::AbstractQASMContext) = d_value & r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{:(^=)}, ctx::AbstractQASMContext) = d_value ⊻ r_val
+_assign_lvalue(lvalue::Identifier, r_val::Number, d_value::Number, ::Val{O}, ctx::AbstractQASMContext) where {O} = error("Operation $op not defined.")
+_assign_lvalue(lvalue::Identifier, r_val::Vector, d_value::Number, op, ctx::AbstractQASMContext) = _assign_lvalue(lvalue, r_val[1], d_value, op, ctx)
+function _assign_lvalue(lvalue::IndexedIdentifier, r_val::AbstractVector, d_value::AbstractVector, op, ctx::AbstractQASMContext)
     len = length(lookup_def(QASMDefinition, id(lvalue), ctx))
     l_inds = collect(Iterators.flatten(mapreduce(ix->ctx(ix, len), vcat, lvalue.indices)))
     for (ii, l_ind) in enumerate(l_inds)
@@ -1010,17 +991,15 @@ function _assign_lvalue(lvalue::IndexedIdentifier, r_val::AbstractVector, d_valu
     end
     return d_value
 end
-_assign_lvalue(lvalue::IndexedIdentifier, r_val::Number, d_value::AbstractVector, op::String, ctx::AbstractQASMContext) = _assign_lvalue(lvalue, fill(r_val, length(d_value)), d_value, op, ctx)
-_assign_lvalue(lvalue::IndexedIdentifier, r_val::Number, d_value::Number, op::String, ctx::AbstractQASMContext) = _assign_lvalue(lvalue, [r_val], [d_value], op, ctx)
-_assign_lvalue(lvalue, r_val, d_value::Missing, op::String, ctx::AbstractQASMContext) = r_val
+_assign_lvalue(lvalue::IndexedIdentifier, r_val::Number, d_value::AbstractVector, op, ctx::AbstractQASMContext) = _assign_lvalue(lvalue, fill(r_val, length(d_value)), d_value, op, ctx)
+_assign_lvalue(lvalue::IndexedIdentifier, r_val::Number, d_value::Number, op, ctx::AbstractQASMContext) = _assign_lvalue(lvalue, [r_val], [d_value], op, ctx)
+_assign_lvalue(lvalue, r_val, d_value::Nothing, op, ctx::AbstractQASMContext) = r_val
 
-function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalAssignment, name::String)
+function (ctx::AbstractQASMContext)(node::OpenQASM3.ClassicalAssignment{O}, name::String) where {O}
     _check_lval(node.lvalue) 
-    _check_node_op(node.op)
     def  = lookup_def(ClassicalDef, name, ctx; span=node.span)
     def.kind == ClassicalVar || error("Variable `$name` cannot be assigned to.")
-    rval = ctx(node.rvalue)
-    val  = _assign_lvalue(node.lvalue, rval, def.value, node.op.name, ctx)
+    val   = _assign_lvalue(node.lvalue, ctx(node.rvalue), def.value, O(), ctx)
     ctx.definitions[name] = ClassicalDef(val, def.valtype, def.kind)
     return
 end
