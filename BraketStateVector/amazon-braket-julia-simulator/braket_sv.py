@@ -5,7 +5,6 @@ from braket.tasks import GateModelQuantumTaskResult
 from braket.tasks.local_quantum_task import LocalQuantumTask
 from braket.tasks.local_quantum_task_batch import LocalQuantumTaskBatch
 from braket.circuits.noise_model import NoiseModel
-from juliacall import Main as _Main
 from typing import List, Union, Optional
 
 class JuliaLocalSimulator(LocalSimulator):
@@ -19,11 +18,7 @@ class JuliaLocalSimulator(LocalSimulator):
         backend: str = "braket_sv",
         noise_model: Optional[NoiseModel] = None,
     ):
-        # THIS SHOULD EVENTUALLY GO IN THE PACKAGE __init__.py!
-        jl = _Main
-        jl.seval('using Braket, BraketStateVector, PythonCall')
-        jl.seval('Braket.IRType[] = :JAQCD')
-        self._device = jl.LocalSimulator(backend)
+        self._device = BraketStateVector.LocalSimulator(backend)
         self._name   = backend
         self._status = "AVAILABLE"
         if noise_model:
@@ -37,8 +32,7 @@ class JuliaLocalSimulator(LocalSimulator):
             specs = spec
         if inputs is None:
             inputs = {}
-        jl_results = self._device(specs, inputs, shots=shots)
-        return jl_results
+        return self._device(specs, inputs, shots=shots)
 
     def run_batch(  # noqa: C901
         self,

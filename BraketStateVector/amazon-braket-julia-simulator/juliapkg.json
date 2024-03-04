@@ -1,0 +1,13 @@
+{
+    "julia": "1.9",
+    "packages": {
+        "BraketStateVector": {
+            "uuid": "4face768-c059-465f-83fa-0d546ea16c1e",
+            "version": "0.1.0"
+        },
+        "Braket": {
+            "uuid": "19504a0f-b47d-4348-9127-acc6cc69ef67",
+            "version": "0.8.0"
+        }
+    }
+}
