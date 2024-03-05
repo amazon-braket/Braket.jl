@@ -46,9 +46,9 @@ function __init__()
     pennylane[] = pyimport("pennylane")
     numpy[]     = pyimport("numpy")
     PythonCall.pyconvert_add_rule("braket.schema_common.schema_header:BraketSchemaHeader", Braket.braketSchemaHeader, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.circuits.circuit:Circuit", Program, jl_convert_circuit)
+    PythonCall.pyconvert_add_rule("braket.circuits.circuit:Circuit", BraketStateVector.Braket.IR.Program, jl_convert_circuit)
+    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", BraketStateVector.Braket.IR.Program, jl_convert_program)
     PythonCall.pyconvert_add_rule("braket.circuits.instruction:Instruction", Instruction, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", Program, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:CNot", Instruction, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:Kraus", Instruction, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.instructions:TwoQubitDephasing", Instruction, jl_convert)
@@ -159,10 +159,8 @@ function __init__()
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Amplitude", Amplitude, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:AdjointGradient", AdjointGradient, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.shared_models:CompilerDirective", CompilerDirective, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:OpenQasmProgram", OpenQasmProgram, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", AbstractProgram, jl_convert)
+    PythonCall.pyconvert_add_rule("braket.ir.openqasm.program_v1:Program", OpenQasmProgram, jl_convert)
     PythonCall.pyconvert_add_rule("braket.ir.jaqcd.results:Variance", Variance, jl_convert)
-    PythonCall.pyconvert_add_rule("braket.ir.jaqcd.program_v1:Program", Program, jl_convert)
     PythonCall.pyconvert_add_rule(
         "pennylane.ops.op_math:Adjoint",
         Instruction,
@@ -469,7 +467,8 @@ function (d::LocalSimulator)(
     kwargs...,
 ) where {N}
     # handle inputs
-    jl_specs = Vector{Program}(undef, length(task_specs))
+    # fix me to use OpenQASM if needed
+    jl_specs  = [] 
     jl_inputs = nothing
     stats = @timed begin
         if inputs isa PyDict{Any,Any}
@@ -479,7 +478,11 @@ function (d::LocalSimulator)(
         end
         s_ix = 1
         for spec in task_specs
-            jl_specs[s_ix] = pyconvert(Program, spec)
+            if pyisinstance(spec, braket[].ir.openqasm.Program)
+                push!(jl_specs, pyconvert(OpenQasmProgram, spec))
+            else
+                push!(jl_specs, pyconvert(Program, spec))
+            end
             s_ix += 1
         end
         task_specs = nothing

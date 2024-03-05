@@ -115,8 +115,15 @@ function jl_convert(::Type{T}, x::Py) where {T<:AbstractIR}
     end
     PythonCall.pyconvert_return(T(args..., pyconvert(String, pygetattr(x, "type"))))
 end
-function jl_convert_circuit(::Type{Braket.Program}, x::Py)
-    x_jaqcd = x._to_jaqcd()
+function jl_convert_circuit(::Type{Braket.IR.Program}, x)
+    x_jaqcd      = x._to_jaqcd()
+    instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]
+    results      = [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results]
+    bris         = [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions]
+    prog         = Braket.Program(Braket.header_dict[Braket.Program], instructions, results, bris)
+    PythonCall.pyconvert_return(prog)
+end
+function jl_convert_program(::Type{Braket.IR.Program}, x_jaqcd)
     instructions = [pyconvert(Instruction, ix) for ix in x_jaqcd.instructions]
     results      = [pyconvert(AbstractProgramResult, rt) for rt in x_jaqcd.results]
     bris         = [pyconvert(Instruction, ix) for ix in x_jaqcd.basis_rotation_instructions]
