@@ -44,7 +44,7 @@ jobs:
       - name: "Dev PyBraket package on Windows"
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), \"PyBraket\"))'
+          julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
           # must escape for windows
       - name: "Dev PyBraket package on OSX"
         if: ${{ matrix.os == 'macOS-latest' }}
