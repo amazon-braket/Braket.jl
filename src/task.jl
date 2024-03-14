@@ -375,7 +375,7 @@ function measurement_probabilities(measurement_counts::Accumulator)
 end
 
 function _measurements(probs::Dict{String, Float64}, shots::Int)
-    measurements = []
+    measurements = Vector{Int}[]
     for (bitstring, prob) in probs
         int_list = [tryparse(Int, string(b)) for b in bitstring]
         measurement = [int_list for ii in 1:convert(Int, round(prob*shots))]
@@ -443,13 +443,13 @@ end
 
 function calculate_result_types(ir_obj, measurements, measured_qubits::Vector{Int})
     result_types = ResultTypeValue[]
-    (!haskey(ir_obj, "results") || isnothing(ir_obj["results"])) && return result_types
-    for result_type in ir_obj["results"]
-        ir_obs = get(result_type, "observable", nothing)
+    (!haskey(ir_obj, :results) || isnothing(ir_obj[:results])) && return result_types
+    for result_type in ir_obj[:results]
+        ir_obs = get(result_type, :observable, nothing)
         rt     = JSON3.read(JSON3.write(result_type), AbstractProgramResult)
         obs    = isnothing(ir_obs) ? nothing : StructTypes.constructfrom(Observables.Observable, rt.observable)
         targs  = rt.targets
-        typ    = result_type["type"]
+        typ    = result_type[:type]
         if typ == "probability"
             val = _calculate_for_targets(measurements, measured_qubits, targs, Val(Symbol(typ)))
             push!(result_types, ResultTypeValue(rt, val))
@@ -486,7 +486,9 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     end
     measured_qubits = r.measuredQubits
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
-        rebuilt_action = JSON3.read(JSON3.write(addl_mtd.action))
+        # do this in case we have custom gates in the IR
+        json_          = Dict("results"=>[rt for rt in addl_mtd.action.results])
+        rebuilt_action = JSON3.read(JSON3.write(json_))
         result_types = calculate_result_types(rebuilt_action, measurements, measured_qubits)
     else
         if !isempty(r.resultTypes) && !isnothing(r.resultTypes[1])

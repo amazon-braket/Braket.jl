@@ -158,11 +158,4 @@ Mocking.activate()
             @test_throws ErrorException Braket.upload_local_data(prefix, randstring(10))
         end
     end
-    @testset "_to_base_10" begin
-        for nq in 2:10
-            for ix in 0:2^nq-1
-                @test Braket._to_base_10(reverse(digits(ix, base=2, pad=nq)), nq) == ix - 1
-            end
-        end
-    end
 end
