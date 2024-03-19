@@ -487,9 +487,9 @@ function computational_basis_sampling(::Type{GateModelQuantumTaskResult}, r::Gat
     measured_qubits = r.measuredQubits
     if isnothing(r.resultTypes) || isempty(r.resultTypes)
         # do this in case we have custom gates in the IR
-        json_          = Dict("results"=>[rt for rt in addl_mtd.action.results])
+        json_          = hasproperty(addl_mtd.action, :results) ? Dict("results"=>[rt for rt in addl_mtd.action.results]) : addl_mtd.action
         rebuilt_action = JSON3.read(JSON3.write(json_))
-        result_types = calculate_result_types(rebuilt_action, measurements, measured_qubits)
+        result_types   = calculate_result_types(rebuilt_action, measurements, measured_qubits)
     else
         if !isempty(r.resultTypes) && !isnothing(r.resultTypes[1])
             json_          = Dict("results"=>[rt.type for rt in r.resultTypes])
