@@ -68,7 +68,7 @@ const IRType = Ref{Symbol}()
 include("tracker.jl")
 const Prices = Ref{Pricing}()
 const GlobalTrackerContext = Ref{TrackerContext}()
-abstract type BraketSimulator end
+abstract type AbstractBraketSimulator end
 
 const _simulator_devices = Ref{Dict}()
 

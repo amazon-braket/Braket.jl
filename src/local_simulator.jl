@@ -14,8 +14,8 @@ results(lqtb::LocalQuantumTaskBatch) = lqtb.results
 
 struct LocalSimulator <: Device
     backend::String
-    _delegate::BraketSimulator
-    function LocalSimulator(backend::Union{String, BraketSimulator})
+    _delegate::AbstractBraketSimulator
+    function LocalSimulator(backend::Union{String, AbstractBraketSimulator})
         backend_name = device_id(backend)
         haskey(_simulator_devices[], backend_name) && return new(backend_name, _simulator_devices[][backend_name](0,0))
         !isdefined(Main, Symbol(backend_name)) && throw(ArgumentError("no local simulator with name $backend_name is loaded!"))
