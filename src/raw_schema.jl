@@ -242,9 +242,9 @@ StructTypes.defaults(::Type{T}) = Dict{Symbol, Any}(:type => "t")
 
 struct Program <: AbstractProgram
     braketSchemaHeader::braketSchemaHeader
-    instructions::Vector{Any}
+    instructions::Vector{<:Any}
     results::Union{Nothing, Vector{AbstractProgramResult}}
-    basis_rotation_instructions::Union{Nothing, Vector{Any}}
+    basis_rotation_instructions::Union{Nothing, Vector{<:Any}}
 end
 StructTypes.StructType(::Type{Program}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{Program}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.ir.jaqcd.program", "1"))

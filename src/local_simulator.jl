@@ -25,7 +25,7 @@ end
 name(s::LocalSimulator) = name(s._delegate)
 device_id(s::String) = s
 
-function (d::LocalSimulator)(task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
+function simulate(d::LocalSimulator, task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
     sim = d._delegate
     @debug "Single task. Starting run..."
     stats = @timed _run_internal(sim, task_spec, args...; inputs=inputs, shots=shots, kwargs...)
@@ -34,7 +34,7 @@ function (d::LocalSimulator)(task_spec::Union{Circuit, AbstractProgram}, args...
     return LocalQuantumTask(local_result.task_metadata.id, local_result)
 end
 
-function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {T}
+function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {T}
     is_single_task  = length(task_specs) == 1
     is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
     if is_single_input
@@ -85,6 +85,7 @@ function (d::LocalSimulator)(task_specs::Vector{T}, args...; shots::Int=0, max_p
     @debug "batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
     return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
+(d::LocalSimulator)(args...; kwargs...) = simulate(d, args...; kwargs...)
 
 function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
     if haskey(properties(simulator).action, "braket.ir.openqasm.program")
@@ -92,13 +93,13 @@ function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, input
         program      = ir(circuit, Val(:OpenQASM))
         full_inputs  = isnothing(program.inputs) ? inputs : merge(program.inputs, inputs)
         full_program = OpenQasmProgram(program.braketSchemaHeader, program.source, full_inputs) 
-        r = simulator(full_program, args...; shots=shots, kwargs...)
+        r            = simulate(simulator, full_program, args...; shots=shots, kwargs...)
         return format_result(r) 
     elseif haskey(properties(simulator).action, "braket.ir.jaqcd.program")
         validate_circuit_and_shots(circuit, shots) 
         program = ir(circuit, Val(:JAQCD))
         qubits  = qubit_count(circuit)
-        r       = simulator(program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
+        r       = simulate(simulator, program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
         return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
@@ -107,7 +108,7 @@ end
 function _run_internal(simulator, program::OpenQasmProgram, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
     if haskey(properties(simulator).action, "braket.ir.openqasm.program")
         stats = @timed begin
-            simulator(program; shots=shots, inputs=inputs, kwargs...)
+            simulate(simulator, program; shots=shots, inputs=inputs, kwargs...)
         end
         @debug "Time to invoke simulator: $(stats.time)"
         r     = stats.value
@@ -124,7 +125,7 @@ function _run_internal(simulator, program::Program, args...; shots::Int=0, input
         @debug "Time to get qubit count: $(stats.time)"
         qubits  = stats.value
         stats = @timed begin
-            simulator(program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
+            simulate(simulator, program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
         end
         @debug "Time to invoke simulator: $(stats.time)"
         r     = stats.value

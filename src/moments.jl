@@ -21,7 +21,7 @@ mutable struct Moments <: AbstractDict{MomentKey,Instruction}
 end
 Base.get(m::Moments, mk::MomentKey, default) = get(m._moments, mk, default)
 
-function Moments(ixs::Vector)
+function Moments(ixs::Vector{Instruction})
     m = Moments()
     foreach(ix->push!(m, ix), ixs)
     return m
@@ -36,30 +36,32 @@ function Base.show(io::IO, m::Moments)
     println(io, "Max times: ", m._max_times)
 end
 
-function Base.push!(m::Moments, ix::Instruction, mt::MomentType_enum=mtGateNoise, noise_index::Int=0)
-    op = ix.operator
-    if op isa CompilerDirective
-        qubits = QubitSet(keys(m._max_times))
-        time   = _update_qubit_time!(m, qubits)
-        key    = MomentKey(time, QubitSet(), mtCompilerDirective, 0)
-        m._moments[key] = ix
-        m._depth = max(m._depth, time+1)
-        m._time_all_qubits = time
-    elseif op isa Noise
-        add_noise!(m, ix, "noise", noise_index)
-    else # it's a Gate
-        qubits = QubitSet(ix.target)
-        time   = _update_qubit_time!(m, qubits)
-        key    = MomentKey(time, qubits, mtGate, noise_index)
-        m._moments[key] = ix
-        union!(m._qubits, qubits)
-        m._depth = max(m._depth, time+1)
-    end
+function Base.push!(m::Moments, ix::Instruction{O}, mt::MomentType_enum=mtGateNoise, noise_index::Int=0) where {O<:CompilerDirective}
+    qubits = QubitSet(keys(m._max_times))
+    time   = _update_qubit_time!(m, qubits)
+    key    = MomentKey(time, QubitSet(), mtCompilerDirective, 0)
+    m._moments[key] = ix
+    m._depth = max(m._depth, time+1)
+    m._time_all_qubits = time
+end
+
+function Base.push!(m::Moments, ix::Instruction{O}, mt::MomentType_enum=mtGateNoise, noise_index::Int=0) where {O<:Noise}
+    add_noise!(m, ix, "noise", noise_index)
     return m
 end
-Base.push!(m::Moments, ixs::Vector{Instruction}, mt::MomentType_enum=mtGateNoise, noise_index::Int=0) = (foreach(ix->push!(m, ix, mt, noise_index), ixs); return m)
 
-function add_noise!(m::Moments, ix::Instruction, input_type::String="noise", noise_index::Int=0)
+function Base.push!(m::Moments, ix::Instruction{O}, mt::MomentType_enum=mtGateNoise, noise_index::Int=0) where {O}
+    qubits = QubitSet(ix.target)
+    time   = _update_qubit_time!(m, qubits)
+    key    = MomentKey(time, qubits, mtGate, noise_index)
+    m._moments[key] = ix
+    union!(m._qubits, qubits)
+    m._depth = max(m._depth, time+1)
+    return m
+end
+Base.push!(m::Moments, ixs::Vector{Instruction{O}}, mt::MomentType_enum=mtGateNoise, noise_index::Int=0) where {O} = (foreach(ix->push!(m, ix, mt, noise_index), ixs); return m)
+
+function add_noise!(m::Moments, ix::Instruction{O}, input_type::String="noise", noise_index::Int=0) where {O}
     qubits = QubitSet(ix.target)
     time   = max(0, prod(get(m._max_times, q, -1) for q in qubits, init=1))
     if MomentType_toenum[input_type] == mtInitializationNoise

@@ -9,6 +9,7 @@ export apply_gate_noise!, apply
 export logs, log_metric, metrics, @hybrid_job
 export depth, qubit_count, qubits, ir, IRType, OpenQASMSerializationProperties
 export OpenQasmProgram
+export simulate
 export QueueDepthInfo, QueueType, Normal, Priority, queue_depth, queue_position
 
 export AdjointGradient, Expectation, Sample, Variance, Amplitude, Probability, StateVector, DensityMatrix, Result
@@ -145,5 +146,5 @@ include("aws_jobs.jl")
 include("local_jobs.jl")
 include("task.jl")
 include("task_batch.jl")
-
+include("precompile.jl")
 end # module

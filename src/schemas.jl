@@ -20,24 +20,27 @@ julia> Instruction(StartVerbatimBox(), QubitSet())
 Braket.Instruction(StartVerbatimBox(), QubitSet())
 ```
 """
-struct Instruction
-    operator::Operator
+struct Instruction{O<:Operator}
+    operator::O
     target::QubitSet
-    Instruction(o::Operator, target) = new(o, QubitSet(target))
 end
-Instruction(cd::CompilerDirective) = Instruction(cd, Int[])
-operator(ix::Instruction) = ix.operator
+Instruction(o::O, target) where {O<:Operator} = Instruction{O}(o, QubitSet(target...))
+Instruction{CD}(cd::CD) where {CD<:CompilerDirective} = Instruction{CD}(cd, QubitSet(Int[]))
+Instruction(cd::CD) where {CD<:CompilerDirective} = Instruction{CD}(cd, Int[])
+operator(ix::Instruction{O}) where {O<:Operator} = ix.operator
+StructTypes.StructType(::Type{Instruction{O}}) where {O} = StructTypes.CustomStruct()
 StructTypes.StructType(::Type{Instruction}) = StructTypes.CustomStruct()
-StructTypes.lower(x::Instruction) = isempty(x.target) ? ir(x.operator, Val(:JAQCD)) : ir(x.operator, x.target, Val(:JAQCD))
-ir(x::Instruction, ::Val{:OpenQASM}; kwargs...) = isempty(x.target) ? ir(x.operator, Val(:OpenQASM); kwargs...) : ir(x.operator, x.target, Val(:OpenQASM); kwargs...)
+StructTypes.lower(x::Instruction{O}) where {O<:Operator} = isempty(x.target) ? ir(x.operator, Val(:JAQCD)) : ir(x.operator, x.target, Val(:JAQCD))
+ir(x::Instruction{O}, ::Val{:OpenQASM}; kwargs...) where {O<:Operator} = isempty(x.target) ? ir(x.operator, Val(:OpenQASM); kwargs...) : ir(x.operator, x.target, Val(:OpenQASM); kwargs...)
 
 conc_types = filter(Base.isconcretetype, vcat(subtypes(AbstractIR), subtypes(CompilerDirective)))
 nt_dict = merge([Dict(zip(fieldnames(t), (Union{Nothing, x} for x in fieldtypes(t)))) for t in conc_types]...)
 ks = tuple(:angles, keys(nt_dict)...)
 vs = Tuple{Union{Nothing, Vector{Float64}}, values(nt_dict)...}
 inst_typ = NamedTuple{ks, vs}
+StructTypes.lowertype(::Type{Instruction{O}}) where {O} = inst_typ
 StructTypes.lowertype(::Type{Instruction}) = inst_typ
-Instruction(x::Instruction) = x
+Instruction(x::Instruction{O}) where {O<:Braket.Operator} = x
 function Instruction(x)
     sts    = merge(StructTypes.subtypes(Gate), StructTypes.subtypes(Noise), StructTypes.subtypes(CompilerDirective))
     o_type = sts[Symbol(x[:type])]
@@ -64,18 +67,21 @@ function Instruction(x)
     target = reduce(vcat, raw_target)
     return Instruction(op, target)
 end
+Instruction(x::Dict{String, <:Any}) = Instruction(Dict(Symbol(k)=>v for (k,v) in x))
 StructTypes.constructfrom(::Type{Instruction}, x::Union{Dict{Symbol, Any}, NamedTuple}) = Instruction(x)
-Base.:(==)(ix1::Instruction, ix2::Instruction) = (ix1.operator == ix2.operator && ix1.target == ix2.target)
-qubits(ix::Instruction) = ix.target
-qubit_count(ix::Instruction) = length(ix.target)
+Base.:(==)(ix1::Instruction{O}, ix2::Instruction{O}) where {O<:Operator} = (ix1.operator == ix2.operator && ix1.target == ix2.target)
+qubits(ix::Instruction{O}) where {O<:Operator} = ix.target
+qubit_count(ix::Instruction{O}) where {O<:Operator} = length(ix.target)
+qubits(ixs::Vector{Instruction{O}}) where {O<:Operator}  = mapreduce(ix->ix.target, union!, ixs, init=Set{Int}())
 qubits(ixs::Vector{Instruction}) = mapreduce(ix->ix.target, union!, ixs, init=Set{Int}())
+qubit_count(ixs::Vector{Instruction{O}}) where {O<:Operator} = length(qubits(ixs)) 
 qubit_count(ixs::Vector{Instruction}) = length(qubits(ixs)) 
 
-bind_value!(ix::Instruction, param_values::Dict{Symbol, Number}) = Instruction(bind_value!(ix.operator, param_values), ix.target)
+bind_value!(ix::Instruction{O}, param_values::Dict{Symbol, Number}) where {O<:Operator} = Instruction{O}(bind_value!(ix.operator, param_values), ix.target)
 
-remap(ix::Instruction, mapping::Dict{<:Integer, <:Integer}) = Instruction(copy(ix.operator), [mapping[q] for q in ix.target])
-remap(ix::Instruction, target::VecOrQubitSet) = Instruction(copy(ix.operator), target[1:length(ix.target)])
-remap(ix::Instruction, target::IntOrQubit)    = Instruction(copy(ix.operator), target)
+remap(ix::Instruction{O}, mapping::Dict{<:Integer, <:Integer}) where {O<:Operator} = Instruction{O}(copy(ix.operator), [mapping[q] for q in ix.target])
+remap(ix::Instruction{O}, target::VecOrQubitSet) where {O<:Operator} = Instruction{O}(copy(ix.operator), target[1:length(ix.target)])
+remap(ix::Instruction{O}, target::IntOrQubit) where {O<:Operator}    = Instruction{O}(copy(ix.operator), target)
 
 function StructTypes.constructfrom(::Type{Program}, obj)
     new_obj = copy(obj)

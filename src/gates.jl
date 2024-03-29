@@ -126,7 +126,7 @@ struct Unitary <: Gate
     matrix::Matrix{ComplexF64}
     Unitary(matrix::Matrix{<:Number}) = new(ComplexF64.(matrix))
 end
-Unitary(mat::Vector{Vector{Vector{Float64}}}) = Unitary(complex_matrix_from_ir(mat))
+Unitary(mat::Vector{Vector{Vector{T}}}) where {T} = Unitary(complex_matrix_from_ir(mat))
 Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix == u2.matrix
 qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
 chars(g::Unitary)       = ntuple(i->"U", qubit_count(g))

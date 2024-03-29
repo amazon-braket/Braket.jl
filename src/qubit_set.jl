@@ -106,7 +106,8 @@ function Base.show(io::IO, qs::QubitSet)
     print(io, join([sprint(show, q) for q in qs], ", "))
     print(io, ")")
 end
-
+Base.convert(::Type{QubitSet}, q::Integer) = QubitSet(q)
+Base.convert(::Type{QubitSet}, v::Vector{<:Integer}) = QubitSet(v)
 Base.sort(qs::QubitSet; kwargs...) = QubitSet(sort(collect(qs); kwargs...))
 
 const VecOrQubitSet = Union{Vector, QubitSet}

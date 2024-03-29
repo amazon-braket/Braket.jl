@@ -99,3 +99,11 @@ function complex_matrix_from_ir(mat::Vector{Vector{Vector{T}}}) where {T<:Number
     end
     return m
 end
+
+function complex_matrix_from_ir(mat::Vector{Vector{Vector{Any}}})
+    m = zeros(ComplexF64, length(mat), length(mat))
+    for ii in 1:length(mat), jj in 1:length(mat)
+        m[ii,jj] = complex(mat[ii][jj][1], mat[ii][jj][2])
+    end
+    return m
+end
