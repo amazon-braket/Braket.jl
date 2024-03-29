@@ -146,5 +146,4 @@ include("aws_jobs.jl")
 include("local_jobs.jl")
 include("task.jl")
 include("task_batch.jl")
-include("precompile.jl")
 end # module
