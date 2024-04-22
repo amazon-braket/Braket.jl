@@ -49,7 +49,7 @@ for (typ, ir_typ, label) in ((:Expectation, :(Braket.IR.Expectation), "expectati
             end
         end
         $typ(o::Vector{String}, targets::QubitSet) = $typ(Observables.TensorProduct(o), targets)
-        $typ(o) = $typ(o, QubitSet())
+        $typ(o::Union{Observables.Observable, String, Vector{String}}) = $typ(o, QubitSet())
         Base.:(==)(e1::$typ, e2::$typ) = (e1.observable == e2.observable && e1.targets == e2.targets)
         StructTypes.StructType(::Type{$typ}) = StructTypes.CustomStruct()
         StructTypes.lower(x::$typ) = $ir_typ(StructTypes.lower(x.observable), (isempty(x.targets) ? nothing : Int.(x.targets)), $label)
@@ -58,7 +58,7 @@ for (typ, ir_typ, label) in ((:Expectation, :(Braket.IR.Expectation), "expectati
             obs_ir = ir(r.observable, r.targets, Val(:OpenQASM); serialization_properties=serialization_properties)
             return "#pragma braket result " * $label * " $obs_ir"
         end
-        $typ(x::union_obs_typ) = $typ(StructTypes.constructfrom(Observables.Observable, x.observable), x.targets)
+        $typ(x::union_obs_typ) = $typ(StructTypes.constructfrom(Observables.Observable, x.observable), QubitSet(x.targets))
         chars(x::$typ) = (uppercasefirst($label) * "(" * chars(x.observable)[1] * ")",) 
     end
 end
