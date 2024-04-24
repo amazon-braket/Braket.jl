@@ -175,7 +175,7 @@ end
 (c::Circuit)(::Type{T}, args...) where {T<:Gate}  = apply_gate!(T, c, args...)
 (c::Circuit)(::Type{T}, args...) where {T<:Noise} = apply_noise!(T, c, args...)
 (c::Circuit)(::Type{T}) where {T<:CompilerDirective} = add_instruction!(c, Instruction{T}(T()))
-(c::Circuit)(g::QO, args...) where {QO<:QuantumOperator} = add_instruction!(c, Instruction{QO}(g, args...))
+(c::Circuit)(g::QO, args...) where {QO<:QuantumOperator} = add_instruction!(c, Instruction(g, args...))
 (c::Circuit)(g::CD) where {CD<:CompilerDirective} = add_instruction!(c, Instruction{CD}(g))
 (c::Circuit)(v::AbstractVector) = foreach(vi->c(vi...), v)
 (c::Circuit)(rt::Result, args...) = add_result_type!(c, rt, args...)

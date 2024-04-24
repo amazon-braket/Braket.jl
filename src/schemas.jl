@@ -24,6 +24,7 @@ struct Instruction{O<:Operator}
     operator::O
     target::QubitSet
 end
+Instruction(o::O, target...) where {O<:Operator} = Instruction{O}(o, QubitSet(target...))
 Instruction(o::O, target) where {O<:Operator} = Instruction{O}(o, QubitSet(target...))
 Instruction{CD}(cd::CD) where {CD<:CompilerDirective} = Instruction{CD}(cd, QubitSet(Int[]))
 Instruction(cd::CD) where {CD<:CompilerDirective} = Instruction{CD}(cd, Int[])

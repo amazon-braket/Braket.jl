@@ -144,7 +144,7 @@ struct TensorProduct{O} <: Observable where {O<:Observable}
         return new(flat_v, coeff)
     end
 end
-TensorProduct(o::Vector{T}, coefficient::Float64=1.0) where {T} = TensorProduct{T}(o, coefficient)
+TensorProduct(o::Vector{T}, coefficient::Float64=1.0) where {T<:Union{String, Observable}} = TensorProduct{T}(o, coefficient)
 function TensorProduct(o::Vector{String}, coefficient::Float64=1.0)
     return TensorProduct([StructTypes.constructfrom(Observable, s) for s in o], coefficient)
 end

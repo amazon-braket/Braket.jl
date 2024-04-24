@@ -77,9 +77,9 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
 	    r_ix = 1
 	    results = Vector{GateModelQuantumTaskResult}(undef, length(task_specs))
 	    while r_ix <= length(task_specs)
-                ix, res = take!(done_tasks_ch)
-		results[ix] = res
-		r_ix += 1
+            ix, res = take!(done_tasks_ch)
+            results[ix] = res
+            r_ix += 1
 	    end
     end
     @debug "batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
