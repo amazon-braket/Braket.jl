@@ -1,11 +1,11 @@
 using Braket, PyBraket, Test, LinearAlgebra, PythonCall
-using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
+using PythonCall: pyconvert, Py, pyisinstance
 @testset "PyBraket circuits" begin
     @testset for ir_type in (:JAQCD, :OpenQASM)
         Braket.IRType[] = ir_type 
         @testset "Expectation" begin
             c = Circuit([(H, 0), (CNot, 0, 1), (Expectation, Braket.Observables.Z(), 0)])
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             braket_task = run(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ 0.0 atol=1e-12
@@ -13,7 +13,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
 
         @testset "Variance" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Variance(ci, Braket.Observables.Z(), 0))
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             braket_task = run(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ 1.0 atol=1e-12
@@ -21,7 +21,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
 
         @testset "Probability" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Probability(ci))
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             braket_task = run(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ [0.5, 0.0, 0.0, 0.5] atol=1e-12
@@ -29,7 +29,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
 
         @testset "DensityMatrix" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->DensityMatrix(ci))
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             braket_task = run(dev, c, shots=0)
             res = result(braket_task)
             ρ = zeros(ComplexF64, 4, 4)
@@ -44,7 +44,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
 
         @testset "Results type" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Expectation(ci, Braket.Observables.Z(), 0))
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             braket_task = run(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ 0.0 atol=1e-12
@@ -53,7 +53,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
 
         @testset "Observable on all qubits" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Expectation(ci, Braket.Observables.Z()))
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             res = result(run(dev, c, shots=0))
             @test pyconvert(Vector{Float64}, res.values[1]) ≈ [0.0, 0.0] atol=1e-12
         end
@@ -66,7 +66,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
             Unitary(c, [0, 1, 2], ccz_mat)
             H(c, [0, 1, 2])
             StateVector(c)
-            dev = LocalSimulator()
+            dev = PyBraket.LocalSimulator()
             braket_task = run(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ ComplexF64[0.75, 0.25, 0.25, -0.25, 0.25, -0.25, -0.25, 0.25] atol=1e-12
@@ -93,7 +93,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
                     obs = rt(o, [0])
                     py_obs = Py(obs)
                     ir_obs = ir(obs)
-                    @test pyisTrue(py_obs.to_ir() == Py(ir_obs))
+                    @test pyconvert(Bool, py_obs.to_ir() == Py(ir_obs))
                     @test pyconvert(ir_rt, Py(ir_obs)) == ir_obs
                 end
                 @testset for (rt, ir_rt) in ((Braket.Probability, Braket.IR.Probability),
@@ -101,27 +101,27 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
                     obs = rt([0])
                     py_obs = Py(obs)
                     ir_obs = ir(obs)
-                    @test pyisTrue(py_obs.to_ir() == Py(ir_obs))
+                    @test pyconvert(Bool, py_obs.to_ir() == Py(ir_obs))
                     @test pyconvert(ir_rt, Py(ir_obs)) == ir_obs
 
                     obs = rt()
                     py_obs = Py(obs)
                     ir_obs = ir(obs)
-                    @test pyisTrue(py_obs.to_ir() == Py(ir_obs))
+                    @test pyconvert(Bool, py_obs.to_ir() == Py(ir_obs))
                     @test pyconvert(ir_rt, Py(ir_obs)) == ir_obs
                 end
                 @testset "(rt, ir_rt) = (Amplitude, IR.Amplitude)" begin
                     obs = Braket.Amplitude(["0000"])
                     py_obs = Py(obs)
                     ir_obs = ir(obs)
-                    @test pyisTrue(py_obs.to_ir() == Py(ir_obs))
+                    @test pyconvert(Bool, py_obs.to_ir() == Py(ir_obs))
                     @test pyconvert(Braket.IR.Amplitude, Py(ir_obs)) == ir_obs
                 end
                 @testset "(rt, ir_rt) = (StateVector, IR.StateVector)" begin
                     obs = Braket.StateVector()
                     py_obs = Py(obs)
                     ir_obs = ir(obs)
-                    @test pyisTrue(py_obs.to_ir() == Py(ir_obs))
+                    @test pyconvert(Bool, py_obs.to_ir() == Py(ir_obs))
                     @test pyconvert(Braket.IR.StateVector, Py(ir_obs)) == ir_obs
                 end
                 @testset "HermitianObservable and TensorProduct" begin
@@ -136,7 +136,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
                     o = 3.0 * Braket.Observables.Z()
                     py_obs = Py(o)
                     @test pyisinstance(py_obs, PyBraket.braketobs.Z)
-                    @test pyisTrue(py_obs.coefficient == 3.0)
+                    @test pyconvert(Bool, py_obs.coefficient == 3.0)
                 end
                 @testset "Sum" begin
                     m = [1. -im; im -1.]
@@ -168,7 +168,7 @@ using PythonCall: pyconvert, Py, pyisTrue, pyisinstance
             py_c2 = PyCircuit(non_para_circ)
             @test py_c2 == py_c1(1.0)
             @testset "running with inputs" begin 
-                dev = LocalSimulator()
+                dev = PyBraket.LocalSimulator()
                 oq3_circ = ir(circ, Val(:OpenQASM))
                 braket_task = run(dev, oq3_circ, shots=0, inputs=Dict(string(α)=>1.0, string(θ)=>2.0))
                 res = result(braket_task)

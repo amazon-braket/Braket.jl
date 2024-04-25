@@ -45,14 +45,14 @@ for gate_def in (
         """
         struct $G <: AngledGate{$n_angle}
             angle::NTuple{$n_angle, Union{Float64, FreeParameter}}
-            $G(angle::NTuple{$n_angle, Union{Float64, FreeParameter}}) = new(angle)
+            $G(angle::T) where {T<:NTuple{$n_angle, Union{Float64, FreeParameter}}} = new(angle)
         end
         $G(angles::Vararg{Union{Float64, FreeParameter}}) = $G(tuple(angles...))
+        $G(angles::Vararg{Number}) = $G((Float64(a) for a in angles)...)
         chars(::Type{$G}) = $c
         qubit_count(::Type{$G}) = $qc
     end
 end
-(::Type{G})(angle::Union{Float64, FreeParameter}) where {G<:AngledGate} = G((angles,))
 
 for gate_def in (
 	(:H, :1, ("H",)),
@@ -91,16 +91,17 @@ end
 label(::Type{G}) where {G<:Gate} = lowercase(string(G))
 (::Type{G})(x::Tuple{}) where {G<:Gate} = G()
 (::Type{G})(x::Tuple{}) where {G<:AngledGate} = throw(ArgumentError("angled gate must be constructed with at least one angle."))
-(::Type{G})(x::AbstractVector) where {G<:AngledGate} = G(x...) 
-qubit_count(g::G) where {G<:Gate} = qubit_count(G)
-angles(g::G) where {G<:Gate} = ()
+(::Type{G})(x::AbstractVector) where {G<:AngledGate} = G(x...)
+(::Type{G})(x::T) where {G<:AngledGate{1}, T<:Union{Float64, FreeParameter}} = G((x,))
+qubit_count(g::G) where {G<:Gate}  = qubit_count(G)
+angles(g::G) where {G<:Gate}       = ()
 angles(g::AngledGate{N}) where {N} = g.angle
-chars(g::G) where {G<:Gate} = map(char->replace(string(char), "ang"=>join(string.(angles(g)), ", ")), chars(G))
-ir_typ(::Type{G}) where {G<:Gate} = getproperty(IR, Symbol(G))
-ir_typ(g::G) where {G<:Gate} = ir_typ(G)
-label(g::G) where {G<:Gate} = label(G)
+chars(g::G) where {G<:Gate}        = map(char->replace(string(char), "ang"=>join(string.(angles(g)), ", ")), chars(G))
+ir_typ(::Type{G}) where {G<:Gate}  = getproperty(IR, Symbol(G))
+ir_typ(g::G) where {G<:Gate}       = ir_typ(G)
+label(g::G) where {G<:Gate}        = label(G)
 ir_str(g::G) where {G<:AngledGate} = label(g) * "(" * join(string.(angles(g)), ", ") * ")"
-ir_str(g::G) where {G<:Gate} = label(g)
+ir_str(g::G) where {G<:Gate}       = label(g)
 targets_and_controls(g::G, target::QubitSet) where {G<:Gate} = IR._generate_control_and_target(IR.ControlAndTarget(ir_typ(g))..., target)
 function ir(g::G, target::QubitSet, ::Val{:JAQCD}; kwargs...) where {G<:Gate}
     t_c = targets_and_controls(g, target)
@@ -125,7 +126,7 @@ struct Unitary <: Gate
     matrix::Matrix{ComplexF64}
     Unitary(matrix::Matrix{<:Number}) = new(ComplexF64.(matrix))
 end
-Unitary(mat::Vector{Vector{Vector{Float64}}}) = Unitary(complex_matrix_from_ir(mat))
+Unitary(mat::Vector{Vector{Vector{T}}}) where {T} = Unitary(complex_matrix_from_ir(mat))
 Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix == u2.matrix
 qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
 chars(g::Unitary)       = ntuple(i->"U", qubit_count(g))

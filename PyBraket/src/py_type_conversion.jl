@@ -54,7 +54,7 @@ function jl_convert_attr(n, t, attr)
             return pyconvert(t, attr)
         end
     else
-        PythonCall.pyisnone(attr) && return nothing
+        PythonCall.pyis(attr, PythonCall.pybuiltins.None) && return nothing
         return union_convert(t, attr)
     end
 end

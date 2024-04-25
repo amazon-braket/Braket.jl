@@ -43,7 +43,7 @@ using Braket: AtomArrangement, AtomArrangementItem, TimeSeries, DrivingField, Aw
     drive                   = DrivingField(Ω, ϕ, Δ)
     ahs_program             = AnalogHamiltonianSimulation(register, drive)
 
-    ahs_local    = LocalSimulator("braket_ahs")
+    ahs_local    = PyBraket.LocalSimulator("braket_ahs")
     local_result = result(run(ahs_local, ahs_program, shots=1_000))
     @test length(local_result.measurements) == 1_000
 
@@ -82,7 +82,7 @@ end
     drive                   = DrivingField(Ω, ϕ, Δ)
     ahs_program             = AnalogHamiltonianSimulation(register, drive)
 
-    ahs_local    = LocalSimulator("braket_ahs")
+    ahs_local    = PyBraket.LocalSimulator("braket_ahs")
     local_result = result(run(ahs_local, ahs_program, shots=1_000))
     
     g_count = 0

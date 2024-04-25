@@ -1,5 +1,5 @@
 using Test, PyBraket, Braket, Braket.IR, PythonCall
-using PythonCall: Py, pyconvert, pyisTrue
+using PythonCall: Py, pyconvert
 
 using Braket: I
 
@@ -20,7 +20,7 @@ using Braket: I
         g    = gate()
         ir_g = Braket.ir(g, 0)
         py_g = Py(g)
-        @test pyisTrue(py_g.to_ir([0]) == Py(ir_g))
+        @test pyconvert(Bool, py_g.to_ir([0]) == Py(ir_g))
         @test pyconvert(ir_gate, Py(ir_g)) == ir_g
     end
     @testset for (gate, ir_gate) in ((PhaseShift, IR.PhaseShift),
@@ -32,7 +32,7 @@ using Braket: I
         g     = gate(angle)
         ir_g  = Braket.ir(g, 0)
         py_g  = Py(g)
-        @test pyisTrue(py_g.to_ir([0]) == Py(ir_g))
+        @test pyconvert(Bool, py_g.to_ir([0]) == Py(ir_g))
         @test pyconvert(ir_gate, Py(ir_g)) == ir_g
     end
     @testset for (gate, ir_gate) in ((CNot, IR.CNot),
@@ -46,7 +46,7 @@ using Braket: I
         g    = gate()
         ir_g = Braket.ir(g, [0, 1])
         py_g = Py(g)
-        @test pyisTrue(py_g.to_ir([0, 1]) == Py(ir_g))
+        @test pyconvert(Bool, py_g.to_ir([0, 1]) == Py(ir_g))
         @test pyconvert(ir_gate, Py(ir_g)) == ir_g
     end
     @testset for (gate, ir_gate) in ((CPhaseShift, IR.CPhaseShift),
@@ -62,14 +62,14 @@ using Braket: I
         g     = gate(angle)
         ir_g  = Braket.ir(g, [0, 1])
         py_g  = Py(g)
-        @test pyisTrue(py_g.to_ir([0, 1]) == Py(ir_g))
+        @test pyconvert(Bool, py_g.to_ir([0, 1]) == Py(ir_g))
         @test pyconvert(ir_gate, Py(ir_g)) == ir_g
     end
     @testset for (gate, ir_gate) in ((CCNot, IR.CCNot), (CSwap, IR.CSwap))
         g    = gate()
         ir_g = Braket.ir(g, [0, 1, 2])
         py_g = Py(g)
-        @test pyisTrue(py_g.to_ir([0, 1, 2]) == Py(ir_g))
+        @test pyconvert(Bool, py_g.to_ir([0, 1, 2]) == Py(ir_g))
         @test pyconvert(ir_gate, Py(ir_g)) == ir_g
     end
     @testset "(gate, ir_gate) = (Unitary, IR.Unitary)" begin
@@ -77,7 +77,7 @@ using Braket: I
         n    = Unitary(mat)
         ir_n = Braket.ir(n, 0)
         py_n = Py(n)
-        @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
+        @test pyconvert(Bool, py_n.to_ir([0]) == Py(ir_n))
         @test pyconvert(IR.Unitary, Py(ir_n)) == ir_n
     end
     Braket.IRType[] = :OpenQASM

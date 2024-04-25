@@ -6,7 +6,7 @@ mutable struct PyCircuit
 end
 (c::PyCircuit)(arg::Number; kwargs...)   = PyCircuit(Py(c)(arg; kwargs...))
 (c::PyCircuit)(; kwargs...)              = PyCircuit(Py(c)(; kwargs...))
-Base.:(==)(c1::PyCircuit, c2::PyCircuit) = PythonCall.pyisTrue(Py(c1) == Py(c2))
+Base.:(==)(c1::PyCircuit, c2::PyCircuit) = pyconvert(Bool, Py(c1) == Py(c2))
 Py(c::PyCircuit) = getfield(c, :o)
 Base.getproperty(c::PyCircuit, s::Symbol)             = pyconvert(Any, getproperty(Py(c), s))
 Base.getproperty(c::PyCircuit, s::AbstractString)     = pyconvert(Any, getproperty(Py(c), s))

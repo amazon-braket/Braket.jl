@@ -41,9 +41,15 @@ for (typ, ir_typ, label) in ((:Expectation, :(Braket.IR.Expectation), "expectati
           - An `Int` or `Qubit`
           - Absent, in which case the observable `o` will be applied to all qubits provided it is a single qubit observable.
         """ $typ(o, targets) = $typ(o, QubitSet(targets))
-        $typ(o::String, targets::QubitSet) = $typ(Observables.TensorProduct([o for ii in 1:length(targets)]), targets)
+        function $typ(o::String, targets::QubitSet)
+            return if !isempty(targets)
+                $typ(Observables.TensorProduct([o for ii in 1:length(targets)]), targets)
+            else
+                $typ(StructTypes.constructfrom(Observable, o), targets)
+            end
+        end
         $typ(o::Vector{String}, targets::QubitSet) = $typ(Observables.TensorProduct(o), targets)
-        $typ(o) = $typ(o, QubitSet())
+        $typ(o::Union{Observables.Observable, String, Vector{String}}) = $typ(o, QubitSet())
         Base.:(==)(e1::$typ, e2::$typ) = (e1.observable == e2.observable && e1.targets == e2.targets)
         StructTypes.StructType(::Type{$typ}) = StructTypes.CustomStruct()
         StructTypes.lower(x::$typ) = $ir_typ(StructTypes.lower(x.observable), (isempty(x.targets) ? nothing : Int.(x.targets)), $label)
@@ -52,7 +58,7 @@ for (typ, ir_typ, label) in ((:Expectation, :(Braket.IR.Expectation), "expectati
             obs_ir = ir(r.observable, r.targets, Val(:OpenQASM); serialization_properties=serialization_properties)
             return "#pragma braket result " * $label * " $obs_ir"
         end
-        $typ(x::union_obs_typ) = $typ(StructTypes.constructfrom(Observables.Observable, x.observable), x.targets)
+        $typ(x::union_obs_typ) = $typ(StructTypes.constructfrom(Observables.Observable, x.observable), QubitSet(x.targets))
         chars(x::$typ) = (uppercasefirst($label) * "(" * chars(x.observable)[1] * ")",) 
     end
 end
@@ -187,7 +193,7 @@ function ir(ag::AdjointGradient, ::Val{:OpenQASM}; serialization_properties::Ser
 end
 StructTypes.StructType(::Type{AdjointGradient}) = StructTypes.CustomStruct()
 function StructTypes.lower(x::AdjointGradient)
-    lowered_obs = ir(x.observable, Val(:JAQCD))
+    lowered_obs     = StructTypes.lower(x.observable)
     lowered_targets = (isempty(x.targets) ? nothing : convert(Vector{Vector{Int}}, x.targets))
     Braket.IR.AdjointGradient(x.parameters, lowered_obs, lowered_targets, "adjoint_gradient")
 end
@@ -196,7 +202,7 @@ function AdjointGradient(x::@NamedTuple{parameters::Union{Nothing, Vector{String
     params = isnothing(x.parameters) || isempty(x.parameters) ? ["all"] : x.parameters
     obs = StructTypes.constructfrom(Observables.Observable, x.observable)
     targets = isnothing(x.targets) || isempty(x.targets) ? QubitSet[] : [QubitSet(t) for t in x.targets]
-    return AdjointGradient(obs, targets, parameters)
+    return AdjointGradient(obs, targets, params)
 end
 chars(x::AdjointGradient) = ("AdjointGradient(H)",) 
 
@@ -259,7 +265,7 @@ StateVector(x::@NamedTuple{type::String}) = StateVector()
 ir(r::Result, ::Val{:JAQCD}; kwargs...) = StructTypes.lower(r)
 ir(r::Result; kwargs...) = ir(r, Val(IRType[]); kwargs...)
 StructTypes.StructType(::Type{Result}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{Result}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, statevector=StateVector, variance=Variance, sample=Sample, densitymatrix=DensityMatrix)
+StructTypes.subtypes(::Type{Result}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, statevector=StateVector, variance=Variance, sample=Sample, densitymatrix=DensityMatrix, adjoint_gradient=AdjointGradient)
 
 function StructTypes.constructfrom(::Type{R}, obj) where {R<:Result}
     return R((getproperty(obj, fn) for fn in fieldnames(R))...)

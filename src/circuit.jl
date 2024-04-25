@@ -14,9 +14,9 @@ See:
 """
 mutable struct Circuit
     moments::Moments
-    instructions::Vector{Instruction}
+    instructions::Vector{Instruction{<:Operator}}
     result_types::Vector{Result}
-    basis_rotation_instructions::Vector{Instruction}
+    basis_rotation_instructions::Vector{Instruction{<:Operator}}
     qubit_observable_mapping::Dict{Int, Observables.Observable}
     qubit_observable_target_mapping::Dict{Int, Tuple}
     qubit_observable_set::Set{Int}
@@ -40,8 +40,8 @@ a vector of [`Result`](@ref)s, and a vector of basis rotation instructions.
 function Circuit(m::Moments, ixs::Vector, rts::Vector{Result}, bri::Vector)
     c = Circuit()
     c.moments = deepcopy(m)
-    c.instructions = deepcopy(ixs)
-    c.basis_rotation_instructions = deepcopy(bri)
+    c.instructions = Instruction.(deepcopy(ixs))
+    c.basis_rotation_instructions = Instruction.(deepcopy(bri))
     foreach(rt->add_result_type!(c, rt), rts)
     return c
 end
@@ -174,9 +174,9 @@ end
 
 (c::Circuit)(::Type{T}, args...) where {T<:Gate}  = apply_gate!(T, c, args...)
 (c::Circuit)(::Type{T}, args...) where {T<:Noise} = apply_noise!(T, c, args...)
-(c::Circuit)(::Type{T}) where {T<:CompilerDirective} = add_instruction!(c, Instruction(T()))
-(c::Circuit)(g::QuantumOperator, args...) = add_instruction!(c, Instruction(g, args...))
-(c::Circuit)(g::CompilerDirective) = add_instruction!(c, Instruction(g))
+(c::Circuit)(::Type{T}) where {T<:CompilerDirective} = add_instruction!(c, Instruction{T}(T()))
+(c::Circuit)(g::QO, args...) where {QO<:QuantumOperator} = add_instruction!(c, Instruction(g, args...))
+(c::Circuit)(g::CD) where {CD<:CompilerDirective} = add_instruction!(c, Instruction{CD}(g))
 (c::Circuit)(v::AbstractVector) = foreach(vi->c(vi...), v)
 (c::Circuit)(rt::Result, args...) = add_result_type!(c, rt, args...)
 (c::Circuit)(::Type{T}, args...) where {T<:Result} = T(c, args...)
@@ -264,7 +264,12 @@ julia> qubits(c)
 QubitSet(0, 1)
 ```
 """
-qubits(c::Circuit)      = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
+qubits(c::Circuit) = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
+function qubits(p::Program)
+    inst_qubits = mapreduce(ix->ix.target, union, p.instructions, init=Set{Int}())
+    res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? reduce(vcat, ix.targets) : Set{Int}(), union, p.results, init=Set{Int}())
+    return union(inst_qubits, res_qubits)
+end
 """
     qubit_count(c::Circuit) -> Int
 
@@ -283,7 +288,7 @@ julia> qubit_count(c)
 ```
 """
 qubit_count(c::Circuit) = length(qubits(c))
-qubit_count(p::Program) = length(mapreduce(ix->ix.target, union, p.instructions))
+qubit_count(p::Program) = length(qubits(p))
 
 (rt::Result)(c::Circuit) = add_result_type!(c, rt)
 
@@ -388,7 +393,7 @@ basis_rotation_gates(o::Observables.TensorProduct) = tuple(reduce(vcat, basis_ro
 basis_rotation_gates(o::Observables.HermitianObservable) = (Unitary(Matrix(adjoint(eigvecs(o.matrix)))),)
 
 
-_observable_to_instruction(observable::Observables.Observable, target_list)::Vector{Instruction} = [Instruction(gate, target_list) for gate in basis_rotation_gates(observable)]
+_observable_to_instruction(observable::Observables.Observable, target_list)::Vector{Instruction{<:Operator}} = [Instruction(gate, target_list) for gate in basis_rotation_gates(observable)]
 
 """
     basis_rotation_instructions!(c::Circuit)
@@ -500,7 +505,7 @@ end
 add_result_type!(c::Circuit, rt::Result, target) = add_result_type!(c, remap(rt, target))
 add_result_type!(c::Circuit, rt::Result, target_mapping::Dict{<:Integer, <:Integer}) = add_result_type!(c, remap(rt, target_mapping))
 
-function add_instruction!(c::Circuit, ix::Instruction)
+function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
     to_add = [ix]
     if ix.operator isa QuantumOperator && Parametrizable(ix.operator) == Parametrized()
         for param in parameters(ix.operator)
@@ -512,7 +517,7 @@ function add_instruction!(c::Circuit, ix::Instruction)
     return c
 end
 
-function add_instruction!(c::Circuit, ix::Instruction, target)
+function add_instruction!(c::Circuit, ix::Instruction{O}, target) where {O<:Operator}
     to_add = Instruction[]
     if qubit_count(ix.operator) == 1
         to_add = [remap(ix, q) for q in target]
@@ -523,7 +528,7 @@ function add_instruction!(c::Circuit, ix::Instruction, target)
     return c
 end
 
-function add_instruction!(c::Circuit, ix::Instruction, target_mapping::Dict{<:Integer, <:Integer})
+function add_instruction!(c::Circuit, ix::Instruction{O}, target_mapping::Dict{<:Integer, <:Integer}) where {O<:Operator}
     to_add = [remap(ix, target_mapping)]
     foreach(ix->add_instruction!(c, ix), to_add)
     return c

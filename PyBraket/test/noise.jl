@@ -1,12 +1,12 @@
 using Test, PyBraket, Braket, Braket.IR, PythonCall
-using PythonCall: Py, pyconvert, pyisTrue
+using PythonCall: Py, pyconvert
 
 @testset "Noise" begin
     circ  = CNot(H(Circuit(), 0), 0, 1)
     noise = BitFlip(0.1)
     circ  = Braket.apply_gate_noise!(circ, noise)
 
-    device = LocalSimulator("braket_dm")
+    device = PyBraket.LocalSimulator("braket_dm")
     # run the circuit on the local simulator
     task = run(device, circ, shots=1000)
 
@@ -37,14 +37,14 @@ using PythonCall: Py, pyconvert, pyisTrue
             n = noise(0.1)
             ir_n = Braket.ir(n, 0)
             py_n = Py(n)
-            @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
+            @test pyconvert(Bool, py_n.to_ir([0]) == Py(ir_n))
             @test pyconvert(ir_noise, Py(ir_n)) == ir_n
         end
         @testset "(noise, ir_noise) = (PauliChannel, IR.PauliChannel)" begin
             n = PauliChannel(0.1, 0.2, 0.1)
             ir_n = Braket.ir(n, 0)
             py_n = Py(n)
-            @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
+            @test pyconvert(Bool, py_n.to_ir([0]) == Py(ir_n))
             @test pyconvert(IR.PauliChannel, Py(ir_n)) == ir_n
         end
         @testset "(noise, ir_noise) = (MultiQubitPauliChannel{1}, IR.MultiQubitPauliChannel)" begin
@@ -56,7 +56,7 @@ using PythonCall: Py, pyconvert, pyisTrue
             n = TwoQubitPauliChannel(Dict("XX"=>0.1, "YY"=>0.2))
             ir_n = Braket.ir(n, [0, 1])
             py_n = Py(n)
-            @test pyisTrue(py_n.to_ir([0, 1]) == Py(ir_n))
+            @test pyconvert(Bool, py_n.to_ir([0, 1]) == Py(ir_n))
             @test pyconvert(IR.MultiQubitPauliChannel, Py(ir_n)) == ir_n
         end
         @testset for (noise, ir_noise) in ((TwoQubitDephasing, IR.TwoQubitDephasing),
@@ -64,14 +64,14 @@ using PythonCall: Py, pyconvert, pyisTrue
             n = noise(0.4)
             ir_n = Braket.ir(n, [0, 1])
             py_n = Py(n)
-            @test pyisTrue(py_n.to_ir([0, 1]) == Py(ir_n))
+            @test pyconvert(Bool, py_n.to_ir([0, 1]) == Py(ir_n))
             @test pyconvert(ir_noise, Py(ir_n)) == ir_n
         end
         @testset "(noise, ir_noise) = (GeneralizedAmplitudeDamping, IR.GeneralizedAmplitudeDamping)" begin
             n = GeneralizedAmplitudeDamping(0.1, 0.2)
             ir_n = Braket.ir(n, 0)
             py_n = Py(n)
-            @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
+            @test pyconvert(Bool, py_n.to_ir([0]) == Py(ir_n))
             @test pyconvert(IR.GeneralizedAmplitudeDamping, Py(ir_n)) == ir_n
         end
         @testset "(noise, ir_noise) = (Kraus, IR.Kraus)" begin
@@ -79,7 +79,7 @@ using PythonCall: Py, pyconvert, pyisTrue
             n = Kraus([mat])
             ir_n = Braket.ir(n, 0)
             py_n = Py(n)
-            @test pyisTrue(py_n.to_ir([0]) == Py(ir_n))
+            @test pyconvert(Bool, py_n.to_ir([0]) == Py(ir_n))
             @test pyconvert(IR.Kraus, Py(ir_n)) == ir_n
         end 
         Braket.IRType[] = :OpenQASM

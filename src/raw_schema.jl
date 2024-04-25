@@ -167,6 +167,8 @@ const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}
 Base.convert(::Type{IRObservable}, v::Vector{String}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
 Base.convert(::Type{IRObservable}, s::String)         = s
 Base.convert(::Type{IRObservable}, v::Vector{Vector{Vector{Vector{Float64}}}}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
+Base.:(==)(s::String, iro::IRObservable) = all(iro .== s)
+Base.:(==)(iro::IRObservable, s::String) = all(iro .== s)
 
 abstract type CompilerDirective <: AbstractIR end
 StructTypes.StructType(::Type{CompilerDirective}) = StructTypes.AbstractType()
@@ -240,9 +242,9 @@ StructTypes.defaults(::Type{T}) = Dict{Symbol, Any}(:type => "t")
 
 struct Program <: AbstractProgram
     braketSchemaHeader::braketSchemaHeader
-    instructions::Vector{Any}
+    instructions::Vector{<:Any}
     results::Union{Nothing, Vector{AbstractProgramResult}}
-    basis_rotation_instructions::Union{Nothing, Vector{Any}}
+    basis_rotation_instructions::Union{Nothing, Vector{<:Any}}
 end
 StructTypes.StructType(::Type{Program}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{Program}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.ir.jaqcd.program", "1"))
