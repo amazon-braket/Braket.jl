@@ -133,12 +133,23 @@ struct TensorProduct{O} <: Observable where {O<:Observable}
     function TensorProduct{O}(v::Vector{O}, coefficient::Float64=1.0) where {O<:Observable}
         any(v_->v_ isa Sum, v) && throw(ArgumentError("Sum observable not allowed in TensorProduct."))
         coeff = prod(coef, v, init=coefficient)
-        flattened_v = Iterators.flatmap(v) do o 
-            if o isa TensorProduct
-                return (unscaled(o) for o in o.factors)
-            else
-                return (unscaled(o),)
+        if VERSION >= v"1.9.0"
+            flattened_v = Iterators.flatmap(v) do o 
+                if o isa TensorProduct
+                    return (unscaled(o) for o in o.factors)
+                else
+                    return (unscaled(o),)
+                end
             end
+        else
+            mapped_v = map(v) do o 
+                if o isa TensorProduct
+                    return (unscaled(o) for o in o.factors)
+                else
+                    return (unscaled(o),)
+                end
+            end
+            flattened_v = Iterators.flatten(mapped_v)
         end
         flat_v = collect(flattened_v)
         return new(flat_v, coeff)
@@ -208,12 +219,15 @@ struct Sum <: Observable
     summands::Vector{Observable}
     coefficient::Float64
     function Sum(v)
-        flattened_v = Iterators.flatmap(v) do obs
-            if obs isa Sum
-                return obs.summands
-            else
-                return (obs,)
+        if VERSION >= v"1.9.0"
+            flattened_v = Iterators.flatmap(v) do obs
+                obs isa Sum ? obs.summands : (obs,)
             end
+        else
+            mapped_v = map(v) do o 
+                obs isa Sum ? obs.summands : (obs,)
+            end
+            flattened_v = Iterators.flatten(mapped_v)
         end
         new(collect(flattened_v), 1.0)
     end
