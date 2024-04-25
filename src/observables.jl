@@ -224,7 +224,7 @@ struct Sum <: Observable
                 obs isa Sum ? obs.summands : (obs,)
             end
         else
-            mapped_v = map(v) do o 
+            mapped_v = map(v) do obs
                 obs isa Sum ? obs.summands : (obs,)
             end
             flattened_v = Iterators.flatten(mapped_v)
