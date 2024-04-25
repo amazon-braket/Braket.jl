@@ -1,3 +1,10 @@
+"""
+    LocalQuantumTask(id::String, result::GateModelQuantumTaskResult)
+
+A quantum task which has been run *locally* using a [`LocalSimulator`](@ref).
+The `state` of a `LocalQuantumTask` is always `"COMPLETED"` as the task object
+is only created once the loca simulation has finished.
+"""
 struct LocalQuantumTask
     id::String
     result::GateModelQuantumTaskResult
@@ -6,12 +13,30 @@ state(b::LocalQuantumTask)  = "COMPLETED"
 id(b::LocalQuantumTask)     = b.id
 result(b::LocalQuantumTask) = b.result
 
+"""
+    LocalQuantumTaskBatch(ids::Vector{String}, results::Vector{GateModelQuantumTaskResult})
+
+A *batch* of quantum tasks which has been run *locally* using a
+[`LocalSimulator`](@ref). 
+"""
 struct LocalQuantumTaskBatch
     ids::Vector{String}
     results::Vector{GateModelQuantumTaskResult}
 end
 results(lqtb::LocalQuantumTaskBatch) = lqtb.results
 
+"""
+    LocalSimulator(backend::Union{String, AbstractBraketSimulator})
+
+A quantum simulator which runs *locally* rather than sending the circuit(s)
+to the cloud to be executed on-demand. A `LocalSimulator` must be created with
+a backend -- either a handle, in the form of a `String`, which uniquely identifies
+a simulator backend registered in [`_simulator_devices`](@ref), or an already instantiated
+simulator object.
+
+`LocalSimulator`s should implement their own method for [`simulate`](@ref) if needed. They
+can process single tasks or task batches.
+"""
 struct LocalSimulator <: Device
     backend::String
     _delegate::AbstractBraketSimulator
@@ -25,6 +50,15 @@ end
 name(s::LocalSimulator) = name(s._delegate)
 device_id(s::String) = s
 
+"""
+    simulate(d::LocalSimulator, task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
+
+Simulate the execution of `task_spec` using the backend of [`LocalSimulator](@ref) `d`.
+`args` are additional arguments to be provided to the backend. `inputs` is used to set
+the value of any [`FreeParameter`](@ref) in `task_spec` and will override the existing
+`inputs` field of an `OpenQasmProgram`. Other `kwargs` will be passed to the backend
+simulator. Returns a [`LocalQuantumTask`](@ref).
+"""
 function simulate(d::LocalSimulator, task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
     sim = d._delegate
     @debug "Single task. Starting run..."
@@ -34,6 +68,31 @@ function simulate(d::LocalSimulator, task_spec::Union{Circuit, AbstractProgram},
     return LocalQuantumTask(local_result.task_metadata.id, local_result)
 end
 
+"""
+    simulate(d::LocalSimulator, task_specs::Vector{T}, args...; kwargs...) where {T}
+
+Simulate the execution of a *batch* of tasks specified by `task_specs`
+using the backend of [`LocalSimulator](@ref) `d`.
+`args` are additional arguments to be provided to the backend.
+
+`kwargs` used by the `LocalSimulator` are:
+  - `shots::Int` - the number of shots to run for all tasks in `task_specs`. Default is `0`.
+  - `max_parallel::Int` - the maximum number of simulations to execute simultaneously. Default is `32`.
+  - `inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}}` - used to set
+    the value of any [`FreeParameter`](@ref) in each task specification. It must either be a
+    `Dict` or a single-element `Vector` (in which case the same parameter values are used for
+    all elements of `task_specs` *or* of the same length as `task_specs` (in which case the `i`-th 
+    specification is paired with the `i`-th input dictionary). Default is an empty dictionary. 
+
+Other `kwargs` are passed through to the backend simulator. Returns a [`LocalQuantumTaskBatch`](@ref).
+
+!!! note
+    Because Julia uses dynamic threading and `Task`s can migrate between threads, each simulation is a `Task`
+    which itself can spawn many more `Task`s, as the internal implementation of [`LocalSimulator`](@ref)'s backend
+    may use threading where appropriate. On systems with many CPU cores, spawning too many `Task`s may overwhelm
+    the Julia scheduler and degrade performance. "Too many" depends on the particulars of your hardware, so on
+    many-core systems you may need to tune this value for best performance.
+"""
 function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=0, max_parallel::Int=-1, inputs::Union{Vector{Dict{String, Float64}}, Dict{String, Float64}} = Dict{String, Float64}(), kwargs...) where {T}
     is_single_task  = length(task_specs) == 1
     is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
