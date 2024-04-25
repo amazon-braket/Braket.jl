@@ -71,6 +71,15 @@ const Prices = Ref{Pricing}()
 const GlobalTrackerContext = Ref{TrackerContext}()
 abstract type AbstractBraketSimulator end
 
+"""
+    _simulator_devices
+
+A `Ref{Dict}` which records the `id`s of registered
+[`LocalSimulator`](@ref) backends so that they can be
+retrieved by this `id`. A new simulator backend
+should register itself in `_simulator_devices`
+in its module's `__init__` function.
+"""
 const _simulator_devices = Ref{Dict}()
 
 function __init__()

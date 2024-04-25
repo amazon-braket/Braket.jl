@@ -31,7 +31,7 @@ results(lqtb::LocalQuantumTaskBatch) = lqtb.results
 A quantum simulator which runs *locally* rather than sending the circuit(s)
 to the cloud to be executed on-demand. A `LocalSimulator` must be created with
 a backend -- either a handle, in the form of a `String`, which uniquely identifies
-a simulator backend registered in [`_simulator_devices`](@ref), or an already instantiated
+a simulator backend registered in [`_simulator_devices`](@ref Braket._simulator_devices), or an already instantiated
 simulator object.
 
 `LocalSimulator`s should implement their own method for [`simulate`](@ref) if needed. They
@@ -57,7 +57,7 @@ Simulate the execution of `task_spec` using the backend of [`LocalSimulator](@re
 `args` are additional arguments to be provided to the backend. `inputs` is used to set
 the value of any [`FreeParameter`](@ref) in `task_spec` and will override the existing
 `inputs` field of an `OpenQasmProgram`. Other `kwargs` will be passed to the backend
-simulator. Returns a [`LocalQuantumTask`](@ref).
+simulator. Returns a [`LocalQuantumTask`](@ref Braket.LocalQuantumTask).
 """
 function simulate(d::LocalSimulator, task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
     sim = d._delegate
@@ -84,7 +84,7 @@ using the backend of [`LocalSimulator](@ref) `d`.
     all elements of `task_specs` *or* of the same length as `task_specs` (in which case the `i`-th 
     specification is paired with the `i`-th input dictionary). Default is an empty dictionary. 
 
-Other `kwargs` are passed through to the backend simulator. Returns a [`LocalQuantumTaskBatch`](@ref).
+Other `kwargs` are passed through to the backend simulator. Returns a [`LocalQuantumTaskBatch`](@ref Braket.LocalQuantumTaskBatch).
 
 !!! note
     Because Julia uses dynamic threading and `Task`s can migrate between threads, each simulation is a `Task`

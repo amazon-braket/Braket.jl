@@ -5,8 +5,9 @@ on local hardware, rather than sending it to the cloud for on-demand execution. 
 can run task *batches* in parallel using multithreading.
 
 ```@docs
-LocalQuantumTask
-LocalQuantumBatch
+Braket._simulator_devices
+Braket.LocalQuantumTask
+Braket.LocalQuantumTaskBatch
 LocalSimulator
 simulate
 ```
