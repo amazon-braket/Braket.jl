@@ -93,6 +93,13 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         @test Braket.Parametrizable(g) == Braket.Parametrized()
         @test Braket.parameters(g) == Braket.FreeParameter[]
     end
+    @testset for g in (PRx(angle, angle),)
+        @test qubit_count(g) == 1
+        ix = Instruction(g, [0])
+        @test JSON3.read(JSON3.write(ix), Instruction) == ix
+        @test Braket.Parametrizable(g) == Braket.Parametrized()
+        @test Braket.parameters(g) == Braket.FreeParameter[]
+    end
     @testset for g in (MS,)
         @test qubit_count(g) == 2
         c = Circuit()

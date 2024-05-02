@@ -1,4 +1,4 @@
-export Gate, AngledGate, H, I, X, Y, Z, S, Si, T, Ti, V, Vi, CNot, Swap, ISwap, CV, CY, CZ, ECR, CCNot, CSwap, Unitary, Rx, Ry, Rz, PhaseShift, PSwap, XY, CPhaseShift, CPhaseShift00, CPhaseShift01, CPhaseShift10, XX, YY, ZZ, GPi, GPi2, MS
+export Gate, AngledGate, H, I, X, Y, Z, S, Si, T, Ti, V, Vi, CNot, Swap, ISwap, CV, CY, CZ, ECR, CCNot, CSwap, Unitary, Rx, Ry, Rz, PhaseShift, PSwap, XY, CPhaseShift, CPhaseShift00, CPhaseShift01, CPhaseShift10, XX, YY, ZZ, GPi, GPi2, MS, PRx
 """
     Gate <: QuantumOperator
 
@@ -6,7 +6,7 @@ Abstract type representing a quantum gate.
 """
 abstract type Gate <: QuantumOperator end
 StructTypes.StructType(::Type{Gate}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{Gate}) = (angledgate=AngledGate, h=H, i=I, x=X, y=Y, z=Z, s=S, si=Si, t=T, ti=Ti, v=V, vi=Vi, cnot=CNot, swap=Swap, iswap=ISwap, cv=CV, cy=CY, cz=CZ, ecr=ECR, ccnot=CCNot, cswap=CSwap, unitary=Unitary, rx=Rx, ry=Ry, rz=Rz, phaseshift=PhaseShift, pswap=PSwap, xy=XY, cphaseshift=CPhaseShift, cphaseshift00=CPhaseShift00, cphaseshift01=CPhaseShift01, cphaseshift10=CPhaseShift10, xx=XX, yy=YY, zz=ZZ, gpi=GPi, gpi2=GPi2, ms=MS)
+StructTypes.subtypes(::Type{Gate}) = (angledgate=AngledGate, h=H, i=I, x=X, y=Y, z=Z, s=S, si=Si, t=T, ti=Ti, v=V, vi=Vi, cnot=CNot, swap=Swap, iswap=ISwap, cv=CV, cy=CY, cz=CZ, ecr=ECR, ccnot=CCNot, cswap=CSwap, unitary=Unitary, rx=Rx, ry=Ry, rz=Rz, phaseshift=PhaseShift, pswap=PSwap, xy=XY, cphaseshift=CPhaseShift, cphaseshift00=CPhaseShift00, cphaseshift01=CPhaseShift01, cphaseshift10=CPhaseShift10, xx=XX, yy=YY, zz=ZZ, gpi=GPi, gpi2=GPi2, ms=MS, prx=PRx)
 
 """
     AngledGate{NA} <: Gate
@@ -34,7 +34,9 @@ for gate_def in (
 	(:ZZ, :1, :2, ("ZZ(ang)", "ZZ(ang)")),
 	(:GPi, :1, :1, ("GPi(ang)",)),
 	(:GPi2, :1, :1, ("GPi2(ang)",)),
-	(:MS, :3, :2, ("MS(ang)", "MS(ang)")))
+	(:MS, :3, :2, ("MS(ang)", "MS(ang)")),
+	(:PRx, :2, :1, ("PRx(ang)", "PRx(ang)")),
+   )
     G, n_angle, qc, c = gate_def
     @eval begin
         @doc """

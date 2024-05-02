@@ -161,7 +161,7 @@ export Program, AHSProgram, AbstractIR, AbstractProgramResult, CompilerDirective
 
 abstract type AbstractIR end
 StructTypes.StructType(::Type{AbstractIR}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, ahsprogram=AHSProgram, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, ms=MS, gpi=GPi, gpi2=GPi2)
+StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, ahsprogram=AHSProgram, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, ms=MS, gpi=GPi, gpi2=GPi2, prx=PRx)
 
 const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, String}
 Base.convert(::Type{IRObservable}, v::Vector{String}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
@@ -472,6 +472,16 @@ end
 StructTypes.StructType(::Type{MS}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{MS}) = Dict{Symbol, Any}(:type => "ms")
 
+struct PRx <: AbstractIR
+    angle1::Float64
+    angle2::Float64
+    target::Int
+    type::String
+end
+StructTypes.StructType(::Type{PRx}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{PRx}) = Dict{Symbol, Any}(:type => "prx")
+
+
 struct ECR <: AbstractIR
     targets::Vector{Int}
     type::String
@@ -714,7 +724,7 @@ for g in [:Swap, :CSwap, :ISwap, :PSwap, :XY, :ECR, :XX, :YY, :ZZ, :TwoQubitDepo
     end
 end
 struct SingleTarget <: Target end
-for g in [:H, :I, :X, :Y, :Z, :Rx, :Ry, :Rz, :S, :T, :Si, :Ti, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :CNot, :CCNot, :CV, :CY, :CZ, :V, :Vi, :BitFlip, :PhaseFlip, :PauliChannel, :Depolarizing, :AmplitudeDamping, :GeneralizedAmplitudeDamping, :PhaseDamping, :GPi, :GPi2]
+for g in [:H, :I, :X, :Y, :Z, :Rx, :Ry, :Rz, :S, :T, :Si, :Ti, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :CNot, :CCNot, :CV, :CY, :CZ, :V, :Vi, :BitFlip, :PhaseFlip, :PauliChannel, :Depolarizing, :AmplitudeDamping, :GeneralizedAmplitudeDamping, :PhaseDamping, :GPi, :GPi2, :PRx]
     @eval begin
         Target(::Type{$g}) = SingleTarget()
     end
@@ -745,7 +755,7 @@ for g in [:Rx, :Ry, :Rz, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift
     end
 end
 struct DoubleAngled <: Angle end
-for g in Symbol[]
+for g in [:PRx]
     @eval begin
         Angle(::Type{$g}) = DoubleAngled()
     end
