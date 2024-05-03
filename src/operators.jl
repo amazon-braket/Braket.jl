@@ -20,6 +20,10 @@ ir(o::Operator, t::QubitSet; kwargs...)  = ir(o, t, Val(IRType[]); kwargs...)
 ir(o::Operator, t::IntOrQubit; kwargs...)          = ir(o, QubitSet(t), Val(IRType[]); kwargs...)
 ir(o::Operator, t::IntOrQubit, args...; kwargs...) = ir(o, QubitSet(t), args...; kwargs...)
 
+abstract type Parametrizable end
+struct Parametrized end 
+struct NonParametrized end 
+
 struct PauliEigenvalues{N}
     coeff::Float64
     PauliEigenvalues{N}(coeff::Float64=1.0) where {N} = new(coeff)
@@ -55,3 +59,27 @@ function Base.getindex(p::PauliEigenvalues{N}, i::Int)::Float64 where N
     end
 end
 Base.getindex(p::PauliEigenvalues{N}, ix::Vector{Int}) where {N} = [p[i] for i in ix]
+
+"""
+    Measure(index) <: QuantumOperator
+
+Represents a measurement operation on targeted qubit, stored in the classical register at `index`.
+"""
+struct Measure <: QuantumOperator
+    index::Int
+end
+Measure() = Measure(-1)
+Parametrizable(m::Measure) = NonParametrized()
+chars(::Type{Measure}) = ("M",)
+chars(m::Measure) = ("M",)
+qubit_count(::Type{Measure}) = 1
+ir(m::Measure, target::QubitSet, ::Val{:JAQCD}; kwargs...) = error("measure instructions are not supported with JAQCD.") 
+function ir(m::Measure, target::QubitSet, ::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties())
+    instructions = Vector{String}(undef, length(target))
+    for (idx, qubit) in enumerate(target)
+        bit_index = m.index > 0 && length(targets) == 1 ? m.index : idx - 1
+        t = format_qubits(qubit, serialization_properties)
+        instructions[idx] = "b[$bit_index] = measure $t;"
+    end
+    return join(instructions, "\n")
+end

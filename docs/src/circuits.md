@@ -42,6 +42,8 @@ FreeParameter
 depth
 qubits
 qubit_count
+measure
+Measure
 ```
 
 ## Output to IR

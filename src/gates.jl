@@ -147,9 +147,6 @@ function ir(g::Unitary, target::QubitSet, ::Val{:JAQCD}; kwargs...)
     return IR.Unitary(t_c, mat, "unitary")
 end
 StructTypes.StructType(::Type{<:Gate}) = StructTypes.Struct()
-abstract type Parametrizable end
-struct Parametrized end 
-struct NonParametrized end 
 
 Parametrizable(g::AngledGate) = Parametrized()
 Parametrizable(g::Gate)       = NonParametrized()

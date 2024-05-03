@@ -16,7 +16,7 @@ generate its ARN when passed to the appropriate function.
 
 # Examples
 ```jldoctest
-julia> d = Braket.SV1()
+julia> d = Braket.SV1();
 
 julia> arn(d)
 "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
