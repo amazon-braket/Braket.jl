@@ -50,6 +50,10 @@ function Instruction(x)
         o_fns  = (:angles, :angle)
         args   = (Float64(x[:angle]),)
         op     = o_type(args)
+    elseif o_type <: AngledGate{2}
+        o_fns  = (:angles, :angle1, :angle2) 
+        args   = tuple([x[fn] for fn in [Symbol("angle$i") for i in 1:n_angles(o_type)]]...)
+        op     = o_type(args)
     elseif o_type <: AngledGate{3}
         o_fns  = (:angles, :angle1, :angle2, :angle3) 
         args   = tuple([x[fn] for fn in [Symbol("angle$i") for i in 1:n_angles(o_type)]]...)
