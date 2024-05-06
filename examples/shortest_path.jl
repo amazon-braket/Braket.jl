@@ -1,5 +1,5 @@
 using Braket, LinearAlgebra, SparseArrays, NLopt, Random
-using Graphs, SimpleWeightedGraphs, GraphPlot
+using Graphs, SimpleWeightedGraphs, GraphMakie
 
 nv = 5
 desired_hops = 4
