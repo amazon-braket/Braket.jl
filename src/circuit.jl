@@ -23,13 +23,14 @@ mutable struct Circuit
     parameters::Set{FreeParameter}
     observables_simultaneously_measureable::Bool
     has_compiler_directives::Bool
+    measure_targets::Vector{Int} 
 
     @doc """
         Circuit()
     
     Construct an empty `Circuit`.
     """
-    Circuit() = new(Moments(), [], [], [], Dict(), Dict(), Set{Int}(), Set(), true, false)
+    Circuit() = new(Moments(), [], [], [], Dict(), Dict(), Set{Int}(), Set(), true, false, Int[])
 end
 """
     Circuit(m::Moments, ixs::Vector, rts::Vector{Result}, bri::Vector)
@@ -175,6 +176,7 @@ end
 (c::Circuit)(::Type{T}, args...) where {T<:Gate}  = apply_gate!(T, c, args...)
 (c::Circuit)(::Type{T}, args...) where {T<:Noise} = apply_noise!(T, c, args...)
 (c::Circuit)(::Type{T}) where {T<:CompilerDirective} = add_instruction!(c, Instruction{T}(T()))
+(c::Circuit)(::Type{Measure}, args...) = foreach(target->add_instruction!(c, Instruction{Measure}(Measure(), target)), args)
 (c::Circuit)(g::QO, args...) where {QO<:QuantumOperator} = add_instruction!(c, Instruction(g, args...))
 (c::Circuit)(g::CD) where {CD<:CompilerDirective} = add_instruction!(c, Instruction{CD}(g))
 (c::Circuit)(v::AbstractVector) = foreach(vi->c(vi...), v)
@@ -201,15 +203,15 @@ julia> θ = FreeParameter(:theta);
 
 julia> circ = Circuit();
 
-julia> circ = H(circ, 0)
+julia> circ = H(circ, 0);
 
-julia> circ = Rx(circ, 1, α)
+julia> circ = Rx(circ, 1, α);
 
-julia> circ = Ry(circ, 0, θ)
+julia> circ = Ry(circ, 0, θ);
 
-julia> circ = Probability(circ)
+julia> circ = Probability(circ);
 
-julia> new_circ = circ(theta=2.0, alpha=1.0)
+julia> new_circ = circ(theta=2.0, alpha=1.0);
 ```
 """
 function (c::Circuit)(arg::Number; kwargs...)
@@ -261,7 +263,9 @@ julia> H(c, 0);
 julia> CNot(c, 0, 1);
 
 julia> qubits(c)
-QubitSet(0, 1)
+QubitSet with 2 elements:
+  0
+  1
 ```
 """
 qubits(c::Circuit) = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
@@ -297,12 +301,65 @@ Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); re
 Circuit(p::Program) = convert(Circuit, p)
 Program(c::Circuit) = convert(Program, c)
 
+function _add_measure!(c::Circuit, target_qubits::QubitSet)
+    for (idx, target) in enumerate(target_qubits)
+        num_qubits_measured = !isempty(c.measure_targets) && length(target_qubits) == 1 ? length(c.measure_targets) : 0
+        add_instruction!(c, Instruction(Measure(idx - 1 + num_qubits_measured), target))
+        push!(c.measure_targets, target)
+    end
+    return c
+end
+_add_measure!(c::Circuit, target_qubits::Vector{IntOrQubit}) = _add_measure!(c, QubitSet(target_qubits))
+_add_measure!(c::Circuit, target_qubit::IntOrQubit) = _add_measure!(c, QubitSet(target_qubit))
+
+"""
+    measure(c::Circuit, target_qubits) -> Circuit
+
+Add a [`Measure`](@ref) operator to `c`, ensuring only the targeted qubits are measured.
+A `Measure` operation can **only** be applied if the circuit does **not** contain any result types.
+If `c` has no qubits defined, or `target_qubits` are not within the qubit range of `c`,
+an `ArgumentError` is raised. If the circuit `c` contains any result types, or any of the 
+target qubits are already measured, an `ErrorException` is raised.
+
+# Examples
+```jldoctest
+julia> circ = Circuit([(H, 0), (CNot, 0, 1)]);
+
+julia> circ = measure(circ, 0);
+
+julia> circ.instructions
+3-element Vector{Braket.Instruction}:
+ Braket.Instruction{H}(H(), QubitSet(0))
+ Braket.Instruction{CNot}(CNot(), QubitSet(0, 1))
+ Braket.Instruction{Measure}(Measure(0), QubitSet(0))
+
+julia> circ = Circuit([(H, 0), (CNot, 0, 1), (StateVector,)]);
+
+julia> circ = measure(circ, 0);
+ERROR: a circuit cannot contain both measure instructions and result types.
+[...]
+
+julia> circ = Circuit([(H, 0), (CNot, 0, 1)]);
+
+julia> circ = measure(circ, [0, 1, 0]);
+ERROR: cannot repeat qubit(s) in the same measurement.
+[...]
+```
+"""
+function measure(c::Circuit, target_qubits)
+    isempty(c.result_types) || error("a circuit cannot contain both measure instructions and result types.")
+    # Check if there are repeated qubits in the same measurement
+    allunique(target_qubits) || error("cannot repeat qubit(s) in the same measurement.")
+    return _add_measure!(c, target_qubits)
+end
+
 function openqasm_header(c::Circuit, sps::SerializationProperties=OpenQASMSerializationProperties())
     ir_instructions = ["OPENQASM 3.0;"]
     for p in sort(string.(c.parameters))
         push!(ir_instructions, "input float $p;")
     end
-    isempty(c.result_types) && push!(ir_instructions, "bit[$(qubit_count(c))] b;")
+    bit_count = isempty(c.measure_targets) ? qubit_count(c) : length(c.measure_targets)
+    isempty(c.result_types) && push!(ir_instructions, "bit[$bit_count] b;")
     if sps.qubit_reference_type == VIRTUAL
         total_qubits = real(maximum(qubits(c))) + 1
         push!(ir_instructions, "qubit[$total_qubits] q;")
@@ -326,7 +383,7 @@ function ir(c::Circuit, ::Val{:OpenQASM}; serialization_properties::Serializatio
     ixs = map(ix->ir(ix, Val(:OpenQASM); serialization_properties=serialization_properties), c.instructions)
     if !isempty(c.result_types)
         rts = map(rt->ir(rt, Val(:OpenQASM); serialization_properties=serialization_properties), c.result_types)
-    else
+    elseif isempty(c.measure_targets) # measure all qubits if not explicitly specified
         rts = ["b[$(idx-1)] = measure $(format(Int(qubit), serialization_properties));" for (idx, qubit) in enumerate(qubits(c))]
     end
     return OpenQasmProgram(header_dict[OpenQasmProgram], join(vcat(header, ixs, rts), "\n"), nothing)
@@ -488,6 +545,7 @@ add_to_qubit_observable_set!(c::Circuit, rt::AdjointGradient)  = union!(c.qubit_
 add_to_qubit_observable_set!(c::Circuit, rt::Result) = c.qubit_observable_set
 
 function add_result_type!(c::Circuit, rt::Result)
+    isempty(c.measure_targets) || error("cannot add a result type to a circuit which already contains a measure instruction.")
     rt_to_add = rt
     if rt_to_add ∉ c.result_types
         if rt_to_add isa AdjointGradient && any(rt_ isa AdjointGradient for rt_ in c.result_types)
@@ -505,7 +563,16 @@ end
 add_result_type!(c::Circuit, rt::Result, target) = add_result_type!(c, remap(rt, target))
 add_result_type!(c::Circuit, rt::Result, target_mapping::Dict{<:Integer, <:Integer}) = add_result_type!(c, remap(rt, target_mapping))
 
+function _check_if_qubit_measured(c::Circuit, qubit::Int)
+    isempty(c.measure_targets) && return
+    # check if there is a measure instruction on the targeted qubit(s)
+    isempty(intersect(c.measure_targets, qubit)) || error("cannot apply instruction to measured qubits.")
+end
+_check_if_qubit_measured(c::Circuit, qubit::Qubit) = _check_if_qubit_measured(c, Int(qubit))
+_check_if_qubit_measured(c::Circuit, qubits) = foreach(q->_check_if_qubit_measured(c, q), qubits)
+
 function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
+    _check_if_qubit_measured(c, ix.target)
     to_add = [ix]
     if ix.operator isa QuantumOperator && Parametrizable(ix.operator) == Parametrized()
         for param in parameters(ix.operator)
@@ -536,6 +603,7 @@ end
 
 function add_verbatim_box!(c::Circuit, verbatim_circuit::Circuit, target_mapping::Dict{<:Integer, <:Integer}=Dict{Int, Int}())
     !isempty(verbatim_circuit.result_types) && throw(ErrorException("verbatim subcircuit is not measured and cannot have result types."))
+    isempty(verbatim_circuit.measure_targets) || error("cannot measure a subcircuit inside a verbatim box.")
     isempty(verbatim_circuit.instructions) && return c
     c = add_instruction!(c, Instruction(StartVerbatimBox()))
     for ix in verbatim_circuit.instructions

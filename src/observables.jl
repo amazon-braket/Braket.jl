@@ -64,7 +64,7 @@ Struct representing an observable of an arbitrary complex Hermitian matrix.
 # Examples
 ```jldoctest
 julia> ho = Braket.Observables.HermitianObservable([0 1; 1 0])
-Braket.Observables.HermitianObservable(Complex{Int64}[0 + 0im 1 + 0im; 1 + 0im 0 + 0im])
+HermitianObservable((2, 2))
 ```
 """
 struct HermitianObservable <: NonCompositeObservable
@@ -110,12 +110,12 @@ Struct representing a tensor product of smaller observables.
 # Examples
 ```jldoctest
 julia> Braket.Observables.TensorProduct(["x", "h"])
-Braket.Observables.TensorProduct(Braket.Observables.Observable[Braket.Observables.X(), Braket.Observables.H()])
+X @ H
 
 julia> ho = Braket.Observables.HermitianObservable([0 1; 1 0]);
 
 julia> Braket.Observables.TensorProduct([ho, Braket.Observables.Z()])
-Braket.Observables.TensorProduct(Braket.Observables.Observable[Braket.Observables.HermitianObservable(Complex{Int64}[0 + 0im 1 + 0im; 1 + 0im 0 + 0im]), Braket.Observables.Z()])
+HermitianObservable((2, 2)) @ Z
 ```
 """
 struct TensorProduct{O} <: Observable where {O<:Observable}
@@ -207,12 +207,12 @@ Struct representing the sum of observables.
 
 # Examples
 ```jldoctest
-julia> o1 = 2.0 * Observables.I() @ Observables.Z();
+julia> o1 = 2.0 * Braket.Observables.I() * Braket.Observables.Z();
 
-julia> o2 = 3.0 * Observables.X() @ Observables.X();
+julia> o2 = 3.0 * Braket.Observables.X() * Braket.Observables.X();
 
 julia> o = o1 + o2
-Braket.Observables.Sum()
+Sum(2.0 * I @ Z, 3.0 * X @ X)
 ```
 """
 struct Sum <: Observable

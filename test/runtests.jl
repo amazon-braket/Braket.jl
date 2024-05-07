@@ -49,6 +49,7 @@ for group in groups
             include("schemas_misc.jl")
             include("device.jl")
             include("circuits.jl")
+            include("measure.jl")
             include("free_parameter.jl")
             include("gates.jl")
             include("observables.jl")

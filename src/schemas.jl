@@ -10,14 +10,14 @@ and a `target` set of qubits to which the `operator` is applied.
 
 # Examples
 ```jldoctest
-julia> Instruction(H(), 1)
-Braket.Instruction(H(), QubitSet(1))
+julia> Braket.Instruction(H(), 1)
+Braket.Instruction{H}(H(), QubitSet(1))
 
-julia> Instruction(CNot(), [1, Qubit(4)])
-Braket.Instruction(CNot(), QubitSet(1, Qubit(4)))
+julia> Braket.Instruction(CNot(), [1, Qubit(4)])
+Braket.Instruction{CNot}(CNot(), QubitSet(1, Qubit(4)))
 
-julia> Instruction(StartVerbatimBox(), QubitSet())
-Braket.Instruction(StartVerbatimBox(), QubitSet())
+julia> Braket.Instruction(StartVerbatimBox(), QubitSet())
+Braket.Instruction{StartVerbatimBox}(StartVerbatimBox(), QubitSet())
 ```
 """
 struct Instruction{O<:Operator}
