@@ -18,26 +18,27 @@ StructTypes.StructType(::Type{AngledGate}) = StructTypes.AbstractType()
 n_angles(::Type{<:Gate}) = 0
 n_angles(::Type{<:AngledGate{N}}) where {N} = N
 n_angles(g::G) where {G<:Gate} = n_angles(G)
+
 for gate_def in (
-	(:Rx, :1, :1, ("Rx(ang)",)),
-	(:Ry, :1, :1, ("Ry(ang)",)),
-	(:Rz, :1, :1, ("Rz(ang)",)),
-	(:PhaseShift, :1, :1, ("PHASE(ang)",)),
-	(:PSwap, :1, :2, ("PSWAP(ang)", "PSWAP(ang)")),
-	(:XY, :1, :2, ("XY(ang)", "XY(ang)")),
-	(:CPhaseShift, :1, :2, ("C", "PHASE(ang)")),
-	(:CPhaseShift00, :1, :2, ("C", "PHASE00(ang)")),
-	(:CPhaseShift01, :1, :2, ("C", "PHASE01(ang)")),
-	(:CPhaseShift10, :1, :2, ("C", "PHASE10(ang)")),
-	(:XX, :1, :2, ("XX(ang)", "XX(ang)")),
-	(:YY, :1, :2, ("YY(ang)", "YY(ang)")),
-	(:ZZ, :1, :2, ("ZZ(ang)", "ZZ(ang)")),
-	(:GPi, :1, :1, ("GPi(ang)",)),
-	(:GPi2, :1, :1, ("GPi2(ang)",)),
-	(:MS, :3, :2, ("MS(ang)", "MS(ang)")),
-	(:PRx, :2, :1, ("PRx(ang)", "PRx(ang)")),
-   )
-    G, n_angle, qc, c = gate_def
+                 (:Rx, :(IR.Rx), :1, :1, ("Rx(ang)",)),
+                 (:Ry, :(IR.Ry), :1, :1, ("Ry(ang)",)),
+                 (:Rz, :(IR.Rz), :1, :1, ("Rz(ang)",)),
+                 (:PSwap, :(IR.PSwap), :1, :2, ("PSWAP(ang)", "PSWAP(ang)")),
+                 (:PhaseShift, :(IR.PhaseShift), :1, :1, ("PHASE(ang)",)),
+                 (:CPhaseShift, :(IR.CPhaseShift), :1, :2, ("C", "PHASE(ang)")),
+                 (:CPhaseShift00, :(IR.CPhaseShift00), :1, :2, ("C", "PHASE00(ang)")),
+                 (:CPhaseShift01, :(IR.CPhaseShift01), :1, :2, ("C", "PHASE01(ang)")),
+                 (:CPhaseShift10, :(IR.CPhaseShift10), :1, :2, ("C", "PHASE10(ang)")),
+                 (:XX, :(IR.XX), :1, :2, ("XX(ang)", "XX(ang)")),
+                 (:XY, :(IR.XY), :1, :2, ("XY(ang)", "XY(ang)")),
+                 (:YY, :(IR.YY), :1, :2, ("YY(ang)", "YY(ang)")),
+                 (:ZZ, :(IR.ZZ), :1, :2, ("ZZ(ang)", "ZZ(ang)")),
+                 (:GPi, :(IR.GPi), :1, :1, ("GPi(ang)",)),
+                 (:GPi2, :(IR.GPi2), :1, :1, ("GPi2(ang)",)),
+                 (:MS, :(IR.MS), :3, :2, ("MS(ang)", "MS(ang)")),
+                 (:PRx, :(IR.PRx), :2, :1, ("PRx(ang)", "PRx(ang)")),
+                )
+    G, IR_G, n_angle, qc, c = gate_def
     @eval begin
         @doc """
             $($G) <: AngledGate{$($n_angle)}
@@ -52,32 +53,35 @@ for gate_def in (
         $G(angles::Vararg{Union{Float64, FreeParameter}}) = $G(tuple(angles...))
         $G(angles::Vararg{Number}) = $G((Float64(a) for a in angles)...)
         chars(::Type{$G}) = $c
+        ir_typ(::Type{$G}) = $IR_G
         qubit_count(::Type{$G}) = $qc
+        label(::Type{$G}) = lowercase(string($G))
     end
 end
 
 for gate_def in (
-	(:H, :1, ("H",)),
-	(:I, :1, ("I",)),
-	(:X, :1, ("X",)),
-	(:Y, :1, ("Y",)),
-	(:Z, :1, ("Z",)),
-	(:S, :1, ("S",)),
-	(:Si, :1, ("Si",)),
-	(:T, :1, ("T",)),
-	(:Ti, :1, ("Ti",)),
-	(:V, :1, ("V",)),
-	(:Vi, :1, ("Vi",)),
-	(:CNot, :2, ("C", "X")),
-	(:Swap, :2, ("SWAP", "SWAP")),
-	(:ISwap, :2, ("ISWAP", "ISWAP")),
-	(:CV, :2, ("C", "V")),
-	(:CY, :2, ("C", "Y")),
-	(:CZ, :2, ("C", "Z")),
-	(:ECR, :2, ("ECR", "ECR")),
-	(:CCNot, :3, ("C", "C", "X")),
-	(:CSwap, :3, ("C", "SWAP", "SWAP")))
-    G, qc, c = gate_def
+                 (:H, :(IR.H), :1, ("H",)),
+                 (:I, :(IR.I), :1, ("I",)),
+                 (:X, :(IR.X), :1, ("X",)),
+                 (:Y, :(IR.Y), :1, ("Y",)),
+                 (:Z, :(IR.Z), :1, ("Z",)),
+                 (:S, :(IR.S), :1, ("S",)),
+                 (:Si, :(IR.Si), :1, ("Si",)),
+                 (:T, :(IR.T), :1, ("T",)),
+                 (:Ti, :(IR.Ti), :1, ("Ti",)),
+                 (:V, :(IR.V), :1, ("V",)),
+                 (:Vi, :(IR.Vi), :1, ("Vi",)),
+                 (:CNot, :(IR.CNot), :2, ("C", "X")),
+                 (:Swap, :(IR.Swap), :2, ("SWAP", "SWAP")),
+                 (:ISwap, :(IR.ISwap), :2, ("ISWAP", "ISWAP")),
+                 (:CV, :(IR.CV), :2, ("C", "V")),
+                 (:CY, :(IR.CY), :2, ("C", "Y")),
+                 (:CZ, :(IR.CZ), :2, ("C", "Z")),
+                 (:ECR, :(IR.ECR), :2, ("ECR", "ECR")),
+                 (:CCNot, :(IR.CCNot), :3, ("C", "C", "X")),
+                 (:CSwap, :(IR.CSwap), :3, ("C", "SWAP", "SWAP")),
+                )
+    G, IR_G, qc, c = gate_def
     @eval begin
         @doc """
             $($G) <: Gate
@@ -87,10 +91,11 @@ for gate_def in (
         """
         struct $G <: Gate end
         chars(::Type{$G}) = $c
+        ir_typ(::Type{$G}) = $IR_G
         qubit_count(::Type{$G}) = $qc
+        label(::Type{$G}) = lowercase(string($G))
     end
 end
-label(::Type{G}) where {G<:Gate} = lowercase(string(G))
 (::Type{G})(x::Tuple{}) where {G<:Gate} = G()
 (::Type{G})(x::Tuple{}) where {G<:AngledGate} = throw(ArgumentError("angled gate must be constructed with at least one angle."))
 (::Type{G})(x::AbstractVector) where {G<:AngledGate} = G(x...)
@@ -99,7 +104,6 @@ qubit_count(g::G) where {G<:Gate}  = qubit_count(G)
 angles(g::G) where {G<:Gate}       = ()
 angles(g::AngledGate{N}) where {N} = g.angle
 chars(g::G) where {G<:Gate}        = map(char->replace(string(char), "ang"=>join(string.(angles(g)), ", ")), chars(G))
-ir_typ(::Type{G}) where {G<:Gate}  = getproperty(IR, Symbol(G))
 ir_typ(g::G) where {G<:Gate}       = ir_typ(G)
 label(g::G) where {G<:Gate}        = label(G)
 ir_str(g::G) where {G<:AngledGate} = label(g) * "(" * join(string.(angles(g)), ", ") * ")"
@@ -132,6 +136,8 @@ Unitary(mat::Vector{Vector{Vector{T}}}) where {T} = Unitary(complex_matrix_from_
 Base.:(==)(u1::Unitary, u2::Unitary) = u1.matrix == u2.matrix
 qubit_count(g::Unitary) = convert(Int, log2(size(g.matrix, 1)))
 chars(g::Unitary)       = ntuple(i->"U", qubit_count(g))
+ir_typ(::Type{Unitary}) = IR.Unitary
+label(::Type{Unitary})  = "unitary"
 
 targets_and_controls(g::Unitary, target::QubitSet) = target[1:convert(Int, log2(size(g.matrix, 1)))]
 ir_str(g::Unitary) = "#pragma braket unitary(" * format_matrix(g.matrix) * ")"
