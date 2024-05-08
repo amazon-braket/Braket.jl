@@ -11,7 +11,7 @@ Please review the [CHANGELOG](CHANGELOG.md) for information about changes in eac
 [![Stable docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://amazon-braket.github.io/Braket.jl/stable)
 [![Latest docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://amazon-braket.github.io/Braket.jl/dev)
 [![CI](https://github.com/amazon-braket/braket.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/amazon-braket/braket.jl/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/amazon-braket/braket.jl/branch/main/graph/badge.svg?token=QC9P7HQY4V)](https://codecov.io/gh/amazon-braket/braket.jl)
+[![codecov](https://codecov.io/gh/amazon-braket/braket.jl/graph/badge.svg?token=xocMQMNqAN)](https://codecov.io/gh/amazon-braket/braket.jl)
 
 ## Installation & Prerequisites
 
