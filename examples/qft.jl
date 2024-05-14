@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ d928ee56-0f14-426c-b669-356627382f8f
-using Braket, PyBraket
+using Braket, BraketSimulator
 
 # ╔═╡ ab9771de-a268-4df8-811d-9310a12a7d79
 using Plots
@@ -202,7 +202,7 @@ With these routines defined, we can run QFT and its inverse on a simulator to de
 """
 
 # ╔═╡ b3a750d1-7a2b-4de6-9e6c-166336ba6cec
-device = PyBraket.LocalSimulator()
+device = LocalSimulator("braket_sv_v2")
 
 # ╔═╡ 7127d624-fb0d-41b9-a8cd-6cae7d34d55f
 """
@@ -227,11 +227,11 @@ function run_and_plot_qft(c::Circuit)
 	num_qubits = qubit_count(c)
 	bitstring_keys = [prod(string.(digits(ii, base=2, pad=num_qubits))) for ii in 0:(2^num_qubits)-1]
 	# specify desired result types
-	c(StateVector)
+	c(Braket.StateVector)
 	c(Probability)
 
 	# Run the task
-	task = run(device, c, shots=0)
+	task = simulate(device, c, shots=0)
 	res  = result(task)
 	state_vector = res.values[1]
 	probs_values = res.values[2]

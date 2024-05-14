@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ 23aaba4e-3342-4581-a6bf-b039c390062e
-using OrderedCollections, Braket, PyBraket, PyBraket.PythonCall, CondaPkg
+using OrderedCollections, Braket, BraketSimulator, PyBraket, PyBraket.PythonCall, CondaPkg
 
 # ╔═╡ ff4fad96-1970-4fb9-a43a-df02cd5dc643
 using Plots
@@ -309,7 +309,7 @@ n_shots = 0
 n_theta = 24
 
 # ╔═╡ cbbd1b17-e9e5-4e3e-8cc1-fc0c26b8e66f
-dev = LocalSimulator()
+dev = LocalSimulator("braket_sv_v2")
 
 # ╔═╡ de771faa-96f7-44d0-801b-76fbb9dc8509
 md"""
