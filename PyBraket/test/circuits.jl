@@ -5,32 +5,32 @@ using PythonCall: pyconvert, Py, pyisinstance
         Braket.IRType[] = ir_type 
         @testset "Expectation" begin
             c = Circuit([(H, 0), (CNot, 0, 1), (Expectation, Braket.Observables.Z(), 0)])
-            dev = PyBraket.LocalSimulator()
-            braket_task = run(dev, c, shots=0)
+            dev = LocalSimulator(PyLocalSimulator())
+            braket_task = simulate(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ 0.0 atol=1e-12
         end
 
         @testset "Variance" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Variance(ci, Braket.Observables.Z(), 0))
-            dev = PyBraket.LocalSimulator()
-            braket_task = run(dev, c, shots=0)
+            dev = LocalSimulator(PyLocalSimulator())
+            braket_task = simulate(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ 1.0 atol=1e-12
         end
 
         @testset "Probability" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Probability(ci))
-            dev = PyBraket.LocalSimulator()
-            braket_task = run(dev, c, shots=0)
+            dev = LocalSimulator(PyLocalSimulator())
+            braket_task = simulate(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ [0.5, 0.0, 0.0, 0.5] atol=1e-12
         end
 
         @testset "DensityMatrix" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->DensityMatrix(ci))
-            dev = PyBraket.LocalSimulator()
-            braket_task = run(dev, c, shots=0)
+            dev = LocalSimulator(PyLocalSimulator())
+            braket_task = simulate(dev, c, shots=0)
             res = result(braket_task)
             ρ = zeros(ComplexF64, 4, 4)
             ρ[1, 1] = 0.5
@@ -44,8 +44,8 @@ using PythonCall: pyconvert, Py, pyisinstance
 
         @testset "Results type" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Expectation(ci, Braket.Observables.Z(), 0))
-            dev = PyBraket.LocalSimulator()
-            braket_task = run(dev, c, shots=0)
+            dev = LocalSimulator(PyLocalSimulator())
+            braket_task = simulate(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ 0.0 atol=1e-12
             @test sprint(show, res) == "GateModelQuantumTaskResult\n"
@@ -53,8 +53,8 @@ using PythonCall: pyconvert, Py, pyisinstance
 
         @testset "Observable on all qubits" begin
             c = Circuit() |> (ci->H(ci, 0)) |> (ci->CNot(ci, 0, 1)) |> (ci->Expectation(ci, Braket.Observables.Z()))
-            dev = PyBraket.LocalSimulator()
-            res = result(run(dev, c, shots=0))
+            dev = LocalSimulator(PyLocalSimulator())
+            res = result(simulate(dev, c, shots=0))
             @test pyconvert(Vector{Float64}, res.values[1]) ≈ [0.0, 0.0] atol=1e-12
         end
 
@@ -66,8 +66,8 @@ using PythonCall: pyconvert, Py, pyisinstance
             Unitary(c, [0, 1, 2], ccz_mat)
             H(c, [0, 1, 2])
             StateVector(c)
-            dev = PyBraket.LocalSimulator()
-            braket_task = run(dev, c, shots=0)
+            dev = LocalSimulator(PyLocalSimulator())
+            braket_task = simulate(dev, c, shots=0)
             res = result(braket_task)
             @test res.values[1] ≈ ComplexF64[0.75, 0.25, 0.25, -0.25, 0.25, -0.25, -0.25, 0.25] atol=1e-12
         end
@@ -168,13 +168,13 @@ using PythonCall: pyconvert, Py, pyisinstance
             py_c2 = PyCircuit(non_para_circ)
             @test py_c2 == py_c1(1.0)
             @testset "running with inputs" begin 
-                dev = PyBraket.LocalSimulator()
+                dev = LocalSimulator(PyLocalSimulator())
                 oq3_circ = ir(circ, Val(:OpenQASM))
-                braket_task = run(dev, oq3_circ, shots=0, inputs=Dict(string(α)=>1.0, string(θ)=>2.0))
+                braket_task = simulate(dev, oq3_circ, shots=0, inputs=Dict(string(α)=>1.0, string(θ)=>2.0))
                 res = result(braket_task)
                 non_para_circ = Circuit() |> (ci->H(ci, 0)) |> (ci->Rx(ci, 1, 1.0)) |> (ci->Ry(ci, 0, 2.0)) |> Probability
                 oq3_circ2 = ir(non_para_circ, Val(:OpenQASM))
-                braket_task2 = run(dev, oq3_circ2, shots=0)
+                braket_task2 = simulate(dev, oq3_circ2, shots=0)
                 res2 = result(braket_task2)
                 @test res.values == res2.values
             end

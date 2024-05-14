@@ -6,3 +6,4 @@ numpy = ""
 
 [pip.deps]
 amazon-braket-sdk = ">=1.70.0"
+amazon-braket-default-simulator = ">=1.10.0"

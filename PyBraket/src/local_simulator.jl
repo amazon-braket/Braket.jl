@@ -1,53 +1,57 @@
-struct LocalQuantumTask
-    id::String
-    result::Braket.AbstractQuantumTaskResult
-end
-Braket.state(b::LocalQuantumTask)  = "COMPLETED"
-Braket.id(b::LocalQuantumTask)     = b.id
-Braket.result(b::LocalQuantumTask) = b.result
-
-
-struct LocalSimulator <: Braket.Device
+struct PyLocalSimulator <: Braket.AbstractBraketSimulator
     o::Py
-    LocalSimulator() = new(local_sim.LocalSimulator())
-    LocalSimulator(backend::String) = new(local_sim.LocalSimulator(backend))
+    PyLocalSimulator() = new(local_sim.LocalSimulator())
+    PyLocalSimulator(backend::String) = new(local_sim.LocalSimulator(backend))
 end
-Braket.name(ls::LocalSimulator) = pyconvert(String, ls.name)
-
-function Base.run(d::LocalSimulator, task_spec::Braket.IR.AHSProgram; shots::Int=0, kwargs...)
+(ls::PyLocalSimulator)(nq::Int, shots::Int) = ls
+Braket.name(ls::PyLocalSimulator) = pyconvert(String, ls.name)
+Braket.device_id(ls::PyLocalSimulator) = pyconvert(String, ls._delegate.DEVICE_ID)
+Braket.properties(ls::PyLocalSimulator) = ls.properties
+function Braket.simulate(d::PyLocalSimulator, task_spec::Braket.IR.AHSProgram; shots::Int=0, kwargs...)
     py_ir = Py(task_spec)
     py_raw_result = d._delegate.run(py_ir, shots; kwargs...)
-    jl_raw_result = pyconvert(Braket.AnalogHamiltonianSimulationTaskResult, py_raw_result)
-    res = Braket.format_result(jl_raw_result)
-    id = res.task_metadata.id
-    LocalQuantumTask(id, res)
+    return pyconvert(Braket.AnalogHamiltonianSimulationTaskResult, py_raw_result)
 end
-Base.run(d::LocalSimulator, task_spec::Braket.AnalogHamiltonianSimulation; shots::Int=0, kwargs...) = run(d, ir(task_spec); shots=shots, kwargs...)
+Braket.simulate(d::PyLocalSimulator, task_spec::Braket.AnalogHamiltonianSimulation; shots::Int=0, kwargs...) = simulate(d, ir(task_spec); shots=shots, kwargs...)
 
-function Base.run(d::LocalSimulator, task_spec::Braket.OpenQasmProgram; shots::Int=0, inputs::Dict{String, Float64}=Dict{String,Float64}(), kwargs...)
+function Braket.simulate(d::PyLocalSimulator, task_spec::Braket.OpenQasmProgram; shots::Int=0, inputs::Dict{String, Float64}=Dict{String,Float64}(), kwargs...)
     py_inputs = pydict(pystr(k)=>v for (k,v) in inputs)
     py_ts = pyopenqasm.Program(source=pystr(task_spec.source), inputs=py_inputs)
     py_raw_result = d._delegate.run_openqasm(py_ts, shots, kwargs...)
-    jl_result = pyconvert(Braket.GateModelTaskResult, py_raw_result)
-    t_id = jl_result.taskMetadata.id
-    res = Braket.format_result(jl_result)
-    LocalQuantumTask(t_id, res)
+    return pyconvert(Braket.GateModelTaskResult, py_raw_result)
 end
 
-function Base.run(d::LocalSimulator, task_spec::PyCircuit; shots::Int=0, inputs::Dict{String, Float64}=Dict{String,Float64}(), kwargs...)
+function Braket.simulate(d::PyLocalSimulator, task_spec::PyCircuit; shots::Int=0, inputs::Dict{String, Float64}=Dict{String,Float64}(), kwargs...)
     jaqcd_ir = task_spec.to_ir(ir_type=circuit.serialization.IRType.JAQCD)
     py_raw_result = d._delegate.run(jaqcd_ir, task_spec.qubit_count, shots, kwargs...)
-    jl_result = pyconvert(Braket.GateModelTaskResult, py_raw_result)
-    t_id = jl_result.taskMetadata.id
-    res = Braket.format_result(jl_result)
-    LocalQuantumTask(t_id, res)
+    return pyconvert(Braket.GateModelTaskResult, py_raw_result)
 end
-Base.run(d::LocalSimulator, task_spec::Circuit; kwargs...) = run(d, PyCircuit(task_spec); kwargs...)
+Braket.simulate(d::PyLocalSimulator, task_spec::Circuit; kwargs...) = simulate(d, PyCircuit(task_spec); kwargs...)
 
-(ls::LocalSimulator)(task_spec; kwargs...) = run(ls, task_spec; kwargs...)
+function Braket._run_internal(simulator::PyLocalSimulator, task_spec::AnalogHamiltonianSimulation, args...; kwargs...)
+    raw_py_result = simulator._run_internal(Py(ir(task_spec)), args...; kwargs...)
+    jl_task_metadata = pyconvert(Braket.TaskMetadata, raw_py_result.task_metadata) 
+    jl_measurements = map(raw_py_result.measurements) do m
+        jl_status = pyconvert(String, pystr(m.status))
+        status = if jl_status == "Success"
+                     Braket.success
+                 elseif jl_status == "Partial_success"
+                     Braket.partial_success
+                 else
+                     Braket.failure
+                 end
+        Braket.ShotResult(status,
+                          pyconvert(Any, m.pre_sequence),
+                          pyconvert(Any, m.post_sequence)
+                         )
+    end
+    return Braket.AnalogHamiltonianSimulationQuantumTaskResult(jl_task_metadata, jl_measurements) 
+end
 
-Py(d::LocalSimulator) = getfield(d, :o)
-Base.getproperty(d::LocalSimulator, s::Symbol)             = getproperty(Py(d), s)
-Base.getproperty(d::LocalSimulator, s::AbstractString)     = getproperty(Py(d), s)
-Base.setproperty!(d::LocalSimulator, s::Symbol, x)         = setproperty!(Py(d), s, x)
-Base.setproperty!(d::LocalSimulator, s::AbstractString, x) = setproperty!(Py(d), s, x)
+(ls::PyLocalSimulator)(task_spec; kwargs...) = simulate(ls, task_spec; kwargs...)
+
+Py(d::PyLocalSimulator) = getfield(d, :o)
+Base.getproperty(d::PyLocalSimulator, s::Symbol)             = getproperty(Py(d), s)
+Base.getproperty(d::PyLocalSimulator, s::AbstractString)     = getproperty(Py(d), s)
+Base.setproperty!(d::PyLocalSimulator, s::Symbol, x)         = setproperty!(Py(d), s, x)
+Base.setproperty!(d::PyLocalSimulator, s::AbstractString, x) = setproperty!(Py(d), s, x)

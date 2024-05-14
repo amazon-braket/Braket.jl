@@ -5,12 +5,13 @@ module PyBraket
     import Braket: Instruction
     using Braket.IR
     import Braket.IR: TimeSeries, AtomArrangement, DrivingField, PhysicalField, ShiftingField, Setup, Hamiltonian, AHSProgram
-    export LocalSimulator, PyCircuit
+    export PyLocalSimulator, PyCircuit
     import PythonCall: Py
 
     const awsbraket   = PythonCall.pynew()
     const braketobs   = PythonCall.pynew()
     const local_sim   = PythonCall.pynew()
+    const default_sim = PythonCall.pynew()
     const tasks       = PythonCall.pynew()
     const circuit     = PythonCall.pynew()
     const pyjaqcd     = PythonCall.pynew()
@@ -25,6 +26,7 @@ module PyBraket
         PythonCall.pycopy!(awsbraket,   pyimport("braket.aws"))
         PythonCall.pycopy!(braketobs,   pyimport("braket.circuits.observables"))
         PythonCall.pycopy!(local_sim,   pyimport("braket.devices.local_simulator"))
+        PythonCall.pycopy!(default_sim, pyimport("braket.default_simulator"))
         PythonCall.pycopy!(circuit,     pyimport("braket.circuits"))
         PythonCall.pycopy!(pygates,     pyimport("braket.circuits.gates"))
         PythonCall.pycopy!(pynoises,    pyimport("braket.circuits.noises"))
@@ -34,6 +36,9 @@ module PyBraket
         PythonCall.pycopy!(tasks,       pyimport("braket.tasks"))
         PythonCall.pycopy!(collections, pyimport("collections"))
         PythonCall.pyconvert_add_rule("collections:Counter", Accumulator, counter_to_acc)
+        Braket._simulator_devices[]["braket_sv"] = PyLocalSimulator("braket_sv") 
+        Braket._simulator_devices[]["braket_dm"] = PyLocalSimulator("braket_dm") 
+        Braket._simulator_devices[]["braket_ahs"] = PyLocalSimulator("braket_ahs") 
     end
     function counter_to_acc(::Type{Accumulator}, x::Py)
         return counter((pyconvert(Any, el) for el in  x.elements()))

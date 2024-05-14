@@ -1,8 +1,8 @@
 using Braket, Braket.Observables, LinearAlgebra, PyBraket, Statistics, Test
 using Braket: I
 
-PURE_DEVICE = PyBraket.LocalSimulator()
-NOISE_DEVICE = PyBraket.LocalSimulator("braket_dm")
+PURE_DEVICE  = LocalSimulator(PyLocalSimulator("braket_sv"))
+NOISE_DEVICE = LocalSimulator(PyLocalSimulator("braket_dm"))
 SHOTS = 8000
 
 get_tol(shots::Int) = return (shots > 0 ? Dict("atol"=> 0.1, "rtol"=>0.15) : Dict("atol"=>0.01, "rtol"=>0))
@@ -29,7 +29,7 @@ end
     @testset for (backend, device_name) in [("default", "StateVectorSimulator"),
                                             ("braket_sv", "StateVectorSimulator"),
                                             ("braket_dm", "DensityMatrixSimulator")]
-        local_simulator_device = PyBraket.LocalSimulator(backend)
+        local_simulator_device = LocalSimulator(PyLocalSimulator(backend))
         @test name(local_simulator_device) == device_name
     end
     @testset for DEVICE in (PURE_DEVICE, NOISE_DEVICE)

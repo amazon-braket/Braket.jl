@@ -28,10 +28,10 @@ for group in groups
     set_aws_creds(test_type)
 
     if test_type == "unit"
+        include(joinpath(@__DIR__, "ahs.jl"))
         include(joinpath(@__DIR__, "circuits.jl"))
         include(joinpath(@__DIR__, "noise.jl"))
         include(joinpath(@__DIR__, "gates.jl"))
-        include(joinpath(@__DIR__, "ahs.jl"))
     elseif test_type == "integ"
         include(joinpath(@__DIR__, "integ_tests/runtests.jl"))
     end

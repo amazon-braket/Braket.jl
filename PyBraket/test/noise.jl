@@ -6,9 +6,9 @@ using PythonCall: Py, pyconvert
     noise = BitFlip(0.1)
     circ  = Braket.apply_gate_noise!(circ, noise)
 
-    device = PyBraket.LocalSimulator("braket_dm")
+    device = LocalSimulator(PyLocalSimulator("braket_dm"))
     # run the circuit on the local simulator
-    task = run(device, circ, shots=1000)
+    task = simulate(device, circ, shots=1000)
 
     t_result = result(task)
     measurement = t_result.measurement_counts
