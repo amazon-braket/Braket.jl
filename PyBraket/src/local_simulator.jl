@@ -14,20 +14,6 @@ function Braket.simulate(d::PyLocalSimulator, task_spec::Braket.IR.AHSProgram; s
 end
 Braket.simulate(d::PyLocalSimulator, task_spec::Braket.AnalogHamiltonianSimulation; shots::Int=0, kwargs...) = simulate(d, ir(task_spec); shots=shots, kwargs...)
 
-function Braket.simulate(d::PyLocalSimulator, task_spec::Braket.OpenQasmProgram; shots::Int=0, inputs::Dict{String, Float64}=Dict{String,Float64}(), kwargs...)
-    py_inputs = pydict(pystr(k)=>v for (k,v) in inputs)
-    py_ts = pyopenqasm.Program(source=pystr(task_spec.source), inputs=py_inputs)
-    py_raw_result = d._delegate.run_openqasm(py_ts, shots, kwargs...)
-    return pyconvert(Braket.GateModelTaskResult, py_raw_result)
-end
-
-function Braket.simulate(d::PyLocalSimulator, task_spec::PyCircuit; shots::Int=0, inputs::Dict{String, Float64}=Dict{String,Float64}(), kwargs...)
-    jaqcd_ir = task_spec.to_ir(ir_type=circuit.serialization.IRType.JAQCD)
-    py_raw_result = d._delegate.run(jaqcd_ir, task_spec.qubit_count, shots, kwargs...)
-    return pyconvert(Braket.GateModelTaskResult, py_raw_result)
-end
-Braket.simulate(d::PyLocalSimulator, task_spec::Circuit; kwargs...) = simulate(d, PyCircuit(task_spec); kwargs...)
-
 function Braket._run_internal(simulator::PyLocalSimulator, task_spec::AnalogHamiltonianSimulation, args...; kwargs...)
     raw_py_result = simulator._run_internal(Py(ir(task_spec)), args...; kwargs...)
     jl_task_metadata = pyconvert(Braket.TaskMetadata, raw_py_result.task_metadata) 

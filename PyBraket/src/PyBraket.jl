@@ -5,39 +5,27 @@ module PyBraket
     import Braket: Instruction
     using Braket.IR
     import Braket.IR: TimeSeries, AtomArrangement, DrivingField, PhysicalField, ShiftingField, Setup, Hamiltonian, AHSProgram
-    export PyLocalSimulator, PyCircuit
+    export PyLocalSimulator
     import PythonCall: Py
 
     const awsbraket   = PythonCall.pynew()
-    const braketobs   = PythonCall.pynew()
     const local_sim   = PythonCall.pynew()
     const default_sim = PythonCall.pynew()
     const tasks       = PythonCall.pynew()
-    const circuit     = PythonCall.pynew()
-    const pyjaqcd     = PythonCall.pynew()
     const pyahs       = PythonCall.pynew()
     const pyopenqasm  = PythonCall.pynew()
-    const pygates     = PythonCall.pynew()
-    const pynoises    = PythonCall.pynew()
     const collections = PythonCall.pynew()
 
     function __init__()
         # must set these when this code is actually loaded
         PythonCall.pycopy!(awsbraket,   pyimport("braket.aws"))
-        PythonCall.pycopy!(braketobs,   pyimport("braket.circuits.observables"))
         PythonCall.pycopy!(local_sim,   pyimport("braket.devices.local_simulator"))
         PythonCall.pycopy!(default_sim, pyimport("braket.default_simulator"))
-        PythonCall.pycopy!(circuit,     pyimport("braket.circuits"))
-        PythonCall.pycopy!(pygates,     pyimport("braket.circuits.gates"))
-        PythonCall.pycopy!(pynoises,    pyimport("braket.circuits.noises"))
-        PythonCall.pycopy!(pyjaqcd,     pyimport("braket.ir.jaqcd"))
         PythonCall.pycopy!(pyopenqasm,  pyimport("braket.ir.openqasm"))
         PythonCall.pycopy!(pyahs,       pyimport("braket.ir.ahs"))
         PythonCall.pycopy!(tasks,       pyimport("braket.tasks"))
         PythonCall.pycopy!(collections, pyimport("collections"))
         PythonCall.pyconvert_add_rule("collections:Counter", Accumulator, counter_to_acc)
-        Braket._simulator_devices[]["braket_sv"] = PyLocalSimulator("braket_sv") 
-        Braket._simulator_devices[]["braket_dm"] = PyLocalSimulator("braket_dm") 
         Braket._simulator_devices[]["braket_ahs"] = PyLocalSimulator("braket_ahs") 
     end
     function counter_to_acc(::Type{Accumulator}, x::Py)
@@ -69,24 +57,8 @@ module PyBraket
         end
         return args
     end
-        
-    for (irT, pyT) in ((:(Braket.IR.Expectation), :(pyjaqcd.Expectation)),
-                       (:(Braket.IR.Variance), :(pyjaqcd.Variance)),
-                       (:(Braket.IR.Sample), :(pyjaqcd.Sample)),
-                       (:(Braket.IR.Amplitude), :(pyjaqcd.Amplitude)),
-                       (:(Braket.IR.StateVector), :(pyjaqcd.StateVector)),
-                       (:(Braket.IR.Probability), :(pyjaqcd.Probability)),
-                       (:(Braket.IR.DensityMatrix), :(pyjaqcd.DensityMatrix)))
-        @eval begin
-            Py(o::$irT) = $pyT(;arg_gen(o, fieldnames($irT))...) 
-        end
-    end
-    
     include("pyahs.jl")
-    include("pygates.jl")
-    include("pynoises.jl")
     include("pyschema.jl")
     using .PySchema
-    include("pycircuit.jl")
     include("local_simulator.jl")
 end
