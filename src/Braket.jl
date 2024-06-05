@@ -1,7 +1,7 @@
 module Braket
 
 export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTaskBatch
-export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator
+export metadata, status, Observable, Result, FreeParameter, FreeParameterExpression, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator, subs
 export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
@@ -32,12 +32,17 @@ using DecFP
 using Graphs
 using HTTP
 using StaticArrays
+using Symbolics
+using SymbolicUtils
 using JSON3, StructTypes
 using LinearAlgebra
 using DataStructures
 using NamedTupleTools
 using OrderedCollections
 using Tar
+
+# Operator overloading for FreeParameterExpression
+import Base: +, -, *, /, ^, ==
 
 include("utils.jl")
 """
@@ -133,6 +138,72 @@ struct FreeParameter
 end
 Base.copy(fp::FreeParameter) = fp
 Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
+
+"""
+    FreeParameterExpression
+    FreeParameterExpression(expr::Union{FreeParameterExpression, Number, Symbolics.Num, String})
+
+Struct representing a Free Parameter expression, which can be used in symbolic computations.
+
+### Examples
+```jldoctest
+julia> fp_alpha = FreeParameter(:alpha)
+alpha
+
+julia> fp_beta = FreeParameter(:beta)
+beta
+
+julia> expr1 = FreeParameterExpression("2 * alpha / 3")
+(2//3)*alpha
+
+julia> expr2 = FreeParameterExpression("alpha + 2 * beta")
+alpha + 2beta
+```
+"""
+
+struct FreeParameterExpression
+    expression::Symbolics.Num
+
+    function FreeParameterExpression(expr::Union{FreeParameterExpression, Number, Symbolics.Num, String})
+        if isa(expr, FreeParameterExpression)
+            return new(expr.expression)
+        elseif isa(expr, Number)
+            return new(Symbolics.Num(expr))
+        elseif isa(expr, Symbolics.Num)
+            return new(expr)
+        elseif isa(expr, String)
+            parsed_expr = parse_expr_to_symbolic(Meta.parse(expr), @__MODULE__)
+            return new(parsed_expr)
+        else
+            throw(ArgumentError("Unsupported expression type"))
+        end
+    end
+end
+
+Base.show(io::IO, fpe::FreeParameterExpression) = print(io, fpe.expression)
+Base.copy(fp::FreeParameterExpression) = fp
+
+function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Number})
+    param_values_num = Dict(Symbolics.Variable(k) => v for (k, v) in parameter_values)
+    subbed_expr = Symbolics.substitute(fpe.expression, param_values_num)
+    if isempty(Symbolics.get_variables(subbed_expr))
+        return subbed_expr
+    else
+       return FreeParameterExpression(subbed_expr)
+    end
+end
+
+import Base: +, *, -, /, ^, ==
+
++(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression + fpe2)
+*(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression * fpe2)
+*(a::Number, fp::FreeParameter) = FreeParameterExpression("$(a) * $(fp.name)")
+-(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression - fpe2)
+/(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression / fpe2)
+^(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression ^ fpe2)
+-(fpe::FreeParameterExpression) = FreeParameterExpression(-fpe.expression)
+==(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = Symbolics.simplify(fpe1.expression) == Symbolics.simplify(fpe2.expression)
+==(fpe::FreeParameterExpression, expr::Symbolics.Num) = fpe.expression == expr
 
 include("compiler_directive.jl")
 include("gates.jl")

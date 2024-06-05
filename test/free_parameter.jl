@@ -25,3 +25,20 @@ using Braket, Test
     @test b.name == :b
     @test copy(b) === b
 end
+
+
+@testset "Free parameter Expression" begin
+    α = FreeParameter(:alpha)
+    θ = FreeParameter(:theta)
+    gate = FreeParameterExpression("α + 2*θ")
+    circ = Circuit()
+    circ = H(circ, 0)
+    circ = Rx(circ, 1, gate)
+    circ = Ry(circ, 0, θ)
+    circ = Ry(circ, 0, θ)
+    circ = Probability(circ)
+    #substitution
+    d = FreeParameterExpression("2*α + 3*θ")
+    e = subs(d, Dict(:α => 1.0, :θ => 2.0))
+    @test e == 8.0
+end

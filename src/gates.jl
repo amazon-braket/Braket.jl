@@ -47,10 +47,10 @@ for gate_def in (
         $($G) gate.
         """
         struct $G <: AngledGate{$n_angle}
-            angle::NTuple{$n_angle, Union{Float64, FreeParameter}}
-            $G(angle::T) where {T<:NTuple{$n_angle, Union{Float64, FreeParameter}}} = new(angle)
+            angle::NTuple{$n_angle, Union{Float64, FreeParameter, FreeParameterExpression}}
+            $G(angle::T) where {T<:NTuple{$n_angle, Union{Float64, FreeParameter, FreeParameterExpression}}} = new(angle)
         end
-        $G(angles::Vararg{Union{Float64, FreeParameter}}) = $G(tuple(angles...))
+        $G(angles::Vararg{Union{Float64, FreeParameter, FreeParameterExpression}}) = $G(tuple(angles...))
         $G(angles::Vararg{Number}) = $G((Float64(a) for a in angles)...)
         chars(::Type{$G}) = $c
         ir_typ(::Type{$G}) = $IR_G
@@ -99,7 +99,7 @@ end
 (::Type{G})(x::Tuple{}) where {G<:Gate} = G()
 (::Type{G})(x::Tuple{}) where {G<:AngledGate} = throw(ArgumentError("angled gate must be constructed with at least one angle."))
 (::Type{G})(x::AbstractVector) where {G<:AngledGate} = G(x...)
-(::Type{G})(x::T) where {G<:AngledGate{1}, T<:Union{Float64, FreeParameter}} = G((x,))
+(::Type{G})(x::T) where {G<:AngledGate{1}, T<:Union{Float64, FreeParameter, FreeParameterExpression}} = G((x,))
 qubit_count(g::G) where {G<:Gate}  = qubit_count(G)
 angles(g::G) where {G<:Gate}       = ()
 angles(g::AngledGate{N}) where {N} = g.angle
