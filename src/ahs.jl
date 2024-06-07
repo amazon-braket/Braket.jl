@@ -330,6 +330,11 @@ function LocalDetuning(times::Vector{<:Number}, values::Vector{<:Number}, patter
     LocalDetuning(field)
 end
 
+
+function ir(ld::LocalDetuning)
+    return IR.LocalDetuning(ir(ld.magnitude))
+end
+
 """
 	stitch(ld1::LocalDetuning, ld2::LocalDetuning; boundary::Symbol="mean") -> LocalDetuning
 
@@ -439,4 +444,13 @@ function discretize(ld::LocalDetuning, properties::DiscretizationProperties)
 
     discretized_magnitude = discretize(ld.magnitude, time_resolution, value_resolution, pattern_resolution)
     LocalDetuning(discretized_magnitude)
+end
+
+function discretize(ld::LocalDetuning, properties::DiscretizationProperties)
+	local_detuning_parameters = properties.rydberg.rydbergLocal
+	time_resolution = Dec128(local_detuning_parameters.timeResolution)
+	value_resolution = Dec128(local_detuning_parameters.commonDetuningResolution)
+	pattern_resolution = Dec128(local_detuning_parameters.localDetuningResolution)
+	discretized_magnitude = discretize(ld.magnitude, time_resolution, value_resolution, pattern_resolution)
+	LocalDetuning(discretized_magnitude)
 end

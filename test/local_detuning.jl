@@ -14,14 +14,8 @@ struct MockRydberg
     rydbergLocal::MockRydbergLocal
 end
 
-struct MockAhsParadigmProperties
-    lattice::Braket.Lattice
+struct MockDiscretizationProperties
     rydberg::MockRydberg
-end
-
-struct MockAhsDeviceCapabilities
-    action::Dict{Union{Braket.DeviceActionType, String}, Braket.DeviceActionProperties}
-    paradigm::MockAhsParadigmProperties
 end
 
 @testset "AHS.LocalDetuning" begin
@@ -31,6 +25,7 @@ end
 		glob_amplitude₁ = [0.5, 0.8, 0.9, 1.0]
 		pattern₁ = [0.3, 0.7, 0.6, -0.5, 0, 1.6]
 		s₁ = LocalDetuning(times₁, glob_amplitude₁, pattern₁)
+           #asserts to test this
 	end
 	
 	@testset "LocalDetuning Stitch: Mean, Left, Right" begin
@@ -45,5 +40,6 @@ end
 		stitchedₗ = stitch(s₁, s₂, :mean)
 		stitchedₗ = stitch(s₁, s₂, :left)
 		stitchedₗ = stitch(s₁, s₂, :right)
+ 		 #asserts to test this
 	end
 end
