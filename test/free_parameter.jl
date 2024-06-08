@@ -31,14 +31,13 @@ end
     α = FreeParameter(:alpha)
     θ = FreeParameter(:theta)
     gate = FreeParameterExpression("α + 2*θ")
+    gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
     circ = Circuit()
     circ = H(circ, 0)
-    circ = Rx(circ, 1, gate)
-    circ = Ry(circ, 0, θ)
+    circ = Rx(circ, 1, gsub)
     circ = Ry(circ, 0, θ)
     circ = Probability(circ)
-    #substitution
-    d = FreeParameterExpression("2*α + 3*θ")
-    e = subs(d, Dict(:α => 1.0, :θ => 2.0))
-    @test e == 8.0
+    new_circ = circ(6.0)
+    non_para_circ = Circuit() |> (ci->H(ci, 0)) |> (ci->Rx(ci, 1, gsub)) |> (ci->Ry(ci, 0, 6.0)) |> Probability
+    @test new_circ == non_para_circ
 end

@@ -187,10 +187,12 @@ function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Num
     param_values_num = Dict(Symbolics.Variable(k) => v for (k, v) in parameter_values)
     subbed_expr = Symbolics.substitute(fpe.expression, param_values_num)
     if isempty(Symbolics.get_variables(subbed_expr))
+	   subbed_expr = Symbolics.value(subbed_expr)
         return subbed_expr
     else
-       return FreeParameterExpression(subbed_expr)
-    end
+	subbed_expr = Symbolics.value(subbed_expr)
+	return FreeParameterExpression(subbed_expr)
+    end 
 end
 
 import Base: +, *, -, /, ^, ==
