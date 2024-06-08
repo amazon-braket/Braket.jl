@@ -297,5 +297,23 @@ DEVICE_ARN = "arn:aws:braket:us-east-1:123456789:device/qpu/ionq/Forte-1"
         @test reservation.is_active == false
         @test !haskey(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
         @test !haskey(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+
     end
+
+    function test_func()
+        println("Executing within reservation context")
+        # Add actions as needed
+        @test ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] == DEVICE_ARN
+        @test ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] == RESERVATION_ARN 
+    end
+
+    @testset "Direct Reservation Function" begin
+	   @test Braket.direct_reservation(reservation, test_func)
+    end
+
+    @testset "Invalid Device Type" begin
+        invalid_device = 12345  # Not a valid device type
+        @test_throws UndefVarError DirectReservation(invalid_device, RESERVATION_ARN)
+    end
+
 end

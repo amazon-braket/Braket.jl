@@ -384,3 +384,18 @@ function stop_reservation!(state::DirectReservation)
     delete!(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
     delete!(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
 end
+
+function direct_reservation(reservation::DirectReservation, func::Function)
+    env_vars = Dict(
+        "AMZN_BRAKET_RESERVATION_DEVICE_ARN" => reservation.device_arn,
+        "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN" => reservation.reservation_arn
+    )
+    withenv(pairs(env_vars)...) do
+        start_reservation!(reservation)
+        try
+            func()
+        finally
+            stop_reservation!(reservation)
+        end
+    end
+end
