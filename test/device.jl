@@ -302,7 +302,7 @@ DEVICE_ARN = "arn:aws:braket:us-east-1:123456789:device/qpu/ionq/Forte-1"
 
     function test_func()
         println("Executing within reservation context")
-	   return 5 
+        return 5 
         # Add actions as needed
         @test ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] == DEVICE_ARN
         @test ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] == RESERVATION_ARN 
