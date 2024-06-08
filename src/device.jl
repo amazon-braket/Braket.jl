@@ -344,8 +344,9 @@ A context manager that adjusts AwsQuantumTasks generated within the context to u
 for all tasks targeting the designated device. Notably, this manager permits only one reservation
 at a time.
 
-Reservations are specific to AWS accounts and devices. Only the AWS account that initiated the
-reservation can utilize the reservation ARN. Moreover, the reservation ARN is solely valid on the
+[Reservations](https://docs.aws.amazon.com/braket/latest/developerguide/braket-reservations.html)
+are specific to AWS accounts and devices. Only the AWS account that initiated the reservation 
+can utilize the reservation ARN. Moreover, the reservation ARN is solely valid on the
 reserved device within the specified start and end times.
 
 Arguments:
@@ -382,17 +383,4 @@ function stop_reservation!(state::DirectReservation)
     state.is_active = false
     delete!(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
     delete!(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
-end
-
-# Direct reservation function
-function direct_reservation(reservation::DirectReservation, func::Function)
-    env_vars = mock_env_vars()
-    withenv(env_vars) do
-        start_reservation!(reservation)
-        try
-            func()
-        finally
-            stop_reservation!(reservation)
-        end
-    end
 end
