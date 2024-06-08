@@ -269,6 +269,10 @@ MOCK_DWAVE_QPU() = """{
     end
 end
 
+# Constants
+RESERVATION_ARN = "arn:aws:braket:us-east-1:123456789:reservation/uuid"
+DEVICE_ARN = "arn:aws:braket:us-east-1:123456789:device/qpu/ionq/Forte-1"
+
 @testset "DirectReservation Tests" begin
     # Creating a DirectReservation
     @testset "Creating DirectReservation" begin

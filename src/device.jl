@@ -337,7 +337,23 @@ function get_devices(; arns::Vector{String}=String[], names::Vector{String}=Stri
     return sort(collect(values(device_map)), by=(x->getproperty(x, Symbol("_"*order_by))))
 end
 
-# DirectReservation structure
+"""
+    DirectReservation(device::Union{Device, String, Nothing}, reservation_arn::Union{String, Nothing})
+
+A context manager that adjusts AwsQuantumTasks generated within the context to utilize a reservation ARN
+for all tasks targeting the designated device. Notably, this manager permits only one reservation
+at a time.
+
+Reservations are specific to AWS accounts and devices. Only the AWS account that initiated the
+reservation can utilize the reservation ARN. Moreover, the reservation ARN is solely valid on the
+reserved device within the specified start and end times.
+
+Arguments:
+- device (Device | str | Nothing): The Braket device for which you possess a reservation ARN, or
+  alternatively, the device ARN.
+- reservation_arn (str | Nothing): The Braket Direct reservation ARN to be implemented for all
+  quantum tasks executed within the contex
+"""
 mutable struct DirectReservation
     device_arn::String
     reservation_arn::String
