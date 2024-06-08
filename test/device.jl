@@ -268,3 +268,28 @@ MOCK_DWAVE_QPU() = """{
         end
     end
 end
+
+@testset "DirectReservation Tests" begin
+    # Creating a DirectReservation
+    @testset "Creating DirectReservation" begin
+        reservation = Braket.DirectReservation(DEVICE_ARN, RESERVATION_ARN)
+        @test reservation.device_arn == DEVICE_ARN
+        @test reservation.reservation_arn == RESERVATION_ARN
+        @test reservation.is_active == false
+    end
+
+    # Starting and stopping a reservation
+    @testset "Starting and Stopping Reservation" begin
+        reservation = Braket.DirectReservation(DEVICE_ARN, RESERVATION_ARN)
+        # Start reservation
+        Braket.start_reservation!(reservation)
+        @test reservation.is_active == true
+        @test ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] == DEVICE_ARN
+        @test ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] == RESERVATION_ARN
+        # Stop reservation
+        Braket.stop_reservation!(reservation)
+        @test reservation.is_active == false
+        @test !haskey(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
+        @test !haskey(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+    end
+end

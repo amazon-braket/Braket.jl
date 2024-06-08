@@ -336,3 +336,47 @@ function get_devices(; arns::Vector{String}=String[], names::Vector{String}=Stri
     end
     return sort(collect(values(device_map)), by=(x->getproperty(x, Symbol("_"*order_by))))
 end
+
+# DirectReservation structure
+mutable struct DirectReservation
+    device_arn::String
+    reservation_arn::String
+    is_active::Bool
+end
+
+function DirectReservation(device_arn::String, reservation_arn::String)
+    return DirectReservation(device_arn, reservation_arn, false)
+end
+
+# Start reservation function
+function start_reservation!(state::DirectReservation)
+    if state.is_active
+        error("Another reservation is already active.")
+    end
+    state.is_active = true
+    ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] = state.device_arn
+    ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] = state.reservation_arn
+end
+
+# Stop reservation function
+function stop_reservation!(state::DirectReservation)
+    if !state.is_active
+        @warn "Reservation is not active."
+    end
+    state.is_active = false
+    delete!(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
+    delete!(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+end
+
+# Direct reservation function
+function direct_reservation(reservation::DirectReservation, func::Function)
+    env_vars = mock_env_vars()
+    withenv(env_vars) do
+        start_reservation!(reservation)
+        try
+            func()
+        finally
+            stop_reservation!(reservation)
+        end
+    end
+end
