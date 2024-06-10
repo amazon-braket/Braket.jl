@@ -163,21 +163,18 @@ julia> gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
 
 struct FreeParameterExpression
     expression::Symbolics.Num
-
-    function FreeParameterExpression(expr::Union{FreeParameterExpression, Number, Symbolics.Num, String})
-        if isa(expr, FreeParameterExpression)
-            return new(expr.expression)
-        elseif isa(expr, Number)
-            return new(Symbolics.Num(expr))
-        elseif isa(expr, Symbolics.Num)
-            return new(expr)
-        elseif isa(expr, String)
-            parsed_expr = parse_expr_to_symbolic(Meta.parse(expr), @__MODULE__)
-            return new(parsed_expr)
-        else
-            throw(ArgumentError("Unsupported expression type"))
-        end
+    function FreeParameterExpression(expr::Symbolics.Num)
+        new(expr)
     end
+end
+
+FreeParameterExpression(expr::FreeParameterExpression) = FreeParameterExpression(expr.expression)
+FreeParameterExpression(expr::Number) = FreeParameterExpression(Symbolics.Num(expr))
+FreeParameterExpression(expr) = throw(ArgumentError("Unsupported expression type"))
+
+function FreeParameterExpression(expr::String)
+    parsed_expr = parse_expr_to_symbolic(Meta.parse(expr), @__MODULE__)
+    return FreeParameterExpression(parsed_expr)
 end
 
 Base.show(io::IO, fpe::FreeParameterExpression) = print(io, fpe.expression)
@@ -194,8 +191,6 @@ function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Num
 	return FreeParameterExpression(subbed_expr)
     end 
 end
-
-import Base: +, *, -, /, ^, ==
 
 +(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression + fpe2)
 *(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number}) = FreeParameterExpression(fpe1.expression * fpe2)
