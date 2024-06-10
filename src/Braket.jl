@@ -265,11 +265,11 @@ function Base.:^(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpressi
 end
 
 function Base.:(==)(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return fpe1.expression == fpe2.expression
+    return isequal(fpe1.expression, fpe2.expression)
 end
 
 function Base.:!=(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return !(fpe1 == fpe2)
+     return !(isequal(fpe1.expression, fpe2.expression))
 end
 
 include("compiler_directive.jl")

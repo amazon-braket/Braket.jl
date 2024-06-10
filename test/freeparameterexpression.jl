@@ -42,7 +42,10 @@ using Braket, Test
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 4.0 # α + 3θ == 4.0 
     fpe3 = FreeParameterExpression("2 * θ")
-    fpe3 == fpe2 
+    # == operator
+    @test fpe3 == fpe2 
+    # != operator
+    @test fpe1 != fpe2 
     show(fpe3)
     # - operator
     result = fpe1 - fpe2
