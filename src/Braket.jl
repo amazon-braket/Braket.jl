@@ -160,14 +160,17 @@ theta
 julia> gate = FreeParameterExpression("α + 2*θ")
 α + 2θ
 
+julia> gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
+6.0
+
+julia> gate₁ = FreeParameterExpression("phi + 2*gamma")
+2gamma + phi
+
 julia> gate + gate
 2α + 4θ
 
 julia> gate * gate
 (α + 2θ)^2
-
-julia> gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
-6.0
 ```
 """
 
