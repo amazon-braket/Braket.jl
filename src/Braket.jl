@@ -147,17 +147,17 @@ Struct representing a Free Parameter expression, which can be used in symbolic c
 
 ### Examples
 ```jldoctest
-julia> fp_alpha = FreeParameter(:alpha)
+julia> α = FreeParameter(:alpha)
 alpha
 
-julia> fp_beta = FreeParameter(:beta)
-beta
+julia> θ = FreeParameter(:theta)
+theta
 
-julia> expr1 = FreeParameterExpression("2 * alpha / 3")
-(2//3)*alpha
+julia> gate = FreeParameterExpression("α + 2*θ")
+α + 2θ
 
-julia> expr2 = FreeParameterExpression("alpha + 2 * beta")
-alpha + 2beta
+julia> gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
+6.0
 ```
 """
 
@@ -184,7 +184,7 @@ Base.show(io::IO, fpe::FreeParameterExpression) = print(io, fpe.expression)
 Base.copy(fp::FreeParameterExpression) = fp
 
 function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Number})
-    param_values_num = Dict(Symbolics.Variable(k) => v for (k, v) in parameter_values)
+    param_values_num = Dict(Symbolics.variable(string(k); T=Real) => v for (k, v) in parameter_values)
     subbed_expr = Symbolics.substitute(fpe.expression, param_values_num)
     if isempty(Symbolics.get_variables(subbed_expr))
 	   subbed_expr = Symbolics.value(subbed_expr)

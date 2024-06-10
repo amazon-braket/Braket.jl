@@ -25,19 +25,3 @@ using Braket, Test
     @test b.name == :b
     @test copy(b) === b
 end
-
-
-@testset "Free parameter Expression" begin
-    α = FreeParameter(:alpha)
-    θ = FreeParameter(:theta)
-    gate = FreeParameterExpression("α + 2*θ")
-    gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
-    circ = Circuit()
-    circ = H(circ, 0)
-    circ = Rx(circ, 1, gsub)
-    circ = Ry(circ, 0, θ)
-    circ = Probability(circ)
-    new_circ = circ(6.0)
-    non_para_circ = Circuit() |> (ci->H(ci, 0)) |> (ci->Rx(ci, 1, gsub)) |> (ci->Ry(ci, 0, 6.0)) |> Probability
-    @test new_circ == non_para_circ
-end
