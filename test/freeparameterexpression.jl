@@ -38,7 +38,7 @@ using Braket, Test
     fpe1 = FreeParameterExpression("α + θ")
     fpe2 = FreeParameterExpression("2 * θ")
     result = fpe1 + fpe2
-    result  == FreeParameterExpression("2 * θ + α + θ")
+    @test result == FreeParameterExpression("2 * θ + α + θ")
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 4.0 # α + 3θ == 4.0 
     fpe3 = FreeParameterExpression("2 * θ")
@@ -49,22 +49,22 @@ using Braket, Test
     show(fpe3)
     # - operator
     result = fpe1 - fpe2
-    result  == FreeParameterExpression("α - θ")
+    @test result == FreeParameterExpression("α - θ")
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 0.0 # α - θ == 0.0 
     # * operator
     result = fpe1 * fpe2
-    result  == FreeParameterExpression("2(α + θ)*θ")
+    @test result == FreeParameterExpression("2(α + θ)*θ")
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 4.0 # 2(α + θ)*θ == 4.0
     # / operator
     result = fpe1 / fpe2
-    result  == FreeParameterExpression("(α + θ) / (2θ)")
+    @test result == FreeParameterExpression("(α + θ) / (2θ)")
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 1.0 # (α + θ) / (2θ) == 1.0
     # ^ operator
     result = fpe1 ^ fpe2
-    result  == FreeParameterExpression("(α + θ)^(2θ)")
+    @test result == FreeParameterExpression("(α + θ)^(2θ)")
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 4.0 # (α + θ)^(2θ) == 4.0
 end
