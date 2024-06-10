@@ -189,7 +189,6 @@ function FreeParameterExpression(expr::String)
     return FreeParameterExpression(parsed_expr)
 end
 
-
 Base.show(io::IO, fpe::FreeParameterExpression) = print(io, fpe.expression)
 Base.copy(fp::FreeParameterExpression) = fp
 
