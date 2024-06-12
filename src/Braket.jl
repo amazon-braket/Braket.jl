@@ -1,7 +1,7 @@
 module Braket
 
 export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTaskBatch
-export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator, ITensorSimulator
+export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator
 export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
@@ -159,5 +159,4 @@ include("aws_jobs.jl")
 include("local_jobs.jl")
 include("task.jl")
 include("task_batch.jl")
-include("itensor_local_simulator.jl")
 end # module
