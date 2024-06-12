@@ -4,12 +4,9 @@ using ITensors
 using ITensorMPS
 
 @testset "ITensorSimulator Tests" begin
-    # Test: Basic DMRG simulation with flexible Hamiltonian
     @testset "DMRG Simulation" begin
         # Create an instance of ITensorSimulator
         simulator = ITensorSimulator("itensor_backend")
-
-        # Define a task specification with Hamiltonian terms
         N = 10
         sites = siteinds("S=1",N)
         os = OpSum()
