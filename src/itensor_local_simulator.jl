@@ -1,20 +1,18 @@
 export ITensorSimulator, simulate
 
-abstract type LocalSimulator end
-
-struct ITensorSimulator <: LocalSimulator
+struct ITensorSimulator
     backend::String
 end
 
 function simulate(d::ITensorSimulator, sites::Any, os::Any; method::Symbol=:DMRG, kwargs...)
     if method == :DMRG
-        return simulate_dmrg(d, sites; kwargs...)
+        return simulate_dmrg(d, sites, os; kwargs...)
     else
         throw(ArgumentError("Unsupported simulation method: $method"))
     end
 end
 
-function simulate_dmrg(d::ITensorSimulator, sites::Any; kwargs...)
+function simulate_dmrg(d::ITensorSimulator, sites::Any, os::Any; kwargs...)
     config = Dict(kwargs...)
 
     # Set default values if not provided in kwargs
@@ -32,6 +30,6 @@ function simulate_dmrg(d::ITensorSimulator, sites::Any; kwargs...)
     # Run DMRG
     energy, psi = dmrg(H, psi0; nsweeps=nsweeps, maxdim=maxdim, cutoff=cutoff)
 
-    # # Return results in the appropriate format : something like LocalQuantumTask("dmrg_task", GateModelQuantumTaskResult(energy, psi)) maybe
+    # Return results in the appropriate format : something like LocalQuantumTask("dmrg_task", GateModelQuantumTaskResult(energy, psi)) maybe
     return energy, psi
 end

@@ -1,7 +1,7 @@
 module Braket
 
 export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTaskBatch
-export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator
+export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator, ITensorSimulator
 export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
@@ -40,6 +40,8 @@ using DataStructures
 using NamedTupleTools
 using OrderedCollections
 using Tar
+
+import ITensors: apply, state, id
 
 include("utils.jl")
 """
