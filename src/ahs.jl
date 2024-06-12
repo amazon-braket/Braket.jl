@@ -276,7 +276,7 @@ end
 """ 
 	LocalDetuning <: Hamiltonian 
 
-Struct representing a Hamiltonian term `H_{shift}` representing the local detuning that changes the energy of the Rydberg level in an AnalogHamiltonianSimulation.
+Struct representing a Hamiltonian term `H_{shift}` representing the [local detuning](https://aws.amazon.com/blogs/quantum-computing/local-detuning-now-available-on-queras-aquila-device-with-braket-direct/) that changes the energy of the Rydberg level in an AnalogHamiltonianSimulation.
 
 
 ```math
@@ -331,10 +331,7 @@ function LocalDetuning(times::Vector{<:Number}, values::Vector{<:Number}, patter
 end
 
 
-function ir(ld::LocalDetuning)
-    return IR.LocalDetuning(ir(ld.magnitude))
-end
-
+ir(ld::LocalDetuning) = IR.LocalDetuning(ir(ld.magnitude))
 """
 	stitch(ld1::LocalDetuning, ld2::LocalDetuning; boundary::Symbol="mean") -> LocalDetuning
 
@@ -360,7 +357,7 @@ end
 """
     stitch(ts1::TimeSeries, ts2::TimeSeries; boundary::Symbol="mean")
 
-Stitches two shifting fields based on the `TimeSeries.stitch` method.
+[`Stitch`](@ref) two shifting fields based on the `TimeSeries.stitch` method.
 The time points of the second `TimeSeries` are shifted such that the first time point of
 the second `TimeSeries` coincides with the last time point of the first `TimeSeries`.
 The boundary point value is handled according to the `boundary` argument value.
