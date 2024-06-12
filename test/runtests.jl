@@ -65,6 +65,7 @@ for group in groups
             include("local_jobs.jl")
             include("job_macro.jl")
             include("jobs.jl")
+            include("itensor_local_simulator.jl")
         elseif test_type == "integ"
             include(joinpath(@__DIR__, "integ_tests", "runtests.jl"))
         end

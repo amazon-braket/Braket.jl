@@ -32,6 +32,8 @@ using DecFP
 using Graphs
 using HTTP
 using StaticArrays
+using ITensors
+using ITensorMPS
 using JSON3, StructTypes
 using LinearAlgebra
 using DataStructures
@@ -155,4 +157,5 @@ include("aws_jobs.jl")
 include("local_jobs.jl")
 include("task.jl")
 include("task_batch.jl")
+include("itensor_local_simulator.jl")
 end # module
