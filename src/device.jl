@@ -350,10 +350,10 @@ can utilize the reservation ARN. Moreover, the reservation ARN is solely valid o
 reserved device within the specified start and end times.
 
 Arguments:
-- device (Device | str | Nothing): The Braket device for which you possess a reservation ARN, or
+- device (Device | string | Nothing): The Braket device for which you possess a reservation ARN, or
   alternatively, the device ARN.
 - reservation_arn (str | Nothing): The Braket Direct reservation ARN to be implemented for all
-  quantum tasks executed within the contex
+  quantum tasks executed within the startreservation and stopreservation
 """
 mutable struct DirectReservation
     device_arn::String
@@ -361,9 +361,7 @@ mutable struct DirectReservation
     is_active::Bool
 end
 
-function DirectReservation(device_arn::String, reservation_arn::String)
-    return DirectReservation(device_arn, reservation_arn, false)
-end
+DirectReservation(device_arn::String, reservation_arn::String) = DirectReservation(device_arn, reservation_arn, false)
 
 # Start reservation function
 function start_reservation!(state::DirectReservation)
@@ -394,6 +392,8 @@ function direct_reservation(reservation::DirectReservation, func::Function)
         start_reservation!(reservation)
         try
             func()
+        catch e
+            error("Error during reservation with device ARN $(reservation.device_arn): $(e)")
         finally
             stop_reservation!(reservation)
         end
