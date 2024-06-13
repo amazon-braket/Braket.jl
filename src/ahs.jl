@@ -335,7 +335,7 @@ ir(ld::LocalDetuning) = IR.LocalDetuning(ir(ld.magnitude))
 """
 	stitch(ld1::LocalDetuning, ld2::LocalDetuning; boundary::Symbol="mean") -> LocalDetuning
 
-Stitches two LocalDetuning terms based on the TimeSeries.stitch method.
+[`stitch`](@ref) two shifting fields based on the `TimeSeries.stitch` method.
 The time points of the second LocalDetuning are shifted such that the first time point of
 the second LocalDetuning coincides with the last time point of the first LocalDetuning.
 The boundary point value is handled according to the boundary argument value.
