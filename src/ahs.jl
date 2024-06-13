@@ -357,7 +357,7 @@ end
 """
     stitch(ts1::TimeSeries, ts2::TimeSeries; boundary::Symbol="mean")
 
-[`Stitch`](@ref) two shifting fields based on the `TimeSeries.stitch` method.
+[`stitch`](@ref) two shifting fields based on the `TimeSeries.stitch` method.
 The time points of the second `TimeSeries` are shifted such that the first time point of
 the second `TimeSeries` coincides with the last time point of the first `TimeSeries`.
 The boundary point value is handled according to the `boundary` argument value.
