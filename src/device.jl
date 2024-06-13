@@ -353,7 +353,7 @@ Arguments:
 - device (Device | String | Nothing): The Braket device for which you possess a reservation ARN, or
   alternatively, the device ARN.
 - reservation_arn (String | Nothing): The Braket Direct reservation ARN to be implemented for all
-  quantum tasks executed within the startreservation and stopreservation.
+  quantum tasks executed within the context.
 """
 mutable struct DirectReservation
     device_arn::String
