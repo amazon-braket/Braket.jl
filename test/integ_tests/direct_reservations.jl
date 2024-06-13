@@ -19,10 +19,6 @@ DEVICE_ARN = "arn:aws:braket:us-east-1:123456789:device/qpu/ionq/Forte-1"
     @testset "Starting and Stopping Reservation" begin
         reservation = Braket.DirectReservation(DEVICE_ARN, RESERVATION_ARN)
 
-       # Start reservation
-        @test ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] == nothing || ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] == DEVICE_ARN
-        @test ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] == nothing || ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] == RESERVATION_ARN
-
         # Start reservation
         Braket.start_reservation!(reservation)
         @test reservation.is_active == true

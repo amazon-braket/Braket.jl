@@ -352,8 +352,8 @@ reserved device within the specified start and end times.
 Arguments:
 - device (Device | string | Nothing): The Braket device for which you possess a reservation ARN, or
   alternatively, the device ARN.
-- reservation_arn (str | Nothing): The Braket Direct reservation ARN to be implemented for all
-  quantum tasks executed within the startreservation and stopreservation
+- reservation_arn (string | Nothing): The Braket Direct reservation ARN to be implemented for all
+  quantum tasks executed within the startreservation and stopreservation.
 """
 mutable struct DirectReservation
     device_arn::String
@@ -379,8 +379,12 @@ function stop_reservation!(state::DirectReservation)
         @warn "Reservation is not active."
     end
     state.is_active = false
-    delete!(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
-    delete!(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+    if haskey(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
+        delete!(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
+    end
+    if haskey(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+        delete!(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+    end
 end
 
 function direct_reservation(reservation::DirectReservation, func::Function)
