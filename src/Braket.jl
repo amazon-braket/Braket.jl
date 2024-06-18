@@ -175,7 +175,7 @@ julia> gate₁ = FreeParameterExpression("phi + 2*gamma")
 """
 struct FreeParameterExpression
     expression::Symbolics.Num
-    function FreeParameterExpression(expr::Symbolics.Num)
+    function FreeParameterExpression(expr::Symbolics.Num) #what about strings
         new(expr)
     end
 end
@@ -204,73 +204,28 @@ function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Num
     end 
 end
 
-function Base.:+(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1.expression + fpe2.expression)
-end
+Base.:+(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) + 
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
-function Base.:+(fpe1::FreeParameterExpression, fpe2::Union{Number, Symbolics.Num})
-    return FreeParameterExpression(fpe1.expression + fpe2)
-end
+Base.:*(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) * 
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
-function Base.:+(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1 + fpe2.expression)
-end
+Base.:-(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) - 
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
-function Base.:*(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1.expression * fpe2.expression)
-end
+Base.:/(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) /
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
-function Base.:*(fpe1::FreeParameterExpression, fpe2::Union{Number, Symbolics.Num})
-    return FreeParameterExpression(fpe1.expression * fpe2)
-end
+Base.:^(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) ^
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
-function Base.:*(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1 * fpe2.expression)
-end
-
-function Base.:-(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1.expression - fpe2.expression)
-end
-
-function Base.:-(fpe1::FreeParameterExpression, fpe2::Union{Number, Symbolics.Num})
-    return FreeParameterExpression(fpe1.expression - fpe2)
-end
-
-function Base.:-(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1 - fpe2.expression)
-end
-
-function Base.:/(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1.expression / fpe2.expression)
-end
-
-function Base.:/(fpe1::FreeParameterExpression, fpe2::Union{Number, Symbolics.Num})
-    return FreeParameterExpression(fpe1.expression / fpe2)
-end
-
-function Base.:/(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1 / fpe2.expression)
-end
-
-function Base.:^(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1.expression ^ fpe2.expression)
-end
-
-function Base.:^(fpe1::FreeParameterExpression, fpe2::Union{Number, Symbolics.Num})
-    return FreeParameterExpression(fpe1.expression ^ fpe2)
-end
-
-function Base.:^(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression)
-    return FreeParameterExpression(fpe1 ^ fpe2.expression)
-end
-
-function Base.:(==)(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-    return isequal(fpe1.expression, fpe2.expression)
-end
-
-function Base.:!=(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression)
-     return !(isequal(fpe1.expression, fpe2.expression))
-end
+Base.:(==)(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = isequal(fpe1.expression, fpe2.expression)
+Base.:!=(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = !(isequal(fpe1, fpe2))
 
 include("compiler_directive.jl")
 include("gates.jl")
