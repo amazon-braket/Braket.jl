@@ -186,10 +186,10 @@ FreeParameterExpression(expr) = throw(ArgumentError("Unsupported expression type
 
 # Function to validate the input expression string
 function validate_expr(expr::String)
-    allowed_chars = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/^()αβγδεζηθικλμνξοπρςστυφχψω ")
+    allowed_chars = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/^()αβγδεζηθικλμνξοπρςστυφχψωϐϑϕϖϘϙϚϛϜϝϞϟϠϡϰϱϴϵ϶ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ ")
     for char in expr
         if !(char in allowed_chars)
-            throw(ArgumentError("Unsupported character '$char' in expression. Only ASCII letters (a-z, A-Z), Greek letters (α-ω), digits (0-9), space( ), and basic mathematical symbols (+ - * / ^ ()) are allowed."))
+            throw(ArgumentError("Unsupported character '$char' in expression. Only ASCII letters (a-z, A-Z), digits (0-9), Greek letters (α-϶, Α-Ω), space( ), and basic mathematical symbols (+ - * / ^ ()) are allowed."))
         end
     end
     return expr
