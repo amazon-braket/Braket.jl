@@ -143,11 +143,11 @@ Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
     FreeParameterExpression
     FreeParameterExpression(expr::Union{FreeParameterExpression, Number, Symbolics.Num, String})
 
-Struct representing a Free Parameter expression, which can be used in symbolic computations. 
-Instances of `FreeParameterExpression` can represent symbolic expressions involving FreeParameters, 
+Struct representing a [`FreeParameterExpression`](@ref), which can be used in symbolic computations. 
+Instances of [`FreeParameterExpression`](@ref) can represent symbolic expressions involving [`FreeParameters`](@ref), 
 such as mathematical expressions with undetermined values.
 
-This type is often used in combination with [`FreeParameter`](@ref), which represents individual FreeParameter.
+This type is often used in combination with [`FreeParameter`](@ref), which represents individual [`FreeParameter`](@ref).
 
 ### Examples
 ```jldoctest
@@ -175,7 +175,7 @@ julia> gate₁ = FreeParameterExpression("phi + 2*gamma")
 """
 struct FreeParameterExpression
     expression::Symbolics.Num
-    function FreeParameterExpression(expr::Symbolics.Num) #what about strings
+    function FreeParameterExpression(expr::Symbolics.Num)
         new(expr)
     end
 end
@@ -184,8 +184,21 @@ FreeParameterExpression(expr::FreeParameterExpression) = FreeParameterExpression
 FreeParameterExpression(expr::Number) = FreeParameterExpression(Symbolics.Num(expr))
 FreeParameterExpression(expr) = throw(ArgumentError("Unsupported expression type"))
 
+# Function to validate the input expression string
+function validate_expr(expr::String)
+    allowed_chars = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/^()αβγδεζηθικλμνξοπρςστυφχψω ")
+    for char in expr
+        if !(char in allowed_chars)
+            throw(ArgumentError("Unsupported character '$char' in expression. Only ASCII letters (a-z, A-Z), Greek letters (α-ω), digits (0-9), space( ), and basic mathematical symbols (+ - * / ^ ()) are allowed."))
+        end
+    end
+    return expr
+end
+
+# Function to create FreeParameterExpression from a validated string
 function FreeParameterExpression(expr::String)
-    parsed_expr = parse_expr_to_symbolic(Meta.parse(expr), @__MODULE__)
+    validated_expr = validate_expr(expr)
+    parsed_expr = parse_expr_to_symbolic(Meta.parse(validated_expr), @__MODULE__)
     return FreeParameterExpression(parsed_expr)
 end
 
