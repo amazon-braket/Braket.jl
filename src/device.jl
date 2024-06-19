@@ -340,9 +340,9 @@ end
 """
     DirectReservation(device_arn::String, reservation_arn::String)
 
-A context manager that adjusts [`AwsQuantumTask`](@refs)s generated within the context to utilize a reservation ARN
-for all tasks targeting the designated device. Notably, this manager permits only one reservation
-at a time.
+A context manager that adjusts [`AwsQuantumTask`](@ref) generated within the context to utilize a
+reservation ARN for all tasks targeting the designated device. Notably, this manager permits only 
+one reservation at a time.
 
 [Reservations](https://docs.aws.amazon.com/braket/latest/developerguide/braket-reservations.html)
 are specific to AWS accounts and devices. Only the AWS account that initiated the reservation 
