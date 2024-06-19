@@ -2,8 +2,6 @@
 
 [Reservations](https://docs.aws.amazon.com/braket/latest/developerguide/braket-reservations.html) grant exclusive access to a specific quantum device for a predetermined time slot. This control over execution windows offers several advantages to users:
 
-Reservations provide exclusive access to a chosen quantum device for a predetermined time slot. This grants you complete control over when your quantum workload starts and finishes execution. Reservations offer several advantages:
-
   * **Predictability:** Users have guaranteed knowledge of precisely when their tasks will be executed, eliminating scheduling uncertainties.
   * **Prioritization:** During the reservation window, the user's workloads take precedence over others, avoiding queueing delays and potential bottlenecks.
   * **Efficiency:**  The cost is based solely on the reserved duration, irrespective of the number of tasks the user runs within that window.
