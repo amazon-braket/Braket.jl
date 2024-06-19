@@ -276,7 +276,7 @@ end
 """ 
 	LocalDetuning <: Hamiltonian 
 
-Struct representing a Hamiltonian term `H_{shift}` representing the [local detuning](https://aws.amazon.com/blogs/quantum-computing/local-detuning-now-available-on-queras-aquila-device-with-braket-direct/) that changes the energy of the Rydberg level in an AnalogHamiltonianSimulation.
+Struct representing a [`Hamiltonian`](@ref) term `H_{shift}` representing the [local detuning](https://aws.amazon.com/blogs/quantum-computing/local-detuning-now-available-on-queras-aquila-device-with-braket-direct/) that changes the energy of the Rydberg level in an [`AnalogHamiltonianSimulation`](@ref).
 
 
 ```math
@@ -292,11 +292,13 @@ where:
 The sum ``\\sum_k`` is taken over all target atoms.
 
 Fields:
-- `magnitude::Field`: Field containing the global magnitude time series Delta(t),
+- `magnitude::Field`: [`Field](@ref) containing the global magnitude time series Delta(t),
   where time is measured in seconds (s) and values are measured in rad/s, and the
   local pattern h_k of dimensionless real numbers between 0 and 1.
 
-```julia
+# Examples
+
+```jldoctest
 julia> magnitude = Field(TimeSeries(OrderedDict([0 => TimeSeriesItem(0, 1), 1 => TimeSeriesItem(1, 2)]), true, -1))
 julia> local_detuning = LocalDetuning(magnitude)
 ```
@@ -308,7 +310,9 @@ end
 """
 	LocalDetuning(times::Vector{<:Number}, values::Vector{<:Number}, pattern::Vector{<:Number})
 
-```julia 
+# Examples
+
+```jldoctest
 julia> times₁ = [0, 0.1, 0.2, 0.3];
 julia> glob_amplitude₁ = [0.5, 0.8, 0.9, 1.0];
 julia> pattern₁ = [0.3, 0.7, 0.6, -0.5, 0, 1.6];
@@ -332,12 +336,13 @@ end
 
 
 ir(ld::LocalDetuning) = IR.LocalDetuning(ir(ld.magnitude))
+
 """
 	stitch(ld1::LocalDetuning, ld2::LocalDetuning; boundary::Symbol="mean") -> LocalDetuning
 
-[`stitch`](@ref) two shifting fields based on the `TimeSeries.stitch` method.
-The time points of the second LocalDetuning are shifted such that the first time point of
-the second LocalDetuning coincides with the last time point of the first LocalDetuning.
+[`stitch`](@ref) two shifting fields based on the `stitch` method.
+The time points of the second [`LocalDetuning`](@ref) are shifted such that the first time point of
+the second [`LocalDetuning`](@ref) coincides with the last time point of the first [`LocalDetuning`](@ref).
 The boundary point value is handled according to the boundary argument value.
 
 # Arguments:
@@ -357,19 +362,19 @@ end
 """
     stitch(ts1::TimeSeries, ts2::TimeSeries; boundary::Symbol="mean")
 
-[`stitch`](@ref) two shifting fields based on the `TimeSeries.stitch` method.
-The time points of the second `TimeSeries` are shifted such that the first time point of
-the second `TimeSeries` coincides with the last time point of the first `TimeSeries`.
+[`stitch`](@ref) two shifting fields based on the `stitch` method.
+The time points of the second [`TimeSeries`](@ref) are shifted such that the first time point of
+the second [`TimeSeries`](@ref) coincides with the last time point of the first [`TimeSeries`](@ref).
 The boundary point value is handled according to the `boundary` argument value.
 
 # Arguments:
-- `ts1::TimeSeries`: The first `TimeSeries` to be stitched.
-- `ts2::TimeSeries`: The second `TimeSeries` to be stitched.
+- `ts1::TimeSeries`: The first [`TimeSeries`](@ref) to be stitched.
+- `ts2::TimeSeries`: The second [`TimeSeries`](@ref) to be stitched.
 - `boundary::Symbol="mean"`: The boundary point handler. Possible options are "mean", "left", "right".
 
 # Examples:
 
-```julia 
+```jldoctest
 julia> times₁ = [0, 0.1, 0.2, 0.3];
 julia> glob_amplitude₁ = [0.5, 0.8, 0.9, 1.0];
 julia> pattern₁ = [0.3, 0.7, 0.6, -0.5, 0, 1.6];
@@ -426,11 +431,11 @@ end
 """
     discretize(ld::LocalDetuning, properties::DiscretizationProperties) -> LocalDetuning
 
-Creates a discretized version of the `LocalDetuning`.
+Creates a discretized version of the [`LocalDetuning`](@ref).
 
 # Arguments:
-- `ld::LocalDetuning`: The `LocalDetuning` to discretize.
-- `properties::DiscretizationProperties`: Capabilities of a device that represent the
+- `ld::LocalDetuning`: The [`LocalDetuning`](@ref) to discretize.
+- `properties::[`DiscretizationProperties`](@ref): Capabilities of a device that represent the
   resolution with which the device can implement the parameters.
 """
 function discretize(ld::LocalDetuning, properties::DiscretizationProperties)
