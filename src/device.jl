@@ -338,9 +338,9 @@ function get_devices(; arns::Vector{String}=String[], names::Vector{String}=Stri
 end
 
 """
-    DirectReservation(device::Union{Device, String, Nothing}, reservation_arn::Union{String, Nothing})
+    DirectReservation(device_arn::String, reservation_arn::String)
 
-A context manager that adjusts AwsQuantumTasks generated within the context to utilize a reservation ARN
+A context manager that adjusts [`AwsQuantumTask`](@refs)s generated within the context to utilize a reservation ARN
 for all tasks targeting the designated device. Notably, this manager permits only one reservation
 at a time.
 
@@ -350,9 +350,9 @@ can utilize the reservation ARN. Moreover, the reservation ARN is solely valid o
 reserved device within the specified start and end times.
 
 Arguments:
-- device (Device | String | Nothing): The Braket device for which you possess a reservation ARN, or
-  alternatively, the device ARN.
-- reservation_arn (String | Nothing): The Braket Direct reservation ARN to be implemented for all
+- device_arn: The [`BraketDevice`](@ref) for which you possess a reservation ARN, or
+  alternatively, the [`Device`](@ref) ARN.
+- reservation_arn: The Braket [`DirectReservation`](@ref) ARN to be implemented for all
   quantum tasks executed within the context.
 """
 mutable struct DirectReservation
@@ -366,7 +366,7 @@ DirectReservation(device_arn::String, reservation_arn::String) = DirectReservati
 # Start reservation function
 function start_reservation!(state::DirectReservation)
     if state.is_active
-        error("Another reservation is already active.")
+        error("Another reservation is already active. Reservation ARN: $reservation_arn")
     end
     state.is_active = true
     ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] = state.device_arn
@@ -397,7 +397,7 @@ function direct_reservation(reservation::DirectReservation, func::Function)
         try
             func()
         catch e
-            error("Error during reservation with device ARN $(reservation.device_arn): $(e)")
+            error("Error during reservation with device ARN $(reservation.device_arn) and reservation ARN $(reservation.reservation_arn): $(e)")
         finally
             stop_reservation!(reservation)
         end

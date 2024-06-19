@@ -7,4 +7,6 @@ Braket.BraketDevice
 isavailable
 search_devices
 get_devices
+Braket.AwsQuantumTask
+DirectReservation
 ```
