@@ -364,6 +364,12 @@ end
 DirectReservation(device_arn::String, reservation_arn::String) = DirectReservation(device_arn, reservation_arn, false)
 
 # Start reservation function
+"""
+    start_reservation!(state::DirectReservation)
+
+[`start_reservation!`](@ref) activates a [`DirectReservation`](@ref) object, granting exclusive access to the
+specified quantum device for the reserved time window.
+"""
 function start_reservation!(state::DirectReservation)
     if state.is_active
         error("Another reservation is already active. Reservation ARN: $reservation_arn")
@@ -374,6 +380,11 @@ function start_reservation!(state::DirectReservation)
 end
 
 # Stop reservation function
+"""
+    stop_reservation!(state::DirectReservation)
+
+[`stop_reservation!`](@ref) deactivates a [`DirectReservation`](@ref) object, releasing exclusive access to the quantum device.
+"""
 function stop_reservation!(state::DirectReservation)
     if !state.is_active
         @warn "Reservation is not active."
