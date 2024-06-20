@@ -6,7 +6,7 @@ using InteractiveUtils
 
 # ╔═╡ 5ba10044-c01a-486a-b6bd-bad198bf1960
 # Braket imports
-using Braket, PyBraket, SparseArrays, NLopt
+using Braket, BraketSimulator, SparseArrays, NLopt
 
 # ╔═╡ ec25630f-2ca7-421a-8559-3046144dd236
 using Graphs, GraphMakie, Colors, Cairo, Compose, LinearAlgebra
@@ -346,7 +346,7 @@ DEPTH   = 2
 SHOTS   = 1000
 
 # ╔═╡ 27f74c2b-8f88-444c-a270-4e1c30cc9b70
-device = PyBraket.LocalSimulator()
+device = LocalSimulator("braket_sv_v2")
 
 # ╔═╡ a20ffdbb-f006-408e-a8a1-fc4dc1c4c7b5
 tracker = train(nv*k, J, device; depth=DEPTH, nshots=SHOTS)

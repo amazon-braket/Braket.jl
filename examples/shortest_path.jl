@@ -1,4 +1,4 @@
-using Braket, LinearAlgebra, SparseArrays, NLopt, Random
+using Braket, BraketSimulator, LinearAlgebra, SparseArrays, NLopt, Random
 using Graphs, SimpleWeightedGraphs, GraphMakie
 
 nv = 5
@@ -171,7 +171,7 @@ SHOTS   = 500
 s, t = 1, 4
 Q = build_hop_Q(s, t, nv, desired_hops, α, adj_mat)
 
-device  = LocalSimulator()
+device  = LocalSimulator("braket_sv_v2")
 
 tracker = train(nv*desired_hops, Q, device; depth=DEPTH, nshots=SHOTS) #s3_folder = (bucket, folder) if using managed simulator
 @show s, t 
