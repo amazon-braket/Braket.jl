@@ -32,12 +32,16 @@ using DecFP
 using Graphs
 using HTTP
 using StaticArrays
+using ITensors
+using ITensorMPS
 using JSON3, StructTypes
 using LinearAlgebra
 using DataStructures
 using NamedTupleTools
 using OrderedCollections
 using Tar
+
+import ITensors: apply, state, id
 
 include("utils.jl")
 """
