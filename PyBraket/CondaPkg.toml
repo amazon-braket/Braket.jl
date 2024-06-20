@@ -1,9 +1,10 @@
 [deps]
-python = ">=3"
+python = ">=3.9"
 pydantic = ""
 scipy = ""
 numpy = ""
 
 [pip.deps]
-amazon-braket-sdk = ">=1.70.0"
+amazon-braket-sdk = ">=1.81.0"
 amazon-braket-default-simulator = ">=1.10.0"
+
