@@ -398,6 +398,17 @@ function stop_reservation!(state::DirectReservation)
     end
 end
 
+"""
+    direct_reservation(reservation::DirectReservation, func::Function)
+
+Runs a function within the context of an AWS Braket [`DirectReservation`](@ref). This function sets 
+the necessary environment variables, starts the reservation, executes the provided function, 
+and then stops the reservation, ensuring proper resource management.
+
+Arguments:
+- reservation::DirectReservation: The reservation details, including device ARN and reservation ARN.
+- func::Function: The function to run within the reservation context.
+"""
 function direct_reservation(reservation::DirectReservation, func::Function)
     env_vars = Dict(
         "AMZN_BRAKET_RESERVATION_DEVICE_ARN" => reservation.device_arn,

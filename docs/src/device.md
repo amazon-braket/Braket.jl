@@ -7,6 +7,8 @@ Braket.BraketDevice
 isavailable
 search_devices
 get_devices
-Braket.AwsQuantumTask
-DirectReservation
+Braket.DirectReservation
+Braket.start_reservation!
+Braket.stop_reservation!
+Braket.direct_reservation
 ```
