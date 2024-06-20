@@ -334,7 +334,12 @@ function LocalDetuning(times::Vector{<:Number}, values::Vector{<:Number}, patter
     LocalDetuning(field)
 end
 
+"""
+    ir(ld::LocalDetuning)
 
+Generate IR from an [`LocalDetuning`](@ref) which can be run on
+a neutral atom simulator or quantum device.
+"""
 ir(ld::LocalDetuning) = IR.LocalDetuning(ir(ld.magnitude))
 
 """
@@ -435,7 +440,7 @@ Creates a discretized version of the [`LocalDetuning`](@ref).
 
 # Arguments:
 - `ld::LocalDetuning`: The [`LocalDetuning`](@ref) to discretize.
-- `properties::[`DiscretizationProperties`](@ref): Capabilities of a device that represent the
+- `properties::DiscretizationProperties: Capabilities of a device that represent the
   resolution with which the device can implement the parameters.
 """
 function discretize(ld::LocalDetuning, properties::DiscretizationProperties)

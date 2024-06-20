@@ -7,7 +7,6 @@ discretize
 Hamiltonian
 AtomArrangementItem
 AtomArrangementItem(::Tuple{Number, Number})
-DiscretizationProperties
 TimeSeriesItem
 TimeSeries
 Field
