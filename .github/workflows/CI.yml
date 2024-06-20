@@ -50,9 +50,9 @@ jobs:
         if: ${{ matrix.os == 'macOS-latest' }}
         run: |
           julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
+      - uses: actions/setup-python@v5
       - name: "Install new Boto3"
         if: ${{ matrix.group == 'PyBraket-unit' }}
-        uses: actions/setup-python@v5
         run: |
           pip install awscli --ignore-installed six
       - name: "Run tests"
@@ -90,9 +90,9 @@ jobs:
       - name: "Dev PyBraket package"
         run: |
           julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
+      - uses: actions/setup-python@v5
       - name: "Install new Boto3"
         if: ${{ matrix.group == 'PyBraket-unit' }}
-        uses: actions/setup-python@v5
         run: |
           pip install awscli --ignore-installed six
       - name: "Run tests"
