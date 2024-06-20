@@ -144,7 +144,7 @@ Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
     FreeParameterExpression(expr::Union{FreeParameterExpression, Number, Symbolics.Num, String})
 
 Struct representing a [`FreeParameterExpression`](@ref), which can be used in symbolic computations. 
-Instances of [`FreeParameterExpression`](@ref) can represent symbolic expressions involving [`FreeParameters`](@ref), 
+Instances of [`FreeParameterExpression`](@ref) can represent symbolic expressions involving [`FreeParameter`](@ref), 
 such as mathematical expressions with undetermined values.
 
 This type is often used in combination with [`FreeParameter`](@ref), which represents individual [`FreeParameter`](@ref).
