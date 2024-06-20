@@ -7,4 +7,4 @@ numpy = ""
 [pip.deps]
 amazon-braket-sdk = ">=1.81.0"
 amazon-braket-default-simulator = ">=1.10.0"
-
+urllib3 = "<2"
