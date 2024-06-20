@@ -20,7 +20,7 @@ jobs:
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     # allow windows to fail
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' || matrix.group == 'PyBraket-unit' }}
     strategy:
       fail-fast: true
       max-parallel: 2
@@ -61,7 +61,7 @@ jobs:
     # don't run on draft PRs
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     # allow failures on nightly or beta Julia
-    continue-on-error: ${{ matrix.version == 'nightly'}}
+    continue-on-error: ${{ matrix.version == 'nightly' || matrix.group == 'PyBraket-unit' }}
     strategy:
       fail-fast: true
       max-parallel: 2

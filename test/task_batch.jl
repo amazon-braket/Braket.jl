@@ -89,7 +89,7 @@ XANADU_ARN = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
         n_tasks = 10
         raw_tasks = [Braket.AwsQuantumTask("arn:fake:$i") for i in 1:n_tasks]
         specs = [c for ix in 1:n_tasks]
-        t = Braket.AwsQuantumTaskBatch(deepcopy(raw_tasks), nothing, Set{String}(), "fake_device", specs, ("fake_bucket", "fake_prefix"), 100, 1, 10)
+        t = Braket.AwsQuantumTaskBatch(copy(raw_tasks), nothing, Set{String}(), "fake_device", specs, ("fake_bucket", "fake_prefix"), 100, 1, 10)
         t._results = fill("fake_result", n_tasks)
         @test isnothing(Braket.retry_unsuccessful_tasks(t))
         t._results = convert(Vector{Any}, fill(nothing, n_tasks))
