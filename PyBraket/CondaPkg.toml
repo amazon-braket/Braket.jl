@@ -1,5 +1,5 @@
 [deps]
-python = ">=3.9"
+python = ">=3.9,<=3.11"
 pydantic = ""
 scipy = ""
 numpy = ""
@@ -8,3 +8,4 @@ numpy = ""
 amazon-braket-sdk = ">=1.81.0"
 amazon-braket-default-simulator = ">=1.10.0"
 urllib3 = "<2"
+botocore = ">=1.34"
