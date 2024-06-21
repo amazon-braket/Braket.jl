@@ -20,7 +20,7 @@ function set_aws_creds(test_type)
     end
 end
 
-groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-integ", "PyBraket-unit", "Examples-unit", "Examples-integ"] : GROUP
+groups = GROUP == "All" ? ["Braket-integ", "Braket-unit", "PyBraket-unit", "Examples-unit", "Examples-integ"] : GROUP
 groups = (groups isa String ? [groups] : groups)
         
 subpackage_path(subpackage::String) = joinpath(dirname(@__DIR__), subpackage)

@@ -2,8 +2,7 @@
 
 **PyBraket.jl is not an officially supported AWS product.**
 
-This package provides Julia-Python interoperability between `Braket.jl` and Python features of the Amazon Braket SDK, such as the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html) and
-[Local Jobs](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs-local-mode.html).
+This package provides Julia-Python interoperability between `Braket.jl` and Python features of the Amazon Braket SDK, such as the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html) and support for unpickling the [results of Braket Jobs](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs-save-results.html).
 
 This is *experimental* software, and support may be discontinued in the future. For a fully supported SDK, please use
 the [Python SDK](https://github.com/aws/amazon-braket-sdk-python). We may change, remove, or deprecate parts of the API when making new releases.
@@ -11,12 +10,12 @@ Please review the [CHANGELOG](CHANGELOG.md) for information about changes in eac
 
 ## Installation & Prerequisites
 
-You'll need [`PythonCall.jl`](https://cjdoris.github.io/PythonCall.jl).
+You'll need [`PythonCall.jl`](https://cjdoris.github.io/PythonCall.jl) installed to use this package.
 
 ### Use `CondaPkg.jl`
 
 `PyBraket.jl` now supports [`CondaPkg.jl`](https://github.com/cjdoris/CondaPkg.jl)! The package and its tests come with `CondaPkg.toml` files ready to go.
-`CondaPkg` will install all necessary dependencies for you.
+`CondaPkg.jl` will install all necessary dependencies for you.
 
 ### Use native Python installation
 
