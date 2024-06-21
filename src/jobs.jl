@@ -1,3 +1,6 @@
+using Base64
+using Pickle
+
 const JOB_DEFAULT_RESULTS_POLL_TIMEOUT = 864000
 const JOB_DEFAULT_RESULTS_POLL_INTERVAL = 5
 const JOB_TERMINAL_STATES = ["COMPLETED", "FAILED", "CANCELLED"]
@@ -67,13 +70,13 @@ function get_hyperparameters()
 end
 
 function serialize_values(data_dictionary::Dict{String, Any}, data_format::PersistedJobDataFormat)
-    data_format == pickled_v4 && throw(ArgumentError("pickling data not yet supported!"))
+    data_format == pickled_v4 && return Dict(k => base64encode(Pickle.stores(v)) for (k, v) in data_dictionary)
     return data_dictionary
 end
 
 function deserialize_values(data_dictionary::Dict{String, Any}, data_format::PersistedJobDataFormat)
     data_format == plaintext && return data_dictionary
-    throw(ArgumentError("unpickling results not yet supported!"))
+    return Dict(k => Pickle.loads(base64decode(v)) for (k, v) in data_dictionary)
 end
 deserialize_values(data_dictionary::Dict{String, Any}, data_format::String) = deserialize_values(data_dictionary, PersistedJobDataFormatDict[data_format])
 
