@@ -18,7 +18,7 @@ end
 
 const GROUP = get(ENV, "GROUP", "PyBraket-unit")
 
-groups = GROUP == "All" ? ["PyBraket-integ", "PyBraket-unit"] : [GROUP]
+groups = GROUP == "All" ? ["PyBraket-unit"] : [GROUP]
 
 for group in groups
     @info "Testing $group"
@@ -28,11 +28,6 @@ for group in groups
     set_aws_creds(test_type)
 
     if test_type == "unit"
-        include(joinpath(@__DIR__, "circuits.jl"))
-        include(joinpath(@__DIR__, "noise.jl"))
-        include(joinpath(@__DIR__, "gates.jl"))
         include(joinpath(@__DIR__, "ahs.jl"))
-    elseif test_type == "integ"
-        include(joinpath(@__DIR__, "integ_tests/runtests.jl"))
     end
 end

@@ -103,7 +103,7 @@ md"Now we'll run each program on the AHS local simulator with 1000 shots."
 device = PyBraket.LocalSimulator("braket_ahs")
 
 # ╔═╡ 14a896f6-f218-43e4-9278-3de94c88cd32
-local_results = [result(run(device, program, shots=1000)) for program in programs]
+local_results = [result(simulate(device, program, shots=1000)) for program in programs]
 
 # ╔═╡ 229b0550-6bd0-4f81-b37a-5a0b8e33a9b1
 state_counts = local_results .|> get_counts
