@@ -16,12 +16,14 @@ Please review the [CHANGELOG](CHANGELOG.md) for information about changes in eac
 ## Installation & Prerequisites
 
 You do *not* need a Python installation or the Python Amazon Braket SDK installed to use this package.
-However, to use the Amazon Braket [Local Simulators](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html)
+However, to use the Amazon Braket Analog Hamiltonian Simulation [Local Simulator](https://docs.aws.amazon.com/braket/latest/developerguide/braket-send-to-local-simulator.html)
 you'll need to install the sub-package `PyBraket.jl`,
 included in this repository. See its [`README`](PyBraket/README.md) for more information.
- 
+
+For *gate based* local simulations, with or without noise, see [`BraketSimulator.jl`](https://github.com/amazon-braket/braketsimulator.jl).
+
 All necessary Julia packages will be installed for you when you run `Pkg.add("Braket")`
-or `] instantiate` (if you're doing a `dev` install).
+or `] instantiate` (if you're doing a [`dev`](https://pkgdocs.julialang.org/v1/managing-packages/#developing) install).
 
 If you want to run tasks on Amazon Braket's [managed simulators or QPUs](https://docs.aws.amazon.com/braket/latest/developerguide/braket-devices.html) or run
 [managed jobs](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs-works.html),
@@ -57,9 +59,25 @@ c = H(c, 0)
 c = CNot(c, 0, 1)
 c = Expectation(c, Observables.X()) # measure X on all qubits
 
-dev = AwsDevice("arn:aws:braket:::device/qpu/ionq/ionQdevice")
+dev = AwsDevice("arn:aws:braket:us-east-1::device/qpu/ionq/Harmony")
 res = result(dev(c, shots=10))
 ```
+
+Simulating a noisy circuit locally:
+
+```julia
+using BraketSimulator, Braket
+
+c = Circuit()
+c = H(c, 0) # qubits are 0-indexed
+c = CNot(c, 0, 1)
+c = BitFlip(c, 0, 0.1)
+c = PhaseFlip(c, 1, 0.2)
+c = Probability(c)
+
+dev = LocalSimulator("braket_dm_v2")
+res = result(simulate(dev, c, shots=200))
+``` 
 
 ## TODO and development roadmap
 
@@ -69,6 +87,7 @@ What's currently implemented in *pure* Julia:
 
 - All of the [`Amazon Braket schemas`](https://github.com/aws/amazon-braket-schemas-python).
 - Submitting [`Amazon Braket Hybrid Jobs`](https://docs.aws.amazon.com/braket/latest/developerguide/braket-jobs.html)
+- Abstract interface for `LocalSimulator`s
 - Local jobs
 - Building and submitting circuits to managed simulators and QPUs
 - Reading results from managed simulators and QPUs

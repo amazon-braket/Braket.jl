@@ -1,5 +1,5 @@
 """
-    LocalQuantumTask(id::String, result::GateModelQuantumTaskResult)
+    LocalQuantumTask(id::String, result::Union{GateModelQuantumTaskResult, AnalogHamiltonianSimulationQuantumTaskResult})
 
 A quantum task which has been run *locally* using a [`LocalSimulator`](@ref).
 The `state` of a `LocalQuantumTask` is always `"COMPLETED"` as the task object
@@ -7,7 +7,7 @@ is only created once the loca simulation has finished.
 """
 struct LocalQuantumTask
     id::String
-    result::GateModelQuantumTaskResult
+    result::Union{GateModelQuantumTaskResult, AnalogHamiltonianSimulationQuantumTaskResult}
 end
 state(b::LocalQuantumTask)  = "COMPLETED"
 id(b::LocalQuantumTask)     = b.id
@@ -59,12 +59,9 @@ the value of any [`FreeParameter`](@ref) in `task_spec` and will override the ex
 `inputs` field of an `OpenQasmProgram`. Other `kwargs` will be passed to the backend
 simulator. Returns a [`LocalQuantumTask`](@ref Braket.LocalQuantumTask).
 """
-function simulate(d::LocalSimulator, task_spec::Union{Circuit, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
+function simulate(d::LocalSimulator, task_spec::Union{Circuit, AnalogHamiltonianSimulation, AbstractProgram}, args...; shots::Int=0, inputs::Dict{String, Float64} = Dict{String, Float64}(), kwargs...)
     sim = d._delegate
-    @debug "Single task. Starting run..."
-    stats = @timed _run_internal(sim, task_spec, args...; inputs=inputs, shots=shots, kwargs...)
-    @debug "Single task. Time to run internally: $(stats.time). GC time: $(stats.gctime)."
-    local_result = stats.value
+    local_result = _run_internal(sim, task_spec, args...; inputs=inputs, shots=shots, kwargs...)
     return LocalQuantumTask(local_result.task_metadata.id, local_result)
 end
 
@@ -152,13 +149,13 @@ function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, input
         program      = ir(circuit, Val(:OpenQASM))
         full_inputs  = isnothing(program.inputs) ? inputs : merge(program.inputs, inputs)
         full_program = OpenQasmProgram(program.braketSchemaHeader, program.source, full_inputs) 
-        r            = simulate(simulator, full_program, args...; shots=shots, kwargs...)
+        r            = simulate(simulator, full_program, shots; kwargs...)
         return format_result(r) 
     elseif haskey(properties(simulator).action, "braket.ir.jaqcd.program")
-        validate_circuit_and_shots(circuit, shots) 
+        validate_circuit_and_shots(circuit, shots)
         program = ir(circuit, Val(:JAQCD))
         qubits  = qubit_count(circuit)
-        r       = simulate(simulator, program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
+        r       = simulate(simulator, program, qubits, shots; inputs=inputs, kwargs...)
         return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
@@ -166,31 +163,17 @@ function _run_internal(simulator, circuit::Circuit, args...; shots::Int=0, input
 end
 function _run_internal(simulator, program::OpenQasmProgram, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
     if haskey(properties(simulator).action, "braket.ir.openqasm.program")
-        stats = @timed begin
-            simulate(simulator, program; shots=shots, inputs=inputs, kwargs...)
-        end
-        @debug "Time to invoke simulator: $(stats.time)"
-        r     = stats.value
-        stats = @timed format_result(r)
-        @debug "Time to format results: $(stats.time)"
-        return stats.value
+        r = simulate(simulator, program, shots; inputs=inputs, kwargs...)
+        return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
 end
 function _run_internal(simulator, program::Program, args...; shots::Int=0, inputs::Dict{String, Float64}=Dict{String, Float64}(), kwargs...)
     if haskey(properties(simulator).action, "braket.ir.jaqcd.program")
-        stats   = @timed qubit_count(program)
-        @debug "Time to get qubit count: $(stats.time)"
-        qubits  = stats.value
-        stats = @timed begin
-            simulate(simulator, program, qubits, args...; shots=shots, inputs=inputs, kwargs...)
-        end
-        @debug "Time to invoke simulator: $(stats.time)"
-        r     = stats.value
-        stats = @timed format_result(r)
-        @debug "Time to format results: $(stats.time)"
-        return stats.value
+        qubits  = qubit_count(program)
+        r = simulate(simulator, program, qubits, shots; inputs=inputs, kwargs...)
+        return format_result(r)
     else
         throw(ErrorException("$(typeof(simulator)) does not support qubit gate-based programs."))
     end
