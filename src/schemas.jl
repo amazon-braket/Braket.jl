@@ -84,9 +84,9 @@ qubit_count(ixs::Vector{Instruction}) = length(qubits(ixs))
 
 bind_value!(ix::Instruction{O}, param_values::Dict{Symbol, Number}) where {O<:Operator} = Instruction{O}(bind_value!(ix.operator, param_values), ix.target)
 
-remap(ix::Instruction{O}, mapping::Dict{<:Integer, <:Integer}) where {O<:Operator} = Instruction{O}(copy(ix.operator), [mapping[q] for q in ix.target])
-remap(ix::Instruction{O}, target::VecOrQubitSet) where {O<:Operator} = Instruction{O}(copy(ix.operator), target[1:length(ix.target)])
-remap(ix::Instruction{O}, target::IntOrQubit) where {O<:Operator}    = Instruction{O}(copy(ix.operator), target)
+remap(@nospecialize(ix::Instruction{O}), mapping::Dict{<:Integer, <:Integer}) where {O} = Instruction{O}(copy(ix.operator), [mapping[q] for q in ix.target])
+remap(@nospecialize(ix::Instruction{O}), target::VecOrQubitSet) where {O} = Instruction{O}(copy(ix.operator), target[1:length(ix.target)])
+remap(@nospecialize(ix::Instruction{O}), target::IntOrQubit) where {O} = Instruction{O}(copy(ix.operator), target)
 
 function StructTypes.constructfrom(::Type{Program}, obj)
     new_obj = copy(obj)
