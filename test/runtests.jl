@@ -43,6 +43,7 @@ for group in groups
             include("rigetti_device.jl")
             include("simulator_device.jl")
             include("oqc_device.jl")
+            include("iqm_device.jl")
             include("quera_device.jl")
             include("xanadu_device.jl")
             include("translation.jl")

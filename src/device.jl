@@ -23,7 +23,7 @@ julia> arn(d)
 ```
 """
 abstract type BraketDevice end
-for provider in (:AmazonDevice, :_XanaduDevice, :_DWaveDevice, :OQCDevice, :QuEraDevice, :IonQDevice, :RigettiDevice)
+for provider in (:AmazonDevice, :_XanaduDevice, :_DWaveDevice, :_OQCDevice, :IQMDevice, :QuEraDevice, :IonQDevice, :RigettiDevice)
     @eval begin
         abstract type $provider <: BraketDevice end
     end
@@ -67,8 +67,11 @@ end
 struct Aquila <: QuEraDevice end
 Base.convert(::Type{String}, d::Aquila) = "arn:aws:braket:us-east-1::device/qpu/quera/Aquila"
 
-struct Lucy <: OQCDevice end
-Base.convert(::Type{String}, d::Lucy) = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
+struct _Lucy <: _OQCDevice end
+Base.convert(::Type{String}, d::_Lucy) = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
+
+struct Garnet <: IQMDevice end
+Base.convert(::Type{String}, d::Garnet) = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
 
 for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_AspenM2, :AspenM3),
                       ("arn:aws:braket:::device/qpu/rigetti/Aspen-8",

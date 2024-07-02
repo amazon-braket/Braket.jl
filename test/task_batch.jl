@@ -15,6 +15,7 @@ RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-11"
 IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
 SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 OQC_ARN = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
+IQM_ARN = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
 XANADU_ARN = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
 
 @testset "Batched tasks" begin
