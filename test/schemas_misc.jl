@@ -209,7 +209,7 @@ using Braket, Braket.IR, Test, JSON3, StructTypes
     end
 
     @testset "Device metadata" begin
-        @testset for T in (Braket.OqcMetadata, Braket.IqmMetadata, Braket.XanaduMetadata, Braket.RigettiMetadata)
+        @testset for T in (Braket.IqmMetadata, Braket.RigettiMetadata)
             raw = """{"compiledProgram": "fake_program"}"""
             read_in = JSON3.read(raw, T)
             @test read_in isa T
