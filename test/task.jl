@@ -111,7 +111,6 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     c = measure q;
     """
     oq3_program() = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], bell_qasm, nothing)
-    bb_program()  = Braket.BlackbirdProgram(Braket.header_dict[Braket.BlackbirdProgram], "Vac | q[0]")
     bell_circ()   = (c = Circuit(); c=H(c, 0); c=CNot(c, 0, 1); return c)
     bell_prog()   = Braket.Program(bell_circ())
     RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-M-3"
@@ -145,7 +144,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         @test task_args[:extra_opts]["deviceParameters"] == JSON3.write(device_params)
     end
 
-    @testset for (program, arn) in zip((oq3_program, bb_program), (SV1_ARN))
+    @testset for program in (oq3_program,), arn in (SV1_ARN,)
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")
