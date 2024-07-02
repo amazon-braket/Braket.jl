@@ -137,6 +137,7 @@ function _device_parameters_from_dict(device_parameters::Dict{String,<:Any}, dev
     occursin("ionq", device_arn) && return IonqDeviceParameters(header_dict[IonqDeviceParameters], paradigm_parameters, processed_em)
     occursin("rigetti", device_arn) && return RigettiDeviceParameters(header_dict[RigettiDeviceParameters], paradigm_parameters)
     occursin("oqc", device_arn) && return OqcDeviceParameters(header_dict[OqcDeviceParameters], paradigm_parameters)
+    occursin("iqm", device_arn) && return IqmDeviceParameters(header_dict[IqmDeviceParameters], paradigm_parameters)
     return GateModelSimulatorDeviceParameters(header_dict[GateModelSimulatorDeviceParameters], paradigm_parameters)
 end
 

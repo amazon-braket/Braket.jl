@@ -15,7 +15,7 @@ oq3_program() = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram
 
 @testset "OQ3ProgramResult" begin
     task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 100, "arn1", nothing, nothing, nothing, nothing, nothing)
-    additional_metadata = Braket.AdditionalMetadata(oq3_program(), nothing, nothing, nothing, nothing, nothing, nothing)
+    additional_metadata = Braket.AdditionalMetadata(oq3_program(), nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     read_in = JSON3.read("""{"taskMetadata": $(JSON3.write(task_metadata)), "additionalMetadata": $(JSON3.write(additional_metadata))}""", Braket.OQ3ProgramResult)
     @test read_in isa Braket.OQ3ProgramResult
     @test read_in.taskMetadata == task_metadata
