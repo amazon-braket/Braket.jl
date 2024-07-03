@@ -271,8 +271,9 @@ QubitSet with 2 elements:
 qubits(c::Circuit) = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
 function qubits(p::Program)
     inst_qubits = mapreduce(ix->ix.target, union, p.instructions, init=Set{Int}())
+    bri_qubits  = mapreduce(ix->ix.target, union, p.basis_rotation_instructions, init=Set{Int}())
     res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? reduce(vcat, ix.targets) : Set{Int}(), union, p.results, init=Set{Int}())
-    return union(inst_qubits, res_qubits)
+    return union(inst_qubits, bri_qubits, res_qubits)
 end
 """
     qubit_count(c::Circuit) -> Int
@@ -584,7 +585,7 @@ function add_instruction!(c::Circuit, ix::Instruction{O}) where {O<:Operator}
     return c
 end
 
-function add_instruction!(c::Circuit, ix::Instruction{O}, target) where {O<:Operator}
+function add_instruction!(c::Circuit, @nospecialize(ix::Instruction{O}), target) where {O<:Operator}
     to_add = Instruction[]
     if qubit_count(ix.operator) == 1
         to_add = [remap(ix, q) for q in target]
@@ -595,7 +596,7 @@ function add_instruction!(c::Circuit, ix::Instruction{O}, target) where {O<:Oper
     return c
 end
 
-function add_instruction!(c::Circuit, ix::Instruction{O}, target_mapping::Dict{<:Integer, <:Integer}) where {O<:Operator}
+function add_instruction!(c::Circuit, @nospecialize(ix::Instruction{O}), target_mapping::Dict{<:Integer, <:Integer}) where {O<:Operator}
     to_add = [remap(ix, target_mapping)]
     foreach(ix->add_instruction!(c, ix), to_add)
     return c
