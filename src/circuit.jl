@@ -273,7 +273,7 @@ function qubits(p::Program)
     inst_qubits = mapreduce(ix->ix.target, union, p.instructions, init=Set{Int}())
     bri_qubits  = mapreduce(ix->ix.target, union, p.basis_rotation_instructions, init=Set{Int}())
     res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? reduce(vcat, ix.targets) : Set{Int}(), union, p.results, init=Set{Int}())
-    return union(inst_qubits, res_qubits)
+    return union(inst_qubits, bri_qubits, res_qubits)
 end
 """
     qubit_count(c::Circuit) -> Int
