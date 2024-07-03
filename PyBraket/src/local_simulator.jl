@@ -15,7 +15,7 @@ end
 Braket.simulate(d::PyLocalSimulator, task_spec::Braket.AnalogHamiltonianSimulation; shots::Int=0, kwargs...) = simulate(d, ir(task_spec); shots=shots, kwargs...)
 
 function Braket._run_internal(simulator::PyLocalSimulator, task_spec::AnalogHamiltonianSimulation, args...; kwargs...)
-    raw_py_result = simulator._run_internal(Py(ir(task_spec)), args...; kwargs...)
+    raw_py_result = simulator.run(Py(ir(task_spec)), args...; kwargs...).result()
     jl_task_metadata = pyconvert(Braket.TaskMetadata, raw_py_result.task_metadata) 
     jl_measurements = map(raw_py_result.measurements) do m
         jl_status = pyconvert(String, pystr(m.status))
