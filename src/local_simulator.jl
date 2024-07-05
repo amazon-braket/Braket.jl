@@ -94,8 +94,11 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
     is_single_task  = length(task_specs) == 1
     is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
     if is_single_input
-        if is_single_task 
-            return d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)
+        if is_single_task
+            inputs = inputs isa Vector ? first(inputs) : inputs
+            results = [d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)]
+
+            return LocalQuantumTaskBatch([local_result.result.task_metadata.id for local_result in results], results)
         elseif inputs isa Dict{String, Float64}
             inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
         else
@@ -103,10 +106,6 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
         end
     end
     !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
-    # let each thread pick up an idle simulator
-    #sims     = Channel(Inf)
-    #foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
-
     tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
     # is this actually faster?
     todo_tasks_ch = Channel(length(tasks_and_inputs))
