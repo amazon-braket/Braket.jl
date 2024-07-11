@@ -1,7 +1,7 @@
 module Braket
 
 export Circuit, QubitSet, Qubit, Device, AwsDevice, AwsQuantumTask, AwsQuantumTaskBatch
-export metadata, status, Observable, Result, FreeParameter, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator
+export metadata, status, Observable, Result, FreeParameter, FreeParameterExpression, Job, AwsQuantumJob, LocalQuantumJob, LocalSimulator, subs
 export Tracker, simulator_tasks_cost, qpu_tasks_cost
 export arn, cancel, state, result, results, name, download_result, id, ir, isavailable, search_devices, get_devices
 export provider_name, properties, type
@@ -32,12 +32,17 @@ using DecFP
 using Graphs
 using HTTP
 using StaticArrays
+using Symbolics
+using SymbolicUtils
 using JSON3, StructTypes
 using LinearAlgebra
 using DataStructures
 using NamedTupleTools
 using OrderedCollections
 using Tar
+
+# Operator overloading for FreeParameterExpression
+import Base: +, -, *, /, ^, ==
 
 include("utils.jl")
 """
@@ -133,6 +138,107 @@ struct FreeParameter
 end
 Base.copy(fp::FreeParameter) = fp
 Base.show(io::IO, fp::FreeParameter) = print(io, string(fp.name))
+
+"""
+    FreeParameterExpression
+    FreeParameterExpression(expr::Union{FreeParameterExpression, Number, Symbolics.Num, String})
+
+Struct representing a [`FreeParameterExpression`](@ref), which can be used in symbolic computations. 
+Instances of [`FreeParameterExpression`](@ref) can represent symbolic expressions involving [`FreeParameter`](@ref), 
+such as mathematical expressions with undetermined values.
+
+This type is often used in combination with [`FreeParameter`](@ref), which represents individual [`FreeParameter`](@ref).
+
+### Examples
+```jldoctest
+julia> α = FreeParameter(:alpha)
+alpha
+
+julia> θ = FreeParameter(:theta)
+theta
+
+julia> gate = FreeParameterExpression("α + 2*θ")
+α + 2θ
+
+julia> gsub = subs(gate, Dict(:α => 2.0, :θ => 2.0))
+6.0
+
+julia> gate + gate
+2α + 4θ
+
+julia> gate * gate
+(α + 2θ)^2
+
+julia> gate₁ = FreeParameterExpression("phi + 2*gamma")
+2gamma + phi
+```
+"""
+struct FreeParameterExpression
+    expression::Symbolics.Num
+    function FreeParameterExpression(expr::Symbolics.Num)
+        new(expr)
+    end
+end
+
+FreeParameterExpression(expr::FreeParameterExpression) = FreeParameterExpression(expr.expression)
+FreeParameterExpression(expr::Number) = FreeParameterExpression(Symbolics.Num(expr))
+FreeParameterExpression(expr) = throw(ArgumentError("Unsupported expression type"))
+
+# Function to validate the input expression string
+function validate_expr(expr::String)
+    allowed_chars = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/^()αβγδεζηθικλμνξοπρςστυφχψωϐϑϕϖϘϙϚϛϜϝϞϟϠϡϰϱϴϵ϶ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ ")
+    for char in expr
+        if !(char in allowed_chars)
+            throw(ArgumentError("Unsupported character '$char' in expression. Only ASCII letters (a-z, A-Z), digits (0-9), Greek letters (α-϶, Α-Ω), space( ), and basic mathematical symbols (+ - * / ^ ()) are allowed."))
+        end
+    end
+    return expr
+end
+
+# Function to create FreeParameterExpression from a validated string
+function FreeParameterExpression(expr::String)
+    validated_expr = validate_expr(expr)
+    parsed_expr = parse_expr_to_symbolic(Meta.parse(validated_expr), @__MODULE__)
+    return FreeParameterExpression(parsed_expr)
+end
+
+Base.show(io::IO, fpe::FreeParameterExpression) = print(io, fpe.expression)
+Base.copy(fp::FreeParameterExpression) = fp
+
+function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Number})
+    param_values_num = Dict(Symbolics.variable(string(k); T=Real) => v for (k, v) in parameter_values)
+    subbed_expr = Symbolics.substitute(fpe.expression, param_values_num)
+    if isempty(Symbolics.get_variables(subbed_expr))
+	   subbed_expr = Symbolics.value(subbed_expr)
+        return subbed_expr
+    else
+	subbed_expr = Symbolics.value(subbed_expr)
+	return FreeParameterExpression(subbed_expr)
+    end 
+end
+
+Base.:+(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) + 
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+
+Base.:*(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) * 
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+
+Base.:-(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) - 
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+
+Base.:/(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) /
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+
+Base.:^(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
+    FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) ^
+                            (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+
+Base.:(==)(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = isequal(fpe1.expression, fpe2.expression)
+Base.:!=(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = !(isequal(fpe1, fpe2))
 
 include("compiler_directive.jl")
 include("gates.jl")
