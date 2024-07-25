@@ -13,4 +13,8 @@ Field
 ShiftingField
 DrivingField
 ir(::AnalogHamiltonianSimulation)
+ir(::LocalDetuning)
+LocalDetuning
+LocalDetuning(::Vector{<:Number}, ::Vector{<:Number}, ::Vector{<:Number})
+stitch
 ```
