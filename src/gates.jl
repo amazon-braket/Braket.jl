@@ -20,25 +20,25 @@ n_angles(::Type{<:AngledGate{N}}) where {N} = N
 n_angles(g::G) where {G<:Gate} = n_angles(G)
 
 for gate_def in (
-                 (:Rx, :(IR.Rx), :1, :1, ("Rx(ang)",)),
-                 (:Ry, :(IR.Ry), :1, :1, ("Ry(ang)",)),
-                 (:Rz, :(IR.Rz), :1, :1, ("Rz(ang)",)),
-                 (:PSwap, :(IR.PSwap), :1, :2, ("PSWAP(ang)", "PSWAP(ang)")),
-                 (:PhaseShift, :(IR.PhaseShift), :1, :1, ("PHASE(ang)",)),
-                 (:CPhaseShift, :(IR.CPhaseShift), :1, :2, ("C", "PHASE(ang)")),
-                 (:CPhaseShift00, :(IR.CPhaseShift00), :1, :2, ("C", "PHASE00(ang)")),
-                 (:CPhaseShift01, :(IR.CPhaseShift01), :1, :2, ("C", "PHASE01(ang)")),
-                 (:CPhaseShift10, :(IR.CPhaseShift10), :1, :2, ("C", "PHASE10(ang)")),
-                 (:XX, :(IR.XX), :1, :2, ("XX(ang)", "XX(ang)")),
-                 (:XY, :(IR.XY), :1, :2, ("XY(ang)", "XY(ang)")),
-                 (:YY, :(IR.YY), :1, :2, ("YY(ang)", "YY(ang)")),
-                 (:ZZ, :(IR.ZZ), :1, :2, ("ZZ(ang)", "ZZ(ang)")),
-                 (:GPi, :(IR.GPi), :1, :1, ("GPi(ang)",)),
-                 (:GPi2, :(IR.GPi2), :1, :1, ("GPi2(ang)",)),
-                 (:MS, :(IR.MS), :3, :2, ("MS(ang)", "MS(ang)")),
-                 (:PRx, :(IR.PRx), :2, :1, ("PRx(ang)", "PRx(ang)")),
+                 (:Rx, :(IR.Rx), :1, :1, ("Rx(ang)",), "rx"),
+                 (:Ry, :(IR.Ry), :1, :1, ("Ry(ang)",), "ry"),
+                 (:Rz, :(IR.Rz), :1, :1, ("Rz(ang)",), "rz"),
+                 (:PSwap, :(IR.PSwap), :1, :2, ("PSWAP(ang)", "PSWAP(ang)"), "pswap"),
+                 (:PhaseShift, :(IR.PhaseShift), :1, :1, ("PHASE(ang)",), "phaseshift"),
+                 (:CPhaseShift, :(IR.CPhaseShift), :1, :2, ("C", "PHASE(ang)"), "cphaseshift"),
+                 (:CPhaseShift00, :(IR.CPhaseShift00), :1, :2, ("C", "PHASE00(ang)"), "cphaseshift00"),
+                 (:CPhaseShift01, :(IR.CPhaseShift01), :1, :2, ("C", "PHASE01(ang)"), "cphaseshift01"),
+                 (:CPhaseShift10, :(IR.CPhaseShift10), :1, :2, ("C", "PHASE10(ang)"), "cphaseshift10"),
+                 (:XX, :(IR.XX), :1, :2, ("XX(ang)", "XX(ang)"), "xx"),
+                 (:XY, :(IR.XY), :1, :2, ("XY(ang)", "XY(ang)"), "xy"),
+                 (:YY, :(IR.YY), :1, :2, ("YY(ang)", "YY(ang)"), "yy"),
+                 (:ZZ, :(IR.ZZ), :1, :2, ("ZZ(ang)", "ZZ(ang)"), "zz"),
+                 (:GPi, :(IR.GPi), :1, :1, ("GPi(ang)",), "gpi"),
+                 (:GPi2, :(IR.GPi2), :1, :1, ("GPi2(ang)",), "gpi2"),
+                 (:MS, :(IR.MS), :3, :2, ("MS(ang)", "MS(ang)"), "ms"),
+                 (:PRx, :(IR.PRx), :2, :1, ("PRx(ang)", "PRx(ang)"), "prx"),
                 )
-    G, IR_G, n_angle, qc, c = gate_def
+    G, IR_G, n_angle, qc, c, lab_str = gate_def
     @eval begin
         @doc """
             $($G) <: AngledGate{$($n_angle)}
@@ -55,33 +55,33 @@ for gate_def in (
         chars(::Type{$G}) = $c
         ir_typ(::Type{$G}) = $IR_G
         qubit_count(::Type{$G}) = $qc
-        label(::Type{$G}) = lowercase(string($G))
+        label(::Type{$G}) = $lab_str
     end
 end
 
 for gate_def in (
-                 (:H, :(IR.H), :1, ("H",)),
-                 (:I, :(IR.I), :1, ("I",)),
-                 (:X, :(IR.X), :1, ("X",)),
-                 (:Y, :(IR.Y), :1, ("Y",)),
-                 (:Z, :(IR.Z), :1, ("Z",)),
-                 (:S, :(IR.S), :1, ("S",)),
-                 (:Si, :(IR.Si), :1, ("Si",)),
-                 (:T, :(IR.T), :1, ("T",)),
-                 (:Ti, :(IR.Ti), :1, ("Ti",)),
-                 (:V, :(IR.V), :1, ("V",)),
-                 (:Vi, :(IR.Vi), :1, ("Vi",)),
-                 (:CNot, :(IR.CNot), :2, ("C", "X")),
-                 (:Swap, :(IR.Swap), :2, ("SWAP", "SWAP")),
-                 (:ISwap, :(IR.ISwap), :2, ("ISWAP", "ISWAP")),
-                 (:CV, :(IR.CV), :2, ("C", "V")),
-                 (:CY, :(IR.CY), :2, ("C", "Y")),
-                 (:CZ, :(IR.CZ), :2, ("C", "Z")),
-                 (:ECR, :(IR.ECR), :2, ("ECR", "ECR")),
-                 (:CCNot, :(IR.CCNot), :3, ("C", "C", "X")),
-                 (:CSwap, :(IR.CSwap), :3, ("C", "SWAP", "SWAP")),
+                 (:H, :(IR.H), :1, ("H",), "h"),
+                 (:I, :(IR.I), :1, ("I",), "i"),
+                 (:X, :(IR.X), :1, ("X",), "x"),
+                 (:Y, :(IR.Y), :1, ("Y",), "y"),
+                 (:Z, :(IR.Z), :1, ("Z",), "z"),
+                 (:S, :(IR.S), :1, ("S",), "s"),
+                 (:Si, :(IR.Si), :1, ("Si",), "si"),
+                 (:T, :(IR.T), :1, ("T",), "t"),
+                 (:Ti, :(IR.Ti), :1, ("Ti",), "ti"),
+                 (:V, :(IR.V), :1, ("V",), "v"),
+                 (:Vi, :(IR.Vi), :1, ("Vi",), "vi"),
+                 (:CNot, :(IR.CNot), :2, ("C", "X"), "cnot"),
+                 (:Swap, :(IR.Swap), :2, ("SWAP", "SWAP"), "swap"),
+                 (:ISwap, :(IR.ISwap), :2, ("ISWAP", "ISWAP"), "iswap"),
+                 (:CV, :(IR.CV), :2, ("C", "V"), "cv"),
+                 (:CY, :(IR.CY), :2, ("C", "Y"), "cy"),
+                 (:CZ, :(IR.CZ), :2, ("C", "Z"), "cz"),
+                 (:ECR, :(IR.ECR), :2, ("ECR", "ECR"), "ecr"),
+                 (:CCNot, :(IR.CCNot), :3, ("C", "C", "X"), "ccnot"),
+                 (:CSwap, :(IR.CSwap), :3, ("C", "SWAP", "SWAP"), "cswap"),
                 )
-    G, IR_G, qc, c = gate_def
+    G, IR_G, qc, c, lab_str = gate_def
     @eval begin
         @doc """
             $($G) <: Gate
@@ -93,7 +93,7 @@ for gate_def in (
         chars(::Type{$G}) = $c
         ir_typ(::Type{$G}) = $IR_G
         qubit_count(::Type{$G}) = $qc
-        label(::Type{$G}) = lowercase(string($G))
+        label(::Type{$G}) = $lab_str
     end
 end
 (::Type{G})(x::Tuple{}) where {G<:Gate} = G()

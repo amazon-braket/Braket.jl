@@ -39,8 +39,8 @@ can process single tasks or task batches.
 """
 struct LocalSimulator <: Device
     backend::String
-    _delegate::AbstractBraketSimulator
-    function LocalSimulator(backend::Union{String, AbstractBraketSimulator})
+    _delegate
+    function LocalSimulator(backend)
         backend_name = device_id(backend)
         haskey(_simulator_devices[], backend_name) && return new(backend_name, _simulator_devices[][backend_name](0,0))
         !isdefined(Main, Symbol(backend_name)) && throw(ArgumentError("no local simulator with name $backend_name is loaded!"))
