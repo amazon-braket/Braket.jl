@@ -138,7 +138,7 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
 	    end
     end
     @debug "batch size is $(length(task_specs)). Time to run internally: $(stats.time). GC time: $(stats.gctime)."
-    return LocalQuantumTaskBatch([local_result.result.task_metadata.id for local_result in results], results)
+    return LocalQuantumTaskBatch([local_result.task_metadata.id for local_result in results], results)
 end
 (d::LocalSimulator)(args...; kwargs...) = simulate(d, args...; kwargs...)
 
