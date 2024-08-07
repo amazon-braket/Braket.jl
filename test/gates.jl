@@ -32,30 +32,11 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         c = g(c, [0, 1, 2])
         @test c.instructions == [Instruction(g(), 0), Instruction(g(), 1),  Instruction(g(), 2)]
     end
-    angle = rand()
-    @testset for g in (Rx(angle), Ry(angle), Rz(angle), PhaseShift(angle))
-        @test qubit_count(g) == 1
-        ix = Instruction(g, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
-        @test Braket.Parametrizable(g) == Braket.Parametrized()
-        @test Braket.parameters(g) == Braket.FreeParameter[]
-    end
-    @testset for g in (Rx, Ry, Rz, PhaseShift)
-        @test qubit_count(g) == 1
-        c = Circuit()
-        c = g(c, 0, angle)
-        @test c.instructions == [Instruction(g(angle), 0)]
-        c = Circuit()
-        c = g(c, [0, 1, 2], angle)
-        @test c.instructions == [Instruction(g(angle), 0), Instruction(g(angle), 1),  Instruction(g(angle), 2)]
-        α = FreeParameter(:alpha)
-        pg = g(α)
-        @test Braket.parameters(pg) == [α]
-    end
     @testset for g in (CNot(), Swap(), ISwap(), CV(), CY(), CZ(), ECR())
         @test qubit_count(g) == 2
         ix = Instruction(g, [0, 1])
         @test JSON3.read(JSON3.write(ix), Instruction) == ix
+        @test Braket.Parametrizable(g) == Braket.NonParametrized()
         @test Braket.parameters(g) == Braket.FreeParameter[]
     end
     @testset for g in (CNot, Swap, ISwap, CV, CY, CZ, ECR)
@@ -66,55 +47,6 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         c = Circuit()
         c = g(c, 10, 1)
         @test c.instructions == [Instruction(g(), [10, 1])]
-    end
-    @testset for g in (PSwap(angle), XY(angle), CPhaseShift(angle), CPhaseShift00(angle), CPhaseShift01(angle), CPhaseShift10(angle), XX(angle), YY(angle), ZZ(angle))
-        @test qubit_count(g) == 2
-        ix = Instruction(g, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
-        @test Braket.Parametrizable(g) == Braket.Parametrized()
-        @test Braket.parameters(g) == Braket.FreeParameter[]
-    end
-    @testset for g in (PSwap, XY, CPhaseShift, CPhaseShift00, CPhaseShift01, CPhaseShift10, XX, YY, ZZ)
-        @test qubit_count(g) == 2
-        c = Circuit()
-        c = g(c, 0, 1, angle)
-        @test c.instructions == [Instruction(g(angle), [0, 1])]
-        c = Circuit()
-        c = g(c, 10, 1, angle)
-        @test c.instructions == [Instruction(g(angle), [10, 1])]
-        α = FreeParameter(:alpha)
-        pg = g(α)
-        @test Braket.parameters(pg) == [α]
-    end
-    @testset for g in (MS(angle, angle, angle),)
-        @test qubit_count(g) == 2
-        ix = Instruction(g, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
-        @test Braket.Parametrizable(g) == Braket.Parametrized()
-        @test Braket.parameters(g) == Braket.FreeParameter[]
-    end
-    @testset for g in (PRx(angle, angle),)
-        @test qubit_count(g) == 1
-        ix = Instruction(g, [0])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
-        @test Braket.Parametrizable(g) == Braket.Parametrized()
-        @test Braket.parameters(g) == Braket.FreeParameter[]
-    end
-    @testset for g in (MS,)
-        @test qubit_count(g) == 2
-        c = Circuit()
-        c = g(c, 0, 1, angle, angle, angle)
-        @test c.instructions == [Instruction(g(angle, angle, angle), [0, 1])]
-        c = Circuit()
-        c = g(c, 10, 1, angle, angle, angle)
-        @test c.instructions == [Instruction(g(angle, angle, angle), [10, 1])]
-        α = FreeParameter(:alpha)
-        β = FreeParameter(:beta)
-        γ = FreeParameter(:gamma)
-        pg = g(α, β, γ)
-        @test Braket.parameters(pg) == [α, β, γ]
-        pg = Braket.bind_value!(Braket.Parametrized(), pg, Dict{Symbol, Number}(:α=>0.1, :β=>0.5, :γ=>0.2))
-        #@test pg == g(0.1, 0.5, 0.2)
     end
     @testset for g in (CCNot(), CSwap())
         @test qubit_count(g) == 3
@@ -131,6 +63,129 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         c = Circuit()
         c = g(c, 5, 1, 2)
         @test c.instructions == [Instruction(g(), [5, 1, 2])]
+    end
+    angle = rand()
+    α = FreeParameter(:alpha)
+    β = FreeParameter(:beta)
+    γ = FreeParameter(:gamma)
+    @testset for (angle1, angle2, angle3) in ((rand(), rand(), rand()), (π, rand(), rand()))
+        @testset for g in (Rx(angle1), Ry(angle1), Rz(angle1), PhaseShift(angle1))
+            @test qubit_count(g) == 1
+            ix = Instruction(g, 0)
+            @test Braket.Parametrizable(g) == Braket.Parametrized()
+            @test Braket.parameters(g) == Braket.FreeParameter[]
+        end
+        @testset for g in (Rx, Ry, Rz, PhaseShift)
+            @test qubit_count(g) == 1
+            c = Circuit()
+            c = g(c, 0, angle1)
+            @test c.instructions == [Instruction(g(angle1), 0)]
+            c = Circuit()
+            c = g(c, [0, 1, 2], angle1)
+            @test c.instructions == [Instruction(g(angle1), 0), Instruction(g(angle1), 1),  Instruction(g(angle1), 2)]
+            pg = g(α)
+            @test Braket.parameters(pg) == [α]
+            ix = Instruction(g(angle1), 0)
+            @test JSON3.read(JSON3.write(ix), Instruction) == Instruction(g(Float64(angle1)), 0)
+        end
+        @testset for g in (PSwap(angle1), XY(angle1), CPhaseShift(angle1), CPhaseShift00(angle1), CPhaseShift01(angle1), CPhaseShift10(angle1), XX(angle1), YY(angle1), ZZ(angle1))
+            @test qubit_count(g) == 2
+            @test Braket.Parametrizable(g) == Braket.Parametrized()
+            @test Braket.parameters(g) == Braket.FreeParameter[]
+        end
+        @testset for g in (PSwap, XY, CPhaseShift, CPhaseShift00, CPhaseShift01, CPhaseShift10, XX, YY, ZZ)
+            @test qubit_count(g) == 2
+            c = Circuit()
+            c = g(c, 0, 1, angle1)
+            @test c.instructions == [Instruction(g(angle1), [0, 1])]
+            c = Circuit()
+            c = g(c, 10, 1, angle1)
+            @test c.instructions == [Instruction(g(angle1), [10, 1])]
+            pg = g(α)
+            @test Braket.parameters(pg) == [α]
+            ix = Instruction(g(angle1), [0, 1])
+            @test JSON3.read(JSON3.write(ix), Instruction) == Instruction(g(Float64(angle1)), [0, 1])
+        end
+        @testset for g in (PRx(angle1, angle2),)
+            @test qubit_count(g) == 1
+            @test Braket.Parametrizable(g) == Braket.Parametrized()
+            @test Braket.parameters(g) == Braket.FreeParameter[]
+        end
+        @testset for g in (PRx,)
+            @test qubit_count(g) == 1
+            c = Circuit()
+            c = g(c, 0, angle1, angle2)
+            @test c.instructions == [Instruction(g(angle1, angle2), 0)]
+            c = Circuit()
+            c = g(c, 10, angle1, angle2)
+            @test c.instructions == [Instruction(g(angle1, angle2), 10)]
+            pg = g(α, β)
+            @test Braket.parameters(pg) == [α, β]
+            pg = Braket.bind_value!(Braket.Parametrized(), pg, Dict(:alpha=>angle1, :beta=>angle2))
+            @test pg == g(angle1, angle2)
+        end
+        @testset for g in (MS(angle1, angle2, angle3),)
+            @test qubit_count(g) == 2
+            @test Braket.Parametrizable(g) == Braket.Parametrized()
+            @test Braket.parameters(g) == Braket.FreeParameter[]
+        end
+        @testset for g in (MS,)
+            @test qubit_count(g) == 2
+            c = Circuit()
+            c = g(c, 0, 1, angle1, angle2, angle3)
+            @test c.instructions == [Instruction(g(angle1, angle2, angle3), [0, 1])]
+            c = Circuit()
+            c = g(c, 10, 1, angle1, angle2, angle3)
+            @test c.instructions == [Instruction(g(angle1, angle2, angle3), [10, 1])]
+            pg = g(α, β, γ)
+            @test Braket.parameters(pg) == [α, β, γ]
+            pg = Braket.bind_value!(Braket.Parametrized(), pg, Dict(:alpha=>angle1, :beta=>angle2, :gamma=>angle3))
+            @test pg == g(angle1, angle2, angle3)
+        end
+        @testset for g in (U(angle1, angle2, angle3),)
+            @test qubit_count(g) == 1
+            @test Braket.Parametrizable(g) == Braket.Parametrized()
+            @test Braket.parameters(g) == Braket.FreeParameter[]
+        end
+        @testset for g in (U,)
+            @test qubit_count(g) == 1
+            c = Circuit()
+            c = g(c, 0, angle1, angle2, angle3)
+            @test c.instructions == [Instruction(g(angle1, angle2, angle3), 0)]
+            c = Circuit()
+            c = g(c, [0, 1, 2], angle1, angle2, angle3)
+            @test c.instructions == [Instruction(g(angle1, angle2, angle3), 0), Instruction(g(angle1, angle2, angle3), 1),  Instruction(g(angle1, angle2, angle3), 2)]
+            c = Circuit()
+            c = g(c, 0, 1, 2, angle1, angle2, angle3)
+            @test c.instructions == [Instruction(g(angle1, angle2, angle3), 0), Instruction(g(angle1, angle2, angle3), 1),  Instruction(g(angle1, angle2, angle3), 2)]
+            pg = g(α, β, γ)
+            @test Braket.parameters(pg) == [α, β, γ]
+            pg = Braket.bind_value!(Braket.Parametrized(), pg, Dict(:alpha=>angle1, :beta=>angle2, :gamma=>angle3))
+            @test pg == g(angle1, angle2, angle3)
+        end
+        @testset "Angled 3 qubit gates" begin
+            # build some "fake" (for now) 3 qubit gates to test gate applicators
+            struct CCPhaseShift <: Braket.AngledGate{1}
+                angle::NTuple{1, Union{Real, FreeParameter}}
+                CCPhaseShift(angle::T) where {T<:NTuple{1, Union{Real, FreeParameter}}} = new(angle)
+            end
+            struct CXX <: Braket.AngledGate{1}
+                angle::NTuple{1, Union{Real, FreeParameter}}
+                CXX(angle::T) where {T<:NTuple{1, Union{Real, FreeParameter}}} = new(angle)
+            end
+            c = Circuit()
+            c = Braket.apply_gate!(Val(1), Val(2), Val(1), CCPhaseShift, c, 0, 1, 2, angle1)
+            @test c.instructions == [Instruction(CCPhaseShift(angle1), [0, 1, 2])]
+            c = Circuit()
+            c = Braket.apply_gate!(Val(1), Val(2), Val(1), CCPhaseShift, c, [0, 1, 2], angle1)
+            @test c.instructions == [Instruction(CCPhaseShift(angle1), [0, 1, 2])]
+            c = Circuit()
+            c = Braket.apply_gate!(Val(1), Val(1), Val(2), CXX, c, 0, 1, 2, angle1)
+            @test c.instructions == [Instruction(CXX(angle1), [0, 1, 2])]
+            c = Circuit()
+            c = Braket.apply_gate!(Val(1), Val(1), Val(2), CXX, c, [0, 1, 2], angle1)
+            @test c.instructions == [Instruction(CXX(angle1), [0, 1, 2])]
+        end
     end
     @testset "g = Unitary" begin
         X = complex([0. 1.; 1. 0.])
@@ -154,38 +209,19 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         c = Unitary(c, 0, 1, kron(X, Y))
         @test c.instructions == [Instruction(Unitary(kron(X, Y)), [0, 1])]
     end
-    @testset "Angled 3 qubit gates" begin
-        # build some "fake" (for now) 3 qubit gates to test gate applicators
-        struct CCPhaseShift <: Braket.AngledGate{1}
-            angle::NTuple{1, Union{Float64, Braket.FreeParameter}}
-        end
-        CCPhaseShift(angles::Vararg{Union{Float64, FreeParameter}}) = CCPhaseShift(tuple(angles...))
-        struct CXX <: Braket.AngledGate{1}
-            angle::NTuple{1, Union{Float64, Braket.FreeParameter}}
-        end
-        CXX(angles::Vararg{Union{Float64, FreeParameter}}) = CXX(tuple(angles...))
-        angle = rand()
-        c = Circuit()
-        c = Braket.apply_gate!(Val(1), Braket.IR.DoubleControl(), Braket.IR.SingleTarget(), CCPhaseShift, c, 0, 1, 2, angle)
-        @test c.instructions == [Instruction(CCPhaseShift((angle,)), [0, 1, 2])]
-        c = Circuit()
-        c = Braket.apply_gate!(Val(1), Braket.IR.DoubleControl(), Braket.IR.SingleTarget(), CCPhaseShift, c, [0, 1, 2], angle)
-        @test c.instructions == [Instruction(CCPhaseShift((angle,)), [0, 1, 2])]
-        c = Circuit()
-        c = Braket.apply_gate!(Val(1), Braket.IR.SingleControl(), Braket.IR.DoubleTarget(), CXX, c, 0, 1, 2, angle)
-        @test c.instructions == [Instruction(CXX((angle,)), [0, 1, 2])]
-        c = Circuit()
-        c = Braket.apply_gate!(Val(1), Braket.IR.SingleControl(), Braket.IR.DoubleTarget(), CXX, c, [0, 1, 2], angle)
-        @test c.instructions == [Instruction(CXX((angle,)), [0, 1, 2])]
-    end
     @testset "OpenQASM IR" begin
         fp  = FreeParameter(:alpha)
         fp2 = FreeParameter(:beta)
+        fp3 = FreeParameter(:gamma)
         @testset for ir_bolus in [
             (Rx(0.17), [Qubit(4)], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "rx(0.17) q[4];",),
             (Rx(0.17), [Qubit(4)], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rx(0.17) \$4;",),
             (Rx(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "rx(0.17) q[4];",),
             (Rx(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rx(0.17) \$4;",),
+            (PRx(0.17, 3.45), [Qubit(4)], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "prx(0.17, 3.45) q[4];",),
+            (PRx(0.17, 3.45), [Qubit(4)], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "prx(0.17, 3.45) \$4;",),
+            (PRx(0.17, 3.45), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "prx(0.17, 3.45) q[4];",),
+            (PRx(0.17, 3.45), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "prx(0.17, 3.45) \$4;",),
             (X(), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "x q[4];",),
             (X(), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "x \$4;",),
             (Z(), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "z q[4];",),
@@ -208,6 +244,10 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             (Rz(0.17), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rz(0.17) \$4;",),
             (Rz(fp), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "rz(alpha) q[4];",),
             (Rz(fp), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "rz(alpha) \$4;",),
+            (U(0.17, 0.2, 0.1), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "U(0.17, 0.2, 0.1) q[4];",),
+            (U(0.17, 0.2, 0.1), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "U(0.17, 0.2, 0.1) \$4;",),
+            (U(fp, fp2, fp3), [4], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "U(alpha, beta, gamma) q[4];",),
+            (U(fp, fp2, fp3), [4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "U(alpha, beta, gamma) \$4;",),
             (XX(0.17), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "xx(0.17) q[4], q[5];",),
             (XX(0.17), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "xx(0.17) \$4, \$5;",),
             (XX(fp), [4, 5], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "xx(alpha) q[4], q[5];",),
@@ -317,6 +357,5 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     end
     @test StructTypes.StructType(X) == StructTypes.Struct()
     @test StructTypes.StructType(Gate) == StructTypes.AbstractType()
-    ##@test StructTypes.StructType(DoubleAngledGate) == StructTypes.AbstractType()
     @test StructTypes.StructType(AngledGate) == StructTypes.AbstractType()
 end
