@@ -168,7 +168,7 @@ export Program, AHSProgram, AbstractIR, AbstractProgramResult, CompilerDirective
 
 abstract type AbstractIR end
 StructTypes.StructType(::Type{AbstractIR}) = StructTypes.AbstractType()
-StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, ahsprogram=AHSProgram, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, ms=MS, gpi=GPi, gpi2=GPi2, prx=PRx)
+StructTypes.subtypes(::Type{AbstractIR})   = (z=Z, sample=Sample, cphaseshift01=CPhaseShift01, phase_damping=PhaseDamping, rz=Rz, generalized_amplitude_damping=GeneralizedAmplitudeDamping, xx=XX, zz=ZZ, phase_flip=PhaseFlip, vi=Vi, depolarizing=Depolarizing, variance=Variance, two_qubit_depolarizing=TwoQubitDepolarizing, densitymatrix=DensityMatrix, cphaseshift00=CPhaseShift00, ecr=ECR, ccnot=CCNot, unitary=Unitary, bit_flip=BitFlip, y=Y, swap=Swap, cz=CZ, cnot=CNot, adjoint_gradient=AdjointGradient, cswap=CSwap, ry=Ry, i=I, si=Si, amplitude_damping=AmplitudeDamping, statevector=StateVector, iswap=ISwap, h=H, xy=XY, yy=YY, t=T, ahsprogram=AHSProgram, two_qubit_dephasing=TwoQubitDephasing, x=X, ti=Ti, cv=CV, pauli_channel=PauliChannel, pswap=PSwap, expectation=Expectation, probability=Probability, phaseshift=PhaseShift, v=V, cphaseshift=CPhaseShift, s=S, rx=Rx, kraus=Kraus, amplitude=Amplitude, cphaseshift10=CPhaseShift10, multi_qubit_pauli_channel=MultiQubitPauliChannel, cy=CY, undefinedgate=UndefinedGate)
 
 const IRObservable = Union{Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, String}
 Base.convert(::Type{IRObservable}, v::Vector{String}) = convert(Vector{Union{String, Vector{Vector{Vector{Float64}}}}}, v)
@@ -320,14 +320,6 @@ end
 StructTypes.StructType(::Type{PSwap}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{PSwap}) = Dict{Symbol, Any}(:type => "pswap")
 
-struct GPi <: AbstractIR
-    angle::Float64
-    target::Vector{Int}
-    type::String
-end
-StructTypes.StructType(::Type{GPi}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{GPi}) = Dict{Symbol, Any}(:type => "gpi")
-
 struct AmplitudeDamping <: AbstractIR
     gamma::Float64
     target::Int
@@ -351,14 +343,6 @@ struct Expectation <: AbstractProgramResult
 end
 StructTypes.StructType(::Type{Expectation}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{Expectation}) = Dict{Symbol, Any}(:type => "expectation")
-
-struct GPi2 <: AbstractIR
-    angle::Float64
-    target::Vector{Int}
-    type::String
-end
-StructTypes.StructType(::Type{GPi2}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{GPi2}) = Dict{Symbol, Any}(:type => "gpi2")
 
 struct BitFlip <: AbstractIR
     probability::Float64
@@ -469,25 +453,14 @@ end
 StructTypes.StructType(::Type{GeneralizedAmplitudeDamping}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{GeneralizedAmplitudeDamping}) = Dict{Symbol, Any}(:type => "generalized_amplitude_damping")
 
-struct MS <: AbstractIR
-    angle1::Float64
-    angle2::Float64
-    angle3::Float64
+struct UndefinedGate <: AbstractIR
+    angles
+    controls::Vector{Int}
     targets::Vector{Int}
     type::String
 end
-StructTypes.StructType(::Type{MS}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{MS}) = Dict{Symbol, Any}(:type => "ms")
-
-struct PRx <: AbstractIR
-    angle1::Float64
-    angle2::Float64
-    target::Int
-    type::String
-end
-StructTypes.StructType(::Type{PRx}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{PRx}) = Dict{Symbol, Any}(:type => "prx")
-
+StructTypes.StructType(::Type{UndefinedGate}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{UndefinedGate}) = Dict{Symbol, Any}(:type => "undefined_gate")
 
 struct ECR <: AbstractIR
     targets::Vector{Int}
@@ -705,109 +678,6 @@ struct Variance <: AbstractProgramResult
 end
 StructTypes.StructType(::Type{Variance}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{Variance}) = Dict{Symbol, Any}(:type => "variance")
-
-
-
-abstract type Control end
-struct SingleControl <: Control end
-for g in [:CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :CNot, :CV, :CY, :CZ, :CSwap]
-    @eval begin
-        Control(::Type{$g}) = SingleControl()
-    end
-end
-struct DoubleControl <: Control end
-for g in [:CCNot]
-    @eval begin
-        Control(::Type{$g}) = DoubleControl()
-    end
-end
-struct NoControl <: Control end
-Control(::Type{G}) where {G<:AbstractIR} = NoControl()
-abstract type Target end
-struct DoubleTarget <: Target end
-for g in [:Swap, :CSwap, :ISwap, :PSwap, :XY, :ECR, :XX, :YY, :ZZ, :TwoQubitDepolarizing, :TwoQubitDephasing, :MS]
-    @eval begin
-        Target(::Type{$g}) = DoubleTarget()
-    end
-end
-struct SingleTarget <: Target end
-for g in [:H, :I, :X, :Y, :Z, :Rx, :Ry, :Rz, :S, :T, :Si, :Ti, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :CNot, :CCNot, :CV, :CY, :CZ, :V, :Vi, :BitFlip, :PhaseFlip, :PauliChannel, :Depolarizing, :AmplitudeDamping, :GeneralizedAmplitudeDamping, :PhaseDamping, :GPi, :GPi2, :PRx]
-    @eval begin
-        Target(::Type{$g}) = SingleTarget()
-    end
-end
-struct OptionalNestedMultiTarget <: Target end
-for g in [:AdjointGradient]
-    @eval begin
-        Target(::Type{$g}) = OptionalNestedMultiTarget()
-    end
-end
-struct OptionalMultiTarget <: Target end
-for g in [:Expectation, :Sample, :Variance, :DensityMatrix, :Probability]
-    @eval begin
-        Target(::Type{$g}) = OptionalMultiTarget()
-    end
-end
-struct MultiTarget <: Target end
-for g in [:Unitary, :MultiQubitPauliChannel, :Kraus]
-    @eval begin
-        Target(::Type{$g}) = MultiTarget()
-    end
-end
-abstract type Angle end
-struct Angled <: Angle end
-for g in [:Rx, :Ry, :Rz, :PhaseShift, :CPhaseShift, :CPhaseShift00, :CPhaseShift01, :CPhaseShift10, :PSwap, :XY, :XX, :YY, :ZZ, :GPi, :GPi2]
-    @eval begin
-        Angle(::Type{$g}) = Angled()
-    end
-end
-struct DoubleAngled <: Angle end
-for g in [:PRx]
-    @eval begin
-        Angle(::Type{$g}) = DoubleAngled()
-    end
-end
-struct TripleAngled <: Angle end
-for g in [:MS]
-    @eval begin
-        Angle(::Type{$g}) = TripleAngled()
-    end
-end
-struct NonAngled <: Angle end
-Angle(::Type{G}) where {G<:AbstractIR} = NonAngled()
-abstract type ProbabilityCount end
-struct TripleProbability <: ProbabilityCount end
-for g in [:PauliChannel]
-    @eval begin
-        ProbabilityCount(::Type{$g}) = TripleProbability()
-    end
-end
-struct MultiProbability <: ProbabilityCount end
-for g in [:MultiQubitPauliChannel, :Kraus]
-    @eval begin
-        ProbabilityCount(::Type{$g}) = MultiProbability()
-    end
-end
-struct DoubleProbability <: ProbabilityCount end
-for g in [:GeneralizedAmplitudeDamping]
-    @eval begin
-        ProbabilityCount(::Type{$g}) = DoubleProbability()
-    end
-end
-struct SingleProbability <: ProbabilityCount end
-for g in [:BitFlip, :PhaseFlip, :Depolarizing, :TwoQubitDephasing, :TwoQubitDepolarizing, :AmplitudeDamping]
-    @eval begin
-        ProbabilityCount(::Type{$g}) = SingleProbability()
-    end
-end
-ControlAndTarget(T) = (Control(T), Target(T))
-_generate_control_and_target(::NoControl, ::SingleTarget, q) = q[1]
-_generate_control_and_target(::NoControl, ::DoubleTarget, q) = ([q[1], q[2]],)
-_generate_control_and_target(::NoControl, ::MultiTarget,  q) = (q,)
-_generate_control_and_target(::SingleControl, ::SingleTarget, q) = (q[1], q[2])
-_generate_control_and_target(::SingleControl, ::DoubleTarget, q) = (q[1], [q[2], q[3]])
-_generate_control_and_target(::DoubleControl, ::SingleTarget, q) = ([q[1], q[2]], q[3])
-
 
 Base.:(==)(o1::T, o2::T) where {T<:AbstractIR} = all(getproperty(o1, fn) == getproperty(o2, fn) for fn in fieldnames(T))
 

@@ -35,10 +35,10 @@ StructTypes.lower(x::Instruction{O}) where {O<:Operator} = isempty(x.target) ? i
 ir(x::Instruction{O}, ::Val{:OpenQASM}; kwargs...) where {O<:Operator} = isempty(x.target) ? ir(x.operator, Val(:OpenQASM); kwargs...) : ir(x.operator, x.target, Val(:OpenQASM); kwargs...)
 
 conc_types = filter(Base.isconcretetype, vcat(subtypes(AbstractIR), subtypes(CompilerDirective)))
-nt_dict = merge([Dict(zip(fieldnames(t), (Union{Nothing, x} for x in fieldtypes(t)))) for t in conc_types]...)
-ks = tuple(:angles, keys(nt_dict)...)
-vs = Tuple{Union{Nothing, Vector{Float64}}, values(nt_dict)...}
-inst_typ = NamedTuple{ks, vs}
+nt_dict    = merge([Dict(zip(fieldnames(t), (Union{Nothing, x} for x in fieldtypes(t)))) for t in conc_types]...)
+ks         = tuple(keys(nt_dict)...)
+vs         = Tuple{values(nt_dict)...}
+inst_typ   = NamedTuple{ks, vs}
 StructTypes.lowertype(::Type{Instruction{O}}) where {O} = inst_typ
 StructTypes.lowertype(::Type{Instruction}) = inst_typ
 Instruction(x::Instruction{O}) where {O<:Braket.Operator} = x

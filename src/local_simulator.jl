@@ -96,9 +96,8 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
     if is_single_input
         if is_single_task
             inputs = inputs isa Vector ? first(inputs) : inputs
-            results = [d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)]
-
-            return LocalQuantumTaskBatch([local_result.result.task_metadata.id for local_result in results], results)
+            local_task = d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)
+            return LocalQuantumTaskBatch([local_task.result.task_metadata.id], [local_task.result])
         elseif inputs isa Dict{String, Float64}
             inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
         else
