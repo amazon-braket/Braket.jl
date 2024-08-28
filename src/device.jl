@@ -73,7 +73,7 @@ Base.convert(::Type{String}, d::_Lucy) = "arn:aws:braket:eu-west-2::device/qpu/o
 struct Garnet <: IQMDevice end
 Base.convert(::Type{String}, d::Garnet) = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
 
-for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_AspenM2, :AspenM3),
+for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_AspenM2, :AspenM3, :Ankaa2),
                       ("arn:aws:braket:::device/qpu/rigetti/Aspen-8",
                        "arn:aws:braket:::device/qpu/rigetti/Aspen-9",
                        "arn:aws:braket:::device/qpu/rigetti/Aspen-10",
@@ -81,6 +81,7 @@ for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_As
                        "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-1",
                        "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-2",
                        "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-3",
+                       "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-2",
                       ))
     @eval begin
         struct $d <: RigettiDevice end
