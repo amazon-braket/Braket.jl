@@ -65,7 +65,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         c = CNot(Circuit(), 0, 1)
         action = Braket.Program(c)
         task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 0, "arn1", nothing, nothing, nothing, nothing, nothing)
-        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+        additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
         s3_req_str = JSON3.write(zero_shots_result(task_metadata, additional_metadata))
         req_patch = @patch Braket.AWS._http_request(a...; b...) = Braket.AWS.Response(Braket.HTTP.Response(200), IOBuffer(s3_req_str))
         apply(req_patch) do
@@ -111,15 +111,13 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     c = measure q;
     """
     oq3_program() = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], bell_qasm, nothing)
-    bb_program()  = Braket.BlackbirdProgram(Braket.header_dict[Braket.BlackbirdProgram], "Vac | q[0]")
     bell_circ()   = (c = Circuit(); c=H(c, 0); c=CNot(c, 0, 1); return c)
     bell_prog()   = Braket.Program(bell_circ())
-    RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-11"
+    RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-M-3"
     IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
     SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
-    OQC_ARN = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
-    XANADU_ARN = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
-    @testset for program in (bell_circ, bell_prog), arn in (SV1_ARN, OQC_ARN, RIGETTI_ARN, IONQ_ARN)
+    IQM_ARN = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
+    @testset for program in (bell_circ, bell_prog), arn in (SV1_ARN, IQM_ARN, RIGETTI_ARN, IONQ_ARN)
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")
@@ -146,7 +144,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         @test task_args[:extra_opts]["deviceParameters"] == JSON3.write(device_params)
     end
 
-    @testset for (program, arn) in zip((oq3_program, bb_program), (SV1_ARN, XANADU_ARN))
+    @testset for program in (oq3_program,), arn in (SV1_ARN,)
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")

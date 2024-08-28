@@ -106,7 +106,6 @@ using Braket, Braket.IR, Test, JSON3, StructTypes
             @test read_T isa T
             @test read_T.targets == targs
             @test read_T.observable == obs
-            @test Braket.IR.Target(T) == Braket.IR.OptionalMultiTarget()
             @test JSON3.read(JSON3.write(read_T), Braket.IR.AbstractIR) == read_T
         end
         for T in (IR.Probability, IR.DensityMatrix)
@@ -115,7 +114,6 @@ using Braket, Braket.IR, Test, JSON3, StructTypes
             read_T = JSON3.read(raw_str, T)
             @test read_T isa T
             @test read_T.targets == targs
-            @test Braket.IR.Target(T) == Braket.IR.OptionalMultiTarget()
             @test JSON3.read(JSON3.write(read_T), Braket.IR.AbstractIR) == read_T
         end
         for T in (IR.StateVector,)
@@ -209,7 +207,7 @@ using Braket, Braket.IR, Test, JSON3, StructTypes
     end
 
     @testset "Device metadata" begin
-        @testset for T in (Braket.OqcMetadata, Braket.XanaduMetadata, Braket.RigettiMetadata)
+        @testset for T in (Braket.IqmMetadata, Braket.RigettiMetadata)
             raw = """{"compiledProgram": "fake_program"}"""
             read_in = JSON3.read(raw, T)
             @test read_in isa T

@@ -39,8 +39,8 @@ can process single tasks or task batches.
 """
 struct LocalSimulator <: Device
     backend::String
-    _delegate::AbstractBraketSimulator
-    function LocalSimulator(backend::Union{String, AbstractBraketSimulator})
+    _delegate
+    function LocalSimulator(backend)
         backend_name = device_id(backend)
         haskey(_simulator_devices[], backend_name) && return new(backend_name, _simulator_devices[][backend_name](0,0))
         !isdefined(Main, Symbol(backend_name)) && throw(ArgumentError("no local simulator with name $backend_name is loaded!"))
@@ -94,8 +94,10 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
     is_single_task  = length(task_specs) == 1
     is_single_input = inputs isa Dict{String, Float64} || length(inputs) == 1
     if is_single_input
-        if is_single_task 
-            return d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)
+        if is_single_task
+            inputs = inputs isa Vector ? first(inputs) : inputs
+            local_task = d(task_specs[1], args...; shots=shots, inputs=inputs, kwargs...)
+            return LocalQuantumTaskBatch([local_task.result.task_metadata.id], [local_task.result])
         elseif inputs isa Dict{String, Float64}
             inputs = [deepcopy(inputs) for ix in 1:length(task_specs)]
         else
@@ -103,10 +105,6 @@ function simulate(d::LocalSimulator, task_specs::Vector{T}, args...; shots::Int=
         end
     end
     !is_single_task && !is_single_input && length(task_specs) != length(inputs) && throw(ArgumentError("number of inputs ($(length(inputs))) and task specifications ($(length(task_specs))) must be equal."))
-    # let each thread pick up an idle simulator
-    #sims     = Channel(Inf)
-    #foreach(i -> put!(sims, copy(d._delegate)), 1:Threads.nthreads())
-
     tasks_and_inputs = zip(1:length(task_specs), task_specs, inputs)
     # is this actually faster?
     todo_tasks_ch = Channel(length(tasks_and_inputs))
