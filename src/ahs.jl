@@ -2,6 +2,7 @@ import StructTypes
 
 export AtomArrangementItem, AtomArrangement, TimeSeriesItem, TimeSeries, Field, DrivingField
 export ShiftingField, Hamiltonian, AnalogHamiltonianSimulation, Pattern, vacant, filled, SiteType, discretize
+export LocalDetuning, stitch
 
 """
     Hamiltonian
@@ -270,4 +271,183 @@ function discretize(ahs::AnalogHamiltonianSimulation, device::Device)
     return AnalogHamiltonianSimulation(
         discretize(ahs.register, properties), map(h->discretize(h, properties), ahs.hamiltonian)
     )
+end
+
+""" 
+	LocalDetuning <: Hamiltonian 
+
+Struct representing a [`Hamiltonian`](@ref) term `H_{shift}` representing the [local detuning](https://aws.amazon.com/blogs/quantum-computing/local-detuning-now-available-on-queras-aquila-device-with-braket-direct/) that changes the energy of the Rydberg level in an [`AnalogHamiltonianSimulation`](@ref).
+
+
+```math
+H_{shift} (t) := -\\Delta(t) \\sum_k h_k | r_k \\rangle \\langle r_k |
+```
+
+where:
+
+- ``\\Delta(t)`` is the magnitude of the frequency shift in rad/s,
+- ``h_k`` is the site coefficient of atom ``k``, a dimensionless real number between 0 and 1,
+- ``|r_k \\rangle`` is the Rydberg state of atom ``k``.
+
+The sum ``\\sum_k`` is taken over all target atoms.
+
+Fields:
+- `magnitude::Field`: [`Field](@ref) containing the global magnitude time series Delta(t),
+  where time is measured in seconds (s) and values are measured in rad/s, and the
+  local pattern h_k of dimensionless real numbers between 0 and 1.
+
+# Examples
+
+```jldoctest
+julia> magnitude = Field(TimeSeries(OrderedDict([0 => TimeSeriesItem(0, 1), 1 => TimeSeriesItem(1, 2)]), true, -1))
+julia> local_detuning = LocalDetuning(magnitude)
+```
+"""
+struct LocalDetuning <: Hamiltonian
+    magnitude::Field
+end
+
+"""
+	LocalDetuning(times::Vector{<:Number}, values::Vector{<:Number}, pattern::Vector{<:Number})
+
+# Examples
+
+```jldoctest
+julia> times₁ = [0, 0.1, 0.2, 0.3];
+julia> glob_amplitude₁ = [0.5, 0.8, 0.9, 1.0];
+julia> pattern₁ = [0.3, 0.7, 0.6, -0.5, 0, 1.6];
+julia> s₁ = LocalDetuning(times₁, glob_amplitude₁, pattern₁)
+LocalDetuning(Field(TimeSeries(OrderedCollections.OrderedDict{Number, TimeSeriesItem}(0.0 => TimeSeriesItem(0.0, 0.5), 0.1 => TimeSeriesItem(0.1, 0.8), 0.2 => TimeSeriesItem(0.2, 0.9), 0.3 => TimeSeriesItem(0.3, 1.0)), true, -1), Pattern(Number[0.3, 0.7, 0.6, -0.5, 0.0, 1.6])))
+```
+"""
+function LocalDetuning(times::Vector{<:Number}, values::Vector{<:Number}, pattern::Vector{<:Number})
+    if length(times) != length(values)
+        throw(ArgumentError("The length of the times and values lists must be equal."))
+    end
+
+    time_series = TimeSeries()
+    for (t, v) in zip(times, values)
+        time_series[t] = v
+    end
+
+    field = Field(time_series, Pattern(pattern))
+    LocalDetuning(field)
+end
+
+"""
+    ir(ld::LocalDetuning)
+
+Generate IR from an [`LocalDetuning`](@ref) which can be run on
+a neutral atom simulator or quantum device.
+"""
+ir(ld::LocalDetuning) = IR.LocalDetuning(ir(ld.magnitude))
+
+"""
+	stitch(ld1::LocalDetuning, ld2::LocalDetuning; boundary::Symbol="mean") -> LocalDetuning
+
+[`stitch`](@ref) two shifting fields based on the `stitch` method.
+The time points of the second [`LocalDetuning`](@ref) are shifted such that the first time point of
+the second [`LocalDetuning`](@ref) coincides with the last time point of the first [`LocalDetuning`](@ref).
+The boundary point value is handled according to the boundary argument value.
+
+# Arguments:
+    ld1::LocalDetuning: The first LocalDetuning to be stitched.
+    ld2::LocalDetuning: The second LocalDetuning to be stitched.
+    boundary::Symbol="mean": The boundary point handler. Possible options are "mean", "left", "right".
+"""
+function stitch(ld1::LocalDetuning, ld2::LocalDetuning, boundary::Symbol=:mean)
+    if ld1.magnitude.pattern.series != ld2.magnitude.pattern.series
+        throw(ArgumentError("The LocalDetuning pattern for both fields must be equal."))
+    end
+
+    new_ts = stitch(ld1.magnitude.time_series, ld2.magnitude.time_series, boundary)
+    LocalDetuning(Field(new_ts, ld1.magnitude.pattern))
+end
+
+"""
+    stitch(ts1::TimeSeries, ts2::TimeSeries; boundary::Symbol="mean")
+
+[`stitch`](@ref) two shifting fields based on the `stitch` method.
+The time points of the second [`TimeSeries`](@ref) are shifted such that the first time point of
+the second [`TimeSeries`](@ref) coincides with the last time point of the first [`TimeSeries`](@ref).
+The boundary point value is handled according to the `boundary` argument value.
+
+# Arguments:
+- `ts1::TimeSeries`: The first [`TimeSeries`](@ref) to be stitched.
+- `ts2::TimeSeries`: The second [`TimeSeries`](@ref) to be stitched.
+- `boundary::Symbol="mean"`: The boundary point handler. Possible options are "mean", "left", "right".
+
+# Examples:
+
+```jldoctest
+julia> times₁ = [0, 0.1, 0.2, 0.3];
+julia> glob_amplitude₁ = [0.5, 0.8, 0.9, 1.0];
+julia> pattern₁ = [0.3, 0.7, 0.6, -0.5, 0, 1.6];
+
+julia> times₂ = [0, 0.1, 0.2, 0.3];
+julia> glob_amplitude₂ = [0.5, 0.8, 0.9, 1.0];
+julia> pattern₂ = pattern₁;
+
+julia> s₂ = LocalDetuning(times₂, glob_amplitude₂, pattern₂)
+LocalDetuning(Field(TimeSeries(OrderedCollections.OrderedDict{Number, TimeSeriesItem}(0.0 => TimeSeriesItem(0.0, 0.5), 0.1 => TimeSeriesItem(0.1, 0.8), 0.2 => TimeSeriesItem(0.2, 0.9), 0.3 => TimeSeriesItem(0.3, 1.0)), true, -1), Pattern(Number[0.3, 0.7, 0.6, -0.5, 0.0, 1.6])))
+
+julia> s₁ = LocalDetuning(times₁, glob_amplitude₁, pattern₁)
+LocalDetuning(Field(TimeSeries(OrderedCollections.OrderedDict{Number, TimeSeriesItem}(0.0 => TimeSeriesItem(0.0, 0.5), 0.1 => TimeSeriesItem(0.1, 0.8), 0.2 => TimeSeriesItem(0.2, 0.9), 0.3 => TimeSeriesItem(0.3, 1.0)), true, -1), Pattern(Number[0.3, 0.7, 0.6, -0.5, 0.0, 1.6])))
+
+julia> stitchedₗ = stitch(s₁, s₂, :mean)
+LocalDetuning(Field(TimeSeries(OrderedCollections.OrderedDict{Number, TimeSeriesItem}(0.0 => TimeSeriesItem(0.0, 0.75), 0.1 => TimeSeriesItem(0.1, 0.8), 0.2 => TimeSeriesItem(0.2, 0.9), 0.3 => TimeSeriesItem(0.3, 1.0)), true, 1), Pattern(Number[0.3, 0.7, 0.6, -0.5, 0.0, 1.6])))
+
+julia> stitchedₗ = stitch(s₁, s₂, :left)
+LocalDetuning(Field(TimeSeries(OrderedCollections.OrderedDict{Number, TimeSeriesItem}(0.0 => TimeSeriesItem(0.3, 1.0), 0.1 => TimeSeriesItem(0.1, 0.8), 0.2 => TimeSeriesItem(0.2, 0.9), 0.3 => TimeSeriesItem(0.3, 1.0)), true, 1), Pattern(Number[0.3, 0.7, 0.6, -0.5, 0.0, 1.6])))
+
+julia> stitchedₗ = stitch(s₁, s₂, :right)
+LocalDetuning(Field(TimeSeries(OrderedCollections.OrderedDict{Number, TimeSeriesItem}(0.0 => TimeSeriesItem(0.0, 0.5), 0.1 => TimeSeriesItem(0.1, 0.8), 0.2 => TimeSeriesItem(0.2, 0.9), 0.3 => TimeSeriesItem(0.3, 1.0)), true, 1), Pattern(Number[0.3, 0.7, 0.6, -0.5, 0.0, 1.6])))
+```
+"""
+function stitch(ts1::TimeSeries, ts2::TimeSeries, boundary::Symbol)
+    merged_series = deepcopy(ts1.series)
+    first_time_ts2 = first(collect(keys(ts2.series)))
+    last_time_ts1 = last(collect(keys(ts1.series)))
+
+    if boundary == :mean
+        merged_value = (ts1.series[last_time_ts1].value + ts2.series[first_time_ts2].value) / 2
+        merged_series[first_time_ts2] = TimeSeriesItem(first_time_ts2, merged_value)
+    elseif boundary == :left
+        merged_series[first_time_ts2] = ts1.series[last_time_ts1]
+    elseif boundary == :right
+        merged_series[first_time_ts2] = ts2.series[first_time_ts2]
+    else
+        throw(ArgumentError("Invalid boundary condition: $boundary"))
+    end
+
+    for (t, v) in ts2.series
+        if t != first_time_ts2
+            merged_series[t] = v
+        end
+    end
+
+    largest_time = maximum(keys(merged_series))
+    if largest_time isa Float64
+        largest_time = Int(ceil(largest_time))
+    end
+
+    TimeSeries(merged_series, true, largest_time)
+end
+"""
+    discretize(ld::LocalDetuning, properties::DiscretizationProperties) -> LocalDetuning
+
+Creates a discretized version of the [`LocalDetuning`](@ref).
+
+# Arguments:
+- `ld::LocalDetuning`: The [`LocalDetuning`](@ref) to discretize.
+- `properties::DiscretizationProperties: Capabilities of a device that represent the
+  resolution with which the device can implement the parameters.
+"""
+function discretize(ld::LocalDetuning, properties::DiscretizationProperties)
+	local_detuning_parameters = properties.rydberg.rydbergLocal
+	time_resolution = Dec128(local_detuning_parameters.timeResolution)
+	value_resolution = Dec128(local_detuning_parameters.commonDetuningResolution)
+	pattern_resolution = Dec128(local_detuning_parameters.localDetuningResolution)
+	discretized_magnitude = discretize(ld.magnitude, time_resolution, value_resolution, pattern_resolution)
+	LocalDetuning(discretized_magnitude)
 end
