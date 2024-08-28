@@ -340,3 +340,92 @@ function get_devices(; arns::Vector{String}=String[], names::Vector{String}=Stri
     end
     return sort(collect(values(device_map)), by=(x->getproperty(x, Symbol("_"*order_by))))
 end
+
+"""
+    DirectReservation(device_arn::String, reservation_arn::String)
+
+A context manager that adjusts [`AwsQuantumTask`](@ref) generated within the context to utilize a
+reservation ARN for all tasks targeting the designated device. Notably, this manager permits only 
+one reservation at a time.
+
+[Reservations](https://docs.aws.amazon.com/braket/latest/developerguide/braket-reservations.html)
+are specific to AWS accounts and devices. Only the AWS account that initiated the reservation 
+can utilize the reservation ARN. Moreover, the reservation ARN is solely valid on the
+reserved device within the specified start and end times.
+
+Arguments:
+- device_arn: The [`BraketDevice`](@ref) for which you possess a reservation ARN, or
+  alternatively, the [`Device`](@ref) ARN.
+- reservation_arn: The Braket [`DirectReservation`](@ref) ARN to be implemented for all
+  quantum tasks executed within the context.
+"""
+mutable struct DirectReservation
+    device_arn::String
+    reservation_arn::String
+    is_active::Bool
+end
+
+DirectReservation(device_arn::String, reservation_arn::String) = DirectReservation(device_arn, reservation_arn, false)
+
+# Start reservation function
+"""
+    start_reservation!(state::DirectReservation)
+
+[`start_reservation!`](@ref) activates a [`DirectReservation`](@ref) object, granting exclusive access to the
+specified quantum device for the reserved time window.
+"""
+function start_reservation!(state::DirectReservation)
+    if state.is_active
+        error("Another reservation is already active. Reservation ARN: $reservation_arn")
+    end
+    state.is_active = true
+    ENV["AMZN_BRAKET_RESERVATION_DEVICE_ARN"] = state.device_arn
+    ENV["AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN"] = state.reservation_arn
+end
+
+# Stop reservation function
+"""
+    stop_reservation!(state::DirectReservation)
+
+[`stop_reservation!`](@ref) deactivates a [`DirectReservation`](@ref) object, releasing exclusive access to the quantum device.
+"""
+function stop_reservation!(state::DirectReservation)
+    if !state.is_active
+        @warn "Reservation is not active."
+    end
+    state.is_active = false
+    if haskey(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
+        delete!(ENV, "AMZN_BRAKET_RESERVATION_DEVICE_ARN")
+    end
+    if haskey(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+        delete!(ENV, "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN")
+    end
+end
+
+"""
+    direct_reservation(reservation::DirectReservation, func::Function)
+
+Runs a function within the context of an AWS Braket [`DirectReservation`](@ref). This function sets 
+the necessary environment variables, starts the reservation, executes the provided function, 
+and then stops the reservation, ensuring proper resource management.
+
+Arguments:
+- reservation::DirectReservation: The reservation details, including device ARN and reservation ARN.
+- func::Function: The function to run within the reservation context.
+"""
+function direct_reservation(reservation::DirectReservation, func::Function)
+    env_vars = Dict(
+        "AMZN_BRAKET_RESERVATION_DEVICE_ARN" => reservation.device_arn,
+        "AMZN_BRAKET_RESERVATION_TIME_WINDOW_ARN" => reservation.reservation_arn
+    )
+    withenv(pairs(env_vars)...) do
+        start_reservation!(reservation)
+        try
+            func()
+        catch e
+            error("Error during reservation with device ARN $(reservation.device_arn) and reservation ARN $(reservation.reservation_arn): $(e)")
+        finally
+            stop_reservation!(reservation)
+        end
+    end
+end
