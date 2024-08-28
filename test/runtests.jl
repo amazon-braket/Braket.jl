@@ -52,6 +52,7 @@ for group in groups
             include("circuits.jl")
             include("measure.jl")
             include("free_parameter.jl")
+            include("freeparameterexpression.jl")
             include("gates.jl")
             include("observables.jl")
             include("noises.jl")

@@ -48,9 +48,12 @@ for gate_def in (
         $($G) gate.
         """
         struct $G <: AngledGate{$n_angle}
-            angle::NTuple{$n_angle, Union{Real, FreeParameter}}
-            $G(angle::T) where {T<:NTuple{$n_angle, Union{Real, FreeParameter}}} = new(angle)
+            angle::NTuple{$n_angle, Union{Real, FreeParameter, FreeParameterExpression}}
+            $G(angle::T) where {T<:NTuple{$n_angle, Union{Real, FreeParameter, FreeParameterExpression}}} = new(angle)
         end
+        $G(angles::Vararg{Union{Float64, FreeParameter, FreeParameterExpression}}) = $G(tuple(angles...))
+        $G(angles::Vararg{Number}) = $G((Float64(a) for a in angles)...)
+
         chars(::Type{$G}) = $c
         ir_typ(::Type{$G}) = $IR_G
         qubit_count(::Type{$G}) = $qc
@@ -106,9 +109,9 @@ end
 (::Type{G})(x::Tuple{}) where {G<:Gate} = G()
 (::Type{G})(x::Tuple{}) where {G<:AngledGate} = throw(ArgumentError("angled gate must be constructed with at least one angle."))
 (::Type{G})(x::AbstractVector) where {G<:AngledGate} = G(x...)
-(::Type{G})(angle::T) where {G<:AngledGate{1}, T<:Union{Real, FreeParameter}} = G((angle,))
-(::Type{G})(angle1::T1, angle2::T2) where {T1<:Union{Real, FreeParameter}, T2<:Union{Real, FreeParameter}, G<:AngledGate{2}} = G((angle1, angle2,))
-(::Type{G})(angle1::T1, angle2::T2, angle3::T3) where {T1<:Union{Real, FreeParameter}, T2<:Union{Real, FreeParameter}, T3<:Union{Real, FreeParameter}, G<:AngledGate{3}} = G((angle1, angle2, angle3,))
+(::Type{G})(angle::T) where {G<:AngledGate{1}, T<:Union{Real, FreeParameter, FreeParameterExpression}} = G((angle,))
+(::Type{G})(angle1::T1, angle2::T2) where {T1<:Union{Real, FreeParameter, FreeParameterExpression}, T2<:Union{Real, FreeParameter, FreeParameterExpression}, G<:AngledGate{2}} = G((angle1, angle2,))
+(::Type{G})(angle1::T1, angle2::T2, angle3::T3) where {T1<:Union{Real, FreeParameter, FreeParameterExpression}, T2<:Union{Real, FreeParameter, FreeParameterExpression}, T3<:Union{Real, FreeParameter, FreeParameterExpression}, G<:AngledGate{3}} = G((angle1, angle2, angle3,))
 qubit_count(g::G) where {G<:Gate}  = qubit_count(G)
 angles(g::G) where {G<:Gate}       = ()
 angles(g::AngledGate{N}) where {N} = g.angle

@@ -39,6 +39,7 @@ QubitSet
 Braket.Operator
 Braket.QuantumOperator
 FreeParameter
+FreeParameterExpression
 depth
 qubits
 qubit_count

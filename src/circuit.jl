@@ -20,7 +20,7 @@ mutable struct Circuit
     qubit_observable_mapping::Dict{Int, Observables.Observable}
     qubit_observable_target_mapping::Dict{Int, Tuple}
     qubit_observable_set::Set{Int}
-    parameters::Set{FreeParameter}
+    parameters::Set{Union{FreeParameter, FreeParameterExpression}}
     observables_simultaneously_measureable::Bool
     has_compiler_directives::Bool
     measure_targets::Vector{Int} 
