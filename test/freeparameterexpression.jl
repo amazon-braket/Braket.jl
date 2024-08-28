@@ -46,7 +46,6 @@ using Braket, Test
     @test fpe3 == fpe2 
     # != operator
     @test fpe1 != fpe2 
-    show(fpe3)
     # - operator
     result = fpe1 - fpe2
     @test result == FreeParameterExpression("α - θ")
@@ -67,4 +66,16 @@ using Braket, Test
     @test result == FreeParameterExpression("(α + θ)^(2θ)")
     gsub = subs(result, Dict(:α => 1.0, :θ => 1.0))
     @test gsub == 4.0 # (α + θ)^(2θ) == 4.0
+
+    @testset "FreeParameterExpressions and irrationals" begin
+        # creating gates directly 
+        gate  = FreeParameterExpression("π")
+        circ = Circuit()
+        circ = H(circ, 0)
+        circ = Rx(circ, 1, gate/2)
+        circ = Ry(circ, 0, gate)
+        circ = Probability(circ)
+        non_para_circ = Circuit() |> (ci->H(ci, 0)) |> (ci->Rx(ci, 1, π/2)) |> (ci->Ry(ci, 0, π)) |> Probability
+        @test_broken circ == non_para_circ
+    end
 end

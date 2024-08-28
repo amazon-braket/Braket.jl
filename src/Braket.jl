@@ -147,7 +147,7 @@ Struct representing a [`FreeParameterExpression`](@ref), which can be used in sy
 Instances of [`FreeParameterExpression`](@ref) can represent symbolic expressions involving [`FreeParameter`](@ref), 
 such as mathematical expressions with undetermined values.
 
-This type is often used in combination with [`FreeParameter`](@ref), which represents individual [`FreeParameter`](@ref).
+This type is often used in combination with [`FreeParameter`](@ref), which represents individual [`FreeParameter`](@ref)s.
 
 ### Examples
 ```jldoctest
@@ -175,9 +175,7 @@ julia> gate₁ = FreeParameterExpression("phi + 2*gamma")
 """
 struct FreeParameterExpression
     expression::Symbolics.Num
-    function FreeParameterExpression(expr::Symbolics.Num)
-        new(expr)
-    end
+    FreeParameterExpression(expr::Symbolics.Num) = new(expr)
 end
 
 FreeParameterExpression(expr::FreeParameterExpression) = FreeParameterExpression(expr.expression)
@@ -212,8 +210,8 @@ function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Num
 	   subbed_expr = Symbolics.value(subbed_expr)
         return subbed_expr
     else
-	subbed_expr = Symbolics.value(subbed_expr)
-	return FreeParameterExpression(subbed_expr)
+        subbed_expr = Symbolics.value(subbed_expr)
+        return FreeParameterExpression(subbed_expr)
     end 
 end
 
@@ -221,23 +219,33 @@ Base.:+(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Numb
     FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) + 
                             (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
+Base.:+(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression) = fpe2 + fpe1
 Base.:*(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
     FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) * 
                             (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+Base.:*(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression) = fpe2 * fpe1
 
 Base.:-(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
     FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) - 
                             (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
+Base.:-(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression) = -1 * fpe2 + fpe1
+Base.:-(fpe::FreeParameterExpression) = -1 * fpe
 
 Base.:/(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
     FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) /
                             (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
+Base.:/(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression) = 1/(fpe2 / fpe1)
+
 Base.:^(fpe1::FreeParameterExpression, fpe2::Union{FreeParameterExpression, Number, Symbolics.Num}) = 
     FreeParameterExpression((fpe1 isa FreeParameterExpression ? fpe1.expression : fpe1) ^
                             (fpe2 isa FreeParameterExpression ? fpe2.expression : fpe2))
 
+Base.:^(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression) = fpe1^FreeParameterExpression(fpe2)
+
 Base.:(==)(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = isequal(fpe1.expression, fpe2.expression)
+Base.:(==)(fpe::FreeParameterExpression, sym_num::Symbolics.Num) = isequal(fpe.expression, sym_num)
+Base.:(==)(num::Symbolics.Num, fpe::FreeParameterExpression) = (fpe == num)
 Base.:!=(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = !(isequal(fpe1, fpe2))
 
 include("compiler_directive.jl")
