@@ -51,9 +51,7 @@ for gate_def in (
             angle::NTuple{$n_angle, Union{Real, FreeParameter, FreeParameterExpression}}
             $G(angle::T) where {T<:NTuple{$n_angle, Union{Real, FreeParameter, FreeParameterExpression}}} = new(angle)
         end
-        $G(angles::Vararg{Union{Float64, FreeParameter, FreeParameterExpression}}) = $G(tuple(angles...))
-        $G(angles::Vararg{Number}) = $G((Float64(a) for a in angles)...)
-
+        $G(angles::Vararg{Union{Float64, FreeParameter, FreeParameterExpression}, $n_angle}) = $G(tuple(angles...))
         chars(::Type{$G}) = $c
         ir_typ(::Type{$G}) = $IR_G
         qubit_count(::Type{$G}) = $qc
