@@ -1,4 +1,4 @@
-using Braket, Test, Mocking, Random, Dates, Tar, JSON3
+using Braket, Pickle, Base64, Test, Mocking, Random, Dates, Tar, JSON3
 Mocking.activate()
 
 Base.parse(d::Dict) = d
@@ -6,14 +6,25 @@ Base.parse(d::Dict) = d
 dev_arn = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 
 @testset "Jobs" begin
-    @testset "deserialization errors" begin
-        @test_throws ArgumentError Braket.deserialize_values(Dict{String, Any}(), Braket.pickled_v4)
+    @testset "serialization pickled_v4" begin
+        data_dictionary = Dict{String, Any}("key1" => "value1", "key2" => "value2")
+        data_format = Braket.pickled_v4
+        result = Braket.serialize_values(data_dictionary, data_format)
+        @test result == Dict{String, Any}("key1" => base64encode(Pickle.stores("value1")), "key2" => base64encode(Pickle.stores("value2")))
+    end
+    @testset "deserialization pickled_v4" begin
+        data_dictionary = Dict{String, Any}("key1" => base64encode(Pickle.stores("value1")), "key2" => base64encode(Pickle.stores("value2")))
+        data_format = Braket.pickled_v4
+        result = Braket.deserialize_values(data_dictionary, data_format)
+        @test result == Dict{String, Any}("key1" => "value1", "key2" => "value2")
+    end
+    @testset "deserialization" begin
+        @test Dict{Any,Any}() == Braket.deserialize_values(Dict{String,Any}(), Braket.pickled_v4)
         mktempdir() do d
             job = Braket.AwsQuantumJob("arn:fake")
             @test Braket._read_and_deserialize_results(job, d) == []
             pjd = Braket.PersistedJobData(Braket.header_dict[Braket.PersistedJobData], Dict{String, Any}(), Braket.pickled_v4)
             write(joinpath(d, Braket.RESULTS_FILENAME), JSON3.write(pjd))
-            @test_throws ArgumentError Braket._read_and_deserialize_results(job, d)
         end
     end
     @testset "logs" begin
