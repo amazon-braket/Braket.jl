@@ -163,7 +163,7 @@ n_controls(g::Unitary)  = 0
 
 ir_str(g::Unitary) = "#pragma braket unitary(" * format_matrix(g.matrix) * ")"
 function ir(g::Unitary, target::QubitSet, ::Val{:JAQCD}; kwargs...)
-    mat = complex_matrix_to_ir(g.matrix) 
+    mat = complex_matrix_to_ir(g.matrix)
     return IR.Unitary(collect(target), mat, "unitary")
 end
 
@@ -174,8 +174,8 @@ end
 Global phase gate.
 """
 struct GPhase <: Gate
-    angle::NTuple{1, Union{Real, FreeParameter}}
-    GPhase(angle::T) where {T<:NTuple{1, Union{Real, FreeParameter}}} = new(angle)
+    angle::NTuple{1, Union{Real, FreeParameter, FreeParameterExpression}}
+    GPhase(angle::T) where {T<:NTuple{1, Union{Real, FreeParameter, FreeParameterExpression}}} = new(angle)
 end
 Base.:(==)(g1::GPhase, g2::GPhase) = g1.angle == g2.angle
 qubit_count(g::GPhase) = 0
@@ -190,14 +190,20 @@ StructTypes.StructType(::Type{<:Gate}) = StructTypes.Struct()
 
 Parametrizable(g::AngledGate) = Parametrized()
 Parametrizable(g::Gate)       = NonParametrized()
-parameters(g::AngledGate)     = collect(filter(a->a isa FreeParameter, angles(g)))
-parameters(g::Gate)           = FreeParameter[] 
+parameters(g::AngledGate)     = mapreduce(union!, angles(g), init=Set{FreeParameter}()) do a
+    a isa FreeParameter && return Set((a,))
+    a isa FreeParameterExpression && return Set(FreeParameter(var.name) for var in Symbolics.get_variables(a.expression))
+    return Set{FreeParameter}()
+end
+parameters(g::Gate)           = Set{FreeParameter}()
 bind_value!(g::G, params::Dict{Symbol, <:Number}) where {G<:Gate} = bind_value!(Parametrizable(g), g, params)
 bind_value!(::NonParametrized, g::G, params::Dict{Symbol, <:Number}) where {G<:Gate} = g
 function bind_value!(::Parametrized, g::G, params::Dict{Symbol, <:Number}) where {G<:AngledGate}
     new_angles = map(angles(g)) do angle
-        angle isa FreeParameter || return angle
-        return get(params, angle.name, angle)
+        angle isa Union{FreeParameter, FreeParameterExpression} || return angle
+        angle isa FreeParameter && return get(params, angle.name, angle)
+        # angle is a FreeParameterExpression
+        return subs(angle, params)
     end
     return G(new_angles...)
 end

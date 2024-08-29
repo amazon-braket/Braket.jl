@@ -76,6 +76,28 @@ using Braket, Test
         circ = Ry(circ, 0, gate)
         circ = Probability(circ)
         non_para_circ = Circuit() |> (ci->H(ci, 0)) |> (ci->Rx(ci, 1, π/2)) |> (ci->Ry(ci, 0, π)) |> Probability
-        @test_broken circ == non_para_circ
+        @test circ(π) == non_para_circ
+    end
+    @testset "Writing to OpenQASM" begin
+        α = FreeParameter(:α)
+        θ = FreeParameter(:θ)
+        gate = FreeParameterExpression("α + 2*θ")
+        circ = Circuit()
+        circ = H(circ, 0)
+        circ = Rx(circ, 1, gate)
+        circ = Ry(circ, 0, θ)
+        circ = Probability(circ)
+        @test circ.parameters == Set([α, θ])
+        reference_source = """
+        OPENQASM 3.0;
+        input float α;
+        input float θ;
+        qubit[2] q;
+        h q[0];
+        rx(α + 2θ) q[1];
+        ry(θ) q[0];
+        #pragma braket result probability all
+        """
+        @test ir(circ, Val(:OpenQASM)).source == reference_source 
     end
 end

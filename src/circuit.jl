@@ -387,7 +387,9 @@ function ir(c::Circuit, ::Val{:OpenQASM}; serialization_properties::Serializatio
     elseif isempty(c.measure_targets) # measure all qubits if not explicitly specified
         rts = ["b[$(idx-1)] = measure $(format(Int(qubit), serialization_properties));" for (idx, qubit) in enumerate(qubits(c))]
     end
-    return OpenQasmProgram(header_dict[OpenQasmProgram], join(vcat(header, ixs, rts), "\n"), nothing)
+    source = join(vcat(header, ixs, rts), "\n")
+    !endswith(source, "\n") && (source *= "\n")
+    return OpenQasmProgram(header_dict[OpenQasmProgram], source, nothing)
 end
 ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = convert(Program, c)
 ir(p::Program, ::Val{:JAQCD}; kwargs...) = p

@@ -207,8 +207,12 @@ function subs(fpe::FreeParameterExpression, parameter_values::Dict{Symbol, <:Num
     param_values_num = Dict(Symbolics.variable(string(k); T=Real) => v for (k, v) in parameter_values)
     subbed_expr = Symbolics.substitute(fpe.expression, param_values_num)
     if isempty(Symbolics.get_variables(subbed_expr))
-	   subbed_expr = Symbolics.value(subbed_expr)
-        return subbed_expr
+	    subbed_expr = Symbolics.value(subbed_expr)
+        if Symbolics.symtype(subbed_expr) <: Irrational
+            return Symbolics.symtype(subbed_expr)()
+        else
+            return subbed_expr
+        end
     else
         subbed_expr = Symbolics.value(subbed_expr)
         return FreeParameterExpression(subbed_expr)
@@ -245,7 +249,7 @@ Base.:^(fpe1::Union{Number, Symbolics.Num}, fpe2::FreeParameterExpression) = fpe
 
 Base.:(==)(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = isequal(fpe1.expression, fpe2.expression)
 Base.:(==)(fpe::FreeParameterExpression, sym_num::Symbolics.Num) = isequal(fpe.expression, sym_num)
-Base.:(==)(num::Symbolics.Num, fpe::FreeParameterExpression) = (fpe == num)
+Base.:(==)(num::Union{Symbolics.Num, Number}, fpe::FreeParameterExpression) = (fpe == num)
 Base.:!=(fpe1::FreeParameterExpression, fpe2::FreeParameterExpression) = !(isequal(fpe1, fpe2))
 
 include("compiler_directive.jl")

@@ -800,12 +800,12 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
     @testset "full Circuits to OpenQASM" begin
         @testset for ir_bolus in [
             (Rx(Rx(Circuit(), 0, 0.15), 1, 0.3), OpenQASMSerializationProperties(VIRTUAL),
-            OpenQasmProgram(join( [ "OPENQASM 3.0;", "bit[2] b;", "qubit[2] q;", "rx(0.15) q[0];", "rx(0.3) q[1];", "b[0] = measure q[0];", "b[1] = measure q[1];", ], "\n"))),
-            (Rx(Rx(Circuit(), 0, 0.15), 4, 0.3), OpenQASMSerializationProperties(PHYSICAL), OpenQasmProgram(join([ "OPENQASM 3.0;", "bit[2] b;", "rx(0.15) \$0;", "rx(0.3) \$4;", "b[0] = measure \$0;", "b[1] = measure \$4;"], "\n"))),
+            OpenQasmProgram(join( [ "OPENQASM 3.0;", "bit[2] b;", "qubit[2] q;", "rx(0.15) q[0];", "rx(0.3) q[1];", "b[0] = measure q[0];", "b[1] = measure q[1];\n" ], "\n"))),
+            (Rx(Rx(Circuit(), 0, 0.15), 4, 0.3), OpenQASMSerializationProperties(PHYSICAL), OpenQasmProgram(join([ "OPENQASM 3.0;", "bit[2] b;", "rx(0.15) \$0;", "rx(0.3) \$4;", "b[0] = measure \$0;", "b[1] = measure \$4;\n"], "\n"))),
             (Expectation(Braket.add_verbatim_box!(Rx(Circuit(), 0, 0.15), Rx(Circuit(), 4, 0.3)), Braket.Observables.I()), OpenQASMSerializationProperties(PHYSICAL),
-            OpenQasmProgram(join(["OPENQASM 3.0;", "rx(0.15) \$0;", "#pragma braket verbatim", "box{", "rx(0.3) \$4;", "}", "#pragma braket result expectation i all"], "\n"))),
+            OpenQasmProgram(join(["OPENQASM 3.0;", "rx(0.15) \$0;", "#pragma braket verbatim", "box{", "rx(0.3) \$4;", "}", "#pragma braket result expectation i all\n"], "\n"))),
             (Expectation(BitFlip(Rx(Rx(Circuit(), 0, 0.15), 4, 0.3), 3, 0.2), Braket.Observables.I(), 0), nothing,
-            OpenQasmProgram(join(["OPENQASM 3.0;", "qubit[5] q;", "rx(0.15) q[0];", "rx(0.3) q[4];", "#pragma braket noise bit_flip(0.2) q[3]", "#pragma braket result expectation i(q[0])"], "\n")))
+            OpenQasmProgram(join(["OPENQASM 3.0;", "qubit[5] q;", "rx(0.15) q[0];", "rx(0.3) q[4];", "#pragma braket noise bit_flip(0.2) q[3]", "#pragma braket result expectation i(q[0])\n"], "\n")))
         ]
             c, sps, expected_ir = ir_bolus
             if !isnothing(sps)
@@ -820,7 +820,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             b = FreeParameter("b")
             c = Circuit([(H, [0, 1, 2]), (Rx, 0, a), (Ry, 1, b)])
             props = OpenQASMSerializationProperties(PHYSICAL)
-            expected_ir = OpenQasmProgram(join([ "OPENQASM 3.0;", "input float a;", "input float b;", "bit[3] b;", "h \$0;", "h \$1;", "h \$2;", "rx(a) \$0;", "ry(b) \$1;", "b[0] = measure \$0;", "b[1] = measure \$1;", "b[2] = measure \$2;"], "\n"))
+            expected_ir = OpenQasmProgram(join([ "OPENQASM 3.0;", "input float a;", "input float b;", "bit[3] b;", "h \$0;", "h \$1;", "h \$2;", "rx(a) \$0;", "ry(b) \$1;", "b[0] = measure \$0;", "b[1] = measure \$1;", "b[2] = measure \$2;\n"], "\n"))
             generated_ir = ir(c, Val(:OpenQASM), serialization_properties=props)
             @test generated_ir == expected_ir
         end
