@@ -34,7 +34,7 @@ MOCK_GATE_MODEL_QPU_CAPABILITIES_1 = """{
 }"""
 
 MOCK_GATE_MODEL_QPU_1() = """{
-    "deviceName": "Ankaa-2",
+    "deviceName": "Aspen-10",
     "deviceType": "QPU",
     "providerName": "provider1",
     "deviceStatus": "OFFLINE",
