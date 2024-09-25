@@ -11,7 +11,7 @@ mock_result(c) = Braket.GateModelTaskResult(
             Braket.AdditionalMetadata(Braket.Program(c), nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
         )
 
-RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-M-3"
+RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Ankaa-2"
 IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
 SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
 IQM_ARN = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"

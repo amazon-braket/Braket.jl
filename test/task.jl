@@ -113,7 +113,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     oq3_program() = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], bell_qasm, nothing)
     bell_circ()   = (c = Circuit(); c=H(c, 0); c=CNot(c, 0, 1); return c)
     bell_prog()   = Braket.Program(bell_circ())
-    RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Aspen-M-3"
+    RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Ankaa-2"
     IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
     SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
     IQM_ARN = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
