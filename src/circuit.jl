@@ -374,7 +374,7 @@ julia> circ.instructions
  Braket.Instruction{Reset}(Reset(), QubitSet(0))
 ```
 """
-Base.reset(c::Circuit, target_qubits) = foreach(t->add_instruction!(c, Instruction(Reset(), t)), target_qubits)
+Base.reset(c::Circuit, target_qubits) = (foreach(t->add_instruction!(c, Instruction(Reset(), t)), target_qubits); return c)
 
 """
     delay(c::Circuit, duration::Dates.Period, target_qubits) -> Circuit
@@ -395,7 +395,7 @@ julia> circ.instructions
  Braket.Instruction{Delay}(Delay(Nanosecond(10)), QubitSet(0, 1))
 ```
 """
-delay(c::Circuit, duration::Dates.Period, target_qubits) = add_instruction!(c, Instruction(Delay(duration), target_qubits))
+delay(c::Circuit, duration::Dates.Period, target_qubits) = (add_instruction!(c, Instruction(Delay(duration), target_qubits)); return c)
 # TODO enforce this in `Moments` as well
 
 """
@@ -417,7 +417,7 @@ julia> circ.instructions
  Braket.Instruction{Barrier}(Barrier(), QubitSet(0, 1))
 ```
 """
-barrier(c::Circuit, target_qubits) = add_instruction!(c, Instruction(Barrier(), target_qubits))
+barrier(c::Circuit, target_qubits) = (add_instruction!(c, Instruction(Barrier(), target_qubits)); return c)
 
 function openqasm_header(c::Circuit, sps::SerializationProperties=OpenQASMSerializationProperties())
     ir_instructions = ["OPENQASM 3.0;"]
