@@ -46,7 +46,7 @@ measure
 Measure
 barrier
 Barrier
-Braket.reset
+reset(::Circuit, ::Any)
 Reset
 delay
 Delay
