@@ -83,3 +83,52 @@ function ir(m::Measure, target::QubitSet, ::Val{:OpenQASM}; serialization_proper
     end
     return join(instructions, "\n")
 end
+
+"""
+    Reset() <: QuantumOperator
+
+Represents an active reset operation on targeted qubit.
+"""
+struct Reset <: QuantumOperator end
+Parametrizable(m::Reset) = NonParametrized()
+chars(::Type{Reset}) = ("Reset",)
+chars(r::Reset) = ("Reset",)
+label(::Reset) = "reset"
+qubit_count(::Type{Reset}) = 1
+qubit_count(r::Reset) = qubit_count(Reset)
+
+"""
+    Barrier() <: QuantumOperator
+
+Represents a barrier operation on targeted qubit.
+"""
+struct Barrier <: QuantumOperator end
+Parametrizable(b::Barrier) = NonParametrized()
+chars(::Type{Barrier}) = ("Barrier",)
+chars(r::Barrier) = ("Barrier",)
+label(::Barrier) = "barrier"
+qubit_count(::Type{Barrier}) = 1
+qubit_count(b::Barrier) = qubit_count(Barrier)
+
+"""
+    Delay(duration::Period) <: QuantumOperator
+
+Represents a delay operation for `duration` on targeted qubit.
+"""
+struct Delay <: QuantumOperator
+    duration::Dates.Period
+end
+Parametrizable(m::Delay) = NonParametrized()
+chars(d::Delay) = ("Delay($(label(d.duration)))",)
+label(d::Delay) = "delay[$(label(d.duration))]"
+qubit_count(::Type{Delay}) = 1
+qubit_count(d::Delay) = qubit_count(Delay)
+Base.:(==)(d1::Delay, d2::Delay) = d1.duration == d2.duration
+label(d::Microsecond) = "$(d.value)ms"
+label(d::Nanosecond)  = "$(d.value)ns"
+label(d::Second)      = "$(d.value)s"
+
+ir(ix::Union{Reset, Barrier, Delay}, target::QubitSet, ::Val{:JAQCD}; kwargs...) = error("$(label(ix)) instructions are not supported with JAQCD.") 
+function ir(ix::Union{Reset, Barrier, Delay}, target::QubitSet, v::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties())
+    return join(("$(label(ix)) $(format_qubits(qubit, serialization_properties));" for qubit in target), "\n")
+end

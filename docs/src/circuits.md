@@ -44,6 +44,12 @@ qubits
 qubit_count
 measure
 Measure
+barrier
+Barrier
+Braket.reset
+Reset
+delay
+Delay
 ```
 
 ## Output to IR

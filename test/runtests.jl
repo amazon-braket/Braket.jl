@@ -51,6 +51,7 @@ for group in groups
             include("device.jl")
             include("circuits.jl")
             include("measure.jl")
+            include("circuit_timing.jl")
             include("free_parameter.jl")
             include("gates.jl")
             include("observables.jl")

@@ -354,6 +354,71 @@ function measure(c::Circuit, target_qubits)
     return _add_measure!(c, target_qubits)
 end
 
+"""
+    reset(c::Circuit, target_qubits) -> Circuit
+
+Add a [`Reset`](@ref) operator to `c`, performing an active reset to the `|0>` state on the targeted qubits.
+A `Reset` operation can be applied after a [`Measure`](@ref) to re-initialize the qubit and allow it to be reused
+after mid-circuit measurement.
+
+# Examples
+```jldoctest
+julia> circ = Circuit([(H, 0), (CNot, 0, 1)]);
+
+julia> circ = reset(circ, 0);
+
+julia> circ.instructions
+3-element Vector{Braket.Instruction}:
+ Braket.Instruction{H}(H(), QubitSet(0))
+ Braket.Instruction{CNot}(CNot(), QubitSet(0, 1))
+ Braket.Instruction{Reset}(Reset(), QubitSet(0))
+```
+"""
+Base.reset(c::Circuit, target_qubits) = foreach(t->add_instruction!(c, Instruction(Reset(), t)), target_qubits)
+
+"""
+    delay(c::Circuit, duration::Dates.Period, target_qubits) -> Circuit
+
+Add a [`Delay`](@ref) operator to `c`, which forces all targeted qubits to wait for `duration`
+before any new operations may be applied to any of them.
+
+# Examples
+```jldoctest
+julia> circ = Circuit([(H, 0), (CNot, 0, 1)]);
+
+julia> circ = delay(circ, Nanosecond(10), [0, 1]);
+
+julia> circ.instructions
+3-element Vector{Braket.Instruction}:
+ Braket.Instruction{H}(H(), QubitSet(0))
+ Braket.Instruction{CNot}(CNot(), QubitSet(0, 1))
+ Braket.Instruction{Delay}(Delay(Nanosecond(10)), QubitSet(0, 1))
+```
+"""
+delay(c::Circuit, duration::Dates.Period, target_qubits) = add_instruction!(c, Instruction(Delay(duration), target_qubits))
+# TODO enforce this in `Moments` as well
+
+"""
+    barrier(c::Circuit, target_qubits) -> Circuit
+
+Add a [`Barrier`](@ref) operator to `c`, which forces all targeted qubits to reach the barrier before any new
+operations may be applied to any of them.
+
+# Examples
+```jldoctest
+julia> circ = Circuit([(H, 0), (CNot, 0, 1)]);
+
+julia> circ = barrier(circ, [0, 1]);
+
+julia> circ.instructions
+3-element Vector{Braket.Instruction}:
+ Braket.Instruction{H}(H(), QubitSet(0))
+ Braket.Instruction{CNot}(CNot(), QubitSet(0, 1))
+ Braket.Instruction{Barrier}(Barrier(), QubitSet(0, 1))
+```
+"""
+barrier(c::Circuit, target_qubits) = add_instruction!(c, Instruction(Barrier(), target_qubits))
+
 function openqasm_header(c::Circuit, sps::SerializationProperties=OpenQASMSerializationProperties())
     ir_instructions = ["OPENQASM 3.0;"]
     for p in sort(string.(c.parameters))
