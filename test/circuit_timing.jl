@@ -4,7 +4,13 @@ using Braket: Instruction, VIRTUAL, PHYSICAL, OpenQASMSerializationProperties
 @testset "Barrier, reset, and delay operators" begin
     @test Barrier() isa Braket.QuantumOperator
     @test Reset()   isa Braket.QuantumOperator
-    @test Delay(Microsecond(200))   isa Braket.QuantumOperator
+    @test Braket.Parametrizable(Reset()) == Braket.NonParametrized()
+    @test Braket.Parametrizable(Barrier()) == Braket.NonParametrized()
+    @test Braket.Parametrizable(Delay(Microsecond(200))) == Braket.NonParametrized()
+    @test qubit_count(Reset()) == 1
+    @test qubit_count(Barrier()) == 1
+    @test qubit_count(Delay(Microsecond(200))) == 1
+    @test Delay(Microsecond(200)) isa Braket.QuantumOperator
     @testset "Equality" for t in (Barrier, Reset) 
         t1 = t()
         t2 = t()
@@ -17,7 +23,7 @@ using Braket: Instruction, VIRTUAL, PHYSICAL, OpenQASMSerializationProperties
     @test Braket.chars(Barrier()) == ("Barrier",)
     @test Braket.chars(Reset())   == ("Reset",)
     @test Braket.chars(Delay(Nanosecond(4))) == ("Delay(4ns)",)
-
+    @test Braket.chars(Delay(Microsecond(4))) == ("Delay(4ms)",)
     @testset "To IR" for (t, str) in ((Barrier(), "barrier"),
                                       (Reset(), "reset"),
                                       (Delay(Second(1)), "delay[1s]"),

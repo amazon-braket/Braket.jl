@@ -3,6 +3,8 @@ using Braket: Instruction, VIRTUAL, PHYSICAL, OpenQASMSerializationProperties
 
 @testset "Measure operator" begin
     @test Measure() isa Braket.QuantumOperator
+    @test Braket.Parametrizable(Measure()) == Braket.NonParametrized()
+    @test qubit_count(Measure()) == 1
     @testset "Equality" begin
         measure1 = Measure()
         measure2 = Measure()

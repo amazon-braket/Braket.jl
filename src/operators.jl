@@ -30,9 +30,7 @@ struct PauliEigenvalues{N}
 end
 PauliEigenvalues(::Val{N}, coeff::Float64=1.0) where {N} = PauliEigenvalues{N}(coeff)
 Base.length(p::PauliEigenvalues{N}) where {N} = 2^N
-function Base.iterate(p::PauliEigenvalues{N}, ix::Int=1) where {N}
-    return ix <= length(p) ? (p[ix], ix+1) : nothing
-end
+Base.iterate(p::PauliEigenvalues{N}, ix::Int=1) where {N} = ix <= length(p) ? (p[ix], ix+1) : nothing
 
 Base.getindex(p::PauliEigenvalues{1}, i::Int)::Float64 = getindex((p.coeff, -p.coeff), i)
 function Base.getindex(p::PauliEigenvalues{N}, i::Int)::Float64 where N
@@ -71,8 +69,9 @@ end
 Measure() = Measure(-1)
 Parametrizable(m::Measure) = NonParametrized()
 chars(::Type{Measure}) = ("M",)
-chars(m::Measure) = ("M",)
+chars(::Measure) = chars(Measure)
 qubit_count(::Type{Measure}) = 1
+qubit_count(::Measure) = qubit_count(Measure)
 ir(m::Measure, target::QubitSet, ::Val{:JAQCD}; kwargs...) = error("measure instructions are not supported with JAQCD.") 
 function ir(m::Measure, target::QubitSet, ::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties())
     instructions = Vector{String}(undef, length(target))
@@ -92,7 +91,7 @@ Represents an active reset operation on targeted qubit.
 struct Reset <: QuantumOperator end
 Parametrizable(m::Reset) = NonParametrized()
 chars(::Type{Reset}) = ("Reset",)
-chars(r::Reset) = ("Reset",)
+chars(::Reset) = chars(Reset)
 label(::Reset) = "reset"
 qubit_count(::Type{Reset}) = 1
 qubit_count(r::Reset) = qubit_count(Reset)
@@ -105,7 +104,7 @@ Represents a barrier operation on targeted qubit.
 struct Barrier <: QuantumOperator end
 Parametrizable(b::Barrier) = NonParametrized()
 chars(::Type{Barrier}) = ("Barrier",)
-chars(r::Barrier) = ("Barrier",)
+chars(r::Barrier) = chars(Barrier)
 label(::Barrier) = "barrier"
 qubit_count(::Type{Barrier}) = 1
 qubit_count(b::Barrier) = qubit_count(Barrier)
