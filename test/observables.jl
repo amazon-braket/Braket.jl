@@ -6,8 +6,12 @@ using LinearAlgebra: eigvals
     Braket.IRType[] = :JAQCD
     @testset "pauli eigenvalues" begin
         z = [1.0 0.0; 0.0 -1.0]
+        @test PauliEigenvalues(Val(1))[1] == 1.0
+        @test PauliEigenvalues(Val(1))[2] == -1.0
+        @test collect(PauliEigenvalues(Val(1))) == [1.0, -1.0]
         for n in 2:6
             pe  = PauliEigenvalues(Val(n))
+            @test length(pe) == 2^n
             mat = kron(ntuple(i->diag(z), n)...)
             for ix in 1:2^n
                 @test pe[ix] == mat[ix]

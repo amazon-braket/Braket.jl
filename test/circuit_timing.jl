@@ -9,6 +9,15 @@ using Braket: Instruction, VIRTUAL, PHYSICAL, OpenQASMSerializationProperties
     @test Braket.Parametrizable(Delay(Microsecond(200))) == Braket.NonParametrized()
     @test qubit_count(Reset()) == 1
     @test qubit_count(Barrier()) == 1
+    circ = Circuit([(H, 0), (CNot, 0, 1)])
+    circ = barrier(circ, 0)
+    @test circ.instructions == [Instruction{H}(H(), QubitSet(0)), Instruction{CNot}(CNot(), QubitSet(0, 1)), Instruction{Barrier}(Barrier(), QubitSet(0))]
+    circ = Circuit([(H, 0), (CNot, 0, 1)])
+    circ = reset(circ, 0)
+    @test circ.instructions == [Instruction{H}(H(), QubitSet(0)), Instruction{CNot}(CNot(), QubitSet(0, 1)), Instruction{Reset}(Reset(), QubitSet(0))]
+    circ = Circuit([(H, 0), (CNot, 0, 1)])
+    circ = delay(circ, Nanosecond(10), 0)
+    @test circ.instructions == [Instruction{H}(H(), QubitSet(0)), Instruction{CNot}(CNot(), QubitSet(0, 1)), Instruction{Delay}(Delay(Nanosecond(10)), QubitSet(0))]
     @test qubit_count(Delay(Microsecond(200))) == 1
     @test Delay(Microsecond(200)) isa Braket.QuantumOperator
     @testset "Equality" for t in (Barrier, Reset) 

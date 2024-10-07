@@ -13,6 +13,9 @@ using Braket: Instruction, VIRTUAL, PHYSICAL, OpenQASMSerializationProperties
         @test measure1 != non_measure
     end
     @test Braket.chars(Measure()) == ("M",)
+    circ = Circuit([(H, 0), (CNot, 0, 1)])
+    circ = measure(circ, 0)
+    @test circ.instructions == [Instruction{H}(H(), QubitSet(0)), Instruction{CNot}(CNot(), QubitSet(0, 1)), Instruction{Measure}(Measure(0), QubitSet(0))]
 
     @testset "To IR" begin
         @testset "Invalid ir_type $ir_type" for (ir_type, message) in ((:JAQCD, "measure instructions are not supported with JAQCD."),
