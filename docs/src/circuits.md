@@ -44,6 +44,12 @@ qubits
 qubit_count
 measure
 Measure
+barrier
+Barrier
+reset(::Circuit, ::Any)
+Reset
+delay
+Delay
 ```
 
 ## Output to IR

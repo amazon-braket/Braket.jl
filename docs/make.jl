@@ -1,6 +1,6 @@
 push!(LOAD_PATH,"../src/")
 
-using Documenter, Braket 
+using Documenter, Braket, Braket.Dates
 
 makedocs(sitename="Braket.jl")
 

@@ -170,5 +170,5 @@ jobs:
         run: |
           using Documenter: DocMeta, doctest
           using Braket
-          DocMeta.setdocmeta!(Braket, :DocTestSetup, :(using Braket); recursive=true)
+          DocMeta.setdocmeta!(Braket, :DocTestSetup, :(using Braket, Braket.Dates); recursive=true)
           doctest(Braket)
