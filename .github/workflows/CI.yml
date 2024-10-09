@@ -33,9 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
-          version: 1.10
+          version: '1.10'
           arch: ${{ matrix.arch }}
       - uses: julia-actions/julia-buildpkg@latest
       - run: |
@@ -74,7 +74,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -115,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -150,7 +150,7 @@ jobs:
       statuses: write
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
       - uses: julia-actions/cache@v1
