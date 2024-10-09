@@ -33,9 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
-          version: 1.9
+          version: '1.10'
           arch: ${{ matrix.arch }}
       - uses: julia-actions/julia-buildpkg@latest
       - run: |
@@ -69,12 +69,12 @@ jobs:
         group:
           - Braket-unit
           - PyBraket-unit
-        version: ['1.6', '1.7', '1.8', '1.9', '1.10', 'nightly']
+        version: ['1.10', '1.11', 'nightly']
         arch: ['x64']
     steps:
       - uses: actions/checkout@v1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -110,12 +110,12 @@ jobs:
       matrix:
         group:
           - Examples-unit
-        version: ['1.9']
+        version: ['1.10']
         arch: ['x64']
     steps:
       - uses: actions/checkout@v1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -150,7 +150,7 @@ jobs:
       statuses: write
     steps:
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
       - uses: julia-actions/cache@v1
