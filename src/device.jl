@@ -53,10 +53,11 @@ end
 struct _Borealis <: _XanaduDevice end
 Base.convert(::String, d::_Borealis) = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
 
-for (d, d_arn) in zip((:Harmony, :Aria1, :Aria2),
+for (d, d_arn) in zip((:_Harmony, :Aria1, :Aria2, :Forte1),
                       ("arn:aws:braket:us-east-1::device/qpu/ionq/Harmony",
                        "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1",
                        "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-2",
+                       "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1",
                       ))
     @eval begin
         struct $d <: IonQDevice end
