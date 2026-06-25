@@ -172,7 +172,6 @@ function _get_simulator_task_cost(arn::String, details::Dict{String})
     else
         product_family = "Simulator Task"
         operation = "CompleteTask"
-        details["status"] == "FAILED" && device_name == "TN1" && (operation = "FailedTask")
     end
     search_dict = Dict(Symbol("Region Code")=>task_region, :Version=>device_name, Symbol("Product Family")=>product_family, :operation=>operation)
     duration_prices = price_search(; namedtuple(search_dict)...)

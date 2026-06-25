@@ -23,14 +23,14 @@ julia> arn(d)
 ```
 """
 abstract type BraketDevice end
-for provider in (:AmazonDevice, :_XanaduDevice, :_DWaveDevice, :_OQCDevice, :IQMDevice, :QuEraDevice, :IonQDevice, :RigettiDevice)
+for provider in (:AmazonDevice, :_XanaduDevice, :_DWaveDevice, :_OQCDevice, :IQMDevice, :QuEraDevice, :IonQDevice, :RigettiDevice, :AQTDevice)
     @eval begin
         abstract type $provider <: BraketDevice end
     end
 end
 arn(d::BraketDevice) = convert(String, d)
 
-for (d, d_arn) in zip((:SV1, :DM1, :TN1), ("sv1", "dm1", "tn1"))
+for (d, d_arn) in zip((:SV1, :DM1, :_TN1), ("sv1", "dm1", "tn1"))
     @eval begin
         struct $d <: AmazonDevice end
         Base.convert(::Type{String}, d::$d) = "arn:aws:braket:::device/quantum-simulator/amazon/" * $d_arn
@@ -53,11 +53,12 @@ end
 struct _Borealis <: _XanaduDevice end
 Base.convert(::String, d::_Borealis) = "arn:aws:braket:us-east-1::device/qpu/xanadu/Borealis"
 
-for (d, d_arn) in zip((:_Harmony, :Aria1, :Aria2, :Forte1),
+for (d, d_arn) in zip((:_Harmony, :_Aria1, :_Aria2, :Forte1, :ForteEnterprise1),
                       ("arn:aws:braket:us-east-1::device/qpu/ionq/Harmony",
                        "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1",
                        "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-2",
                        "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1",
+                       "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-Enterprise-1",
                       ))
     @eval begin
         struct $d <: IonQDevice end
@@ -71,10 +72,20 @@ Base.convert(::Type{String}, d::Aquila) = "arn:aws:braket:us-east-1::device/qpu/
 struct _Lucy <: _OQCDevice end
 Base.convert(::Type{String}, d::_Lucy) = "arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy"
 
-struct Garnet <: IQMDevice end
-Base.convert(::Type{String}, d::Garnet) = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
+for (d, d_arn) in zip((:Garnet, :Emerald),
+                      ("arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet",
+                       "arn:aws:braket:eu-north-1::device/qpu/iqm/Emerald",
+                      ))
+    @eval begin
+        struct $d <: IQMDevice end
+        Base.convert(::Type{String}, d::$d) = $d_arn
+    end
+end
 
-for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_AspenM2, :_AspenM3, :Ankaa2),
+struct IbexQ1 <: AQTDevice end
+Base.convert(::Type{String}, d::IbexQ1) = "arn:aws:braket:eu-north-1::device/qpu/aqt/Ibex-Q1"
+
+for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_AspenM2, :_AspenM3, :_Ankaa2, :_Ankaa3, :Cepheus1108Q),
                       ("arn:aws:braket:::device/qpu/rigetti/Aspen-8",
                        "arn:aws:braket:::device/qpu/rigetti/Aspen-9",
                        "arn:aws:braket:::device/qpu/rigetti/Aspen-10",
@@ -83,6 +94,8 @@ for (d, d_arn) in zip((:_Aspen8, :_Aspen9, :_Aspen10, :_Aspen11, :_AspenM1, :_As
                        "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-2",
                        "arn:aws:braket:us-west-1::device/qpu/rigetti/Aspen-M-3",
                        "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-2",
+                       "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3",
+                       "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q",
                       ))
     @eval begin
         struct $d <: RigettiDevice end

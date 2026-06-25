@@ -59,7 +59,7 @@ c = H(c, 0)
 c = CNot(c, 0, 1)
 c = Expectation(c, Observables.X()) # measure X on all qubits
 
-dev = AwsDevice("arn:aws:braket:us-east-1::device/qpu/ionq/Harmony")
+dev = AwsDevice("arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1")
 res = result(dev(c, shots=10))
 ```
 

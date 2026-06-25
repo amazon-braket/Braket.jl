@@ -7,7 +7,7 @@ using AWS: @service, AWSConfig, global_aws_config
         circuit = Circuit([(H, 0)])
         t = Braket.Tracker()
         n_available = 0
-        for arn = ("arn:aws:braket:eu-west-2::device/qpu/oqc/Lucy", "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet", "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-2", "arn:aws:braket:us-east-1::device/qpu/ionq/Harmony")
+        for arn = ("arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet", "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q", "arn:aws:braket:us-east-1::device/qpu/ionq/Forte-1")
             d = AwsDevice(arn)
             if Braket.isavailable(d)
                 d(circuit, shots=10)
