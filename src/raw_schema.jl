@@ -818,11 +818,12 @@ end
 StructTypes.StructType(::Type{CoherenceTime}) = StructTypes.UnorderedStruct()
 
 struct OneQubitProperties
-    T1::CoherenceTime
-    T2::CoherenceTime
+    T1::Union{Nothing, CoherenceTime}
+    T2::Union{Nothing, CoherenceTime}
     oneQubitFidelity::Vector{Fidelity1Q}
 end
 StructTypes.StructType(::Type{OneQubitProperties}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{OneQubitProperties}) = Dict{Symbol, Any}(:T1 => nothing, :T2 => nothing)
 
 abstract type ErrorMitigationScheme end
 StructTypes.StructType(::Type{ErrorMitigationScheme}) = StructTypes.AbstractType()
@@ -1023,6 +1024,16 @@ end
 StructTypes.StructType(::Type{OpenQASMDeviceActionProperties}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{OpenQASMDeviceActionProperties}) = Dict{Symbol, Any}(:supportedModifiers => Any[], :supportsUnassignedMeasurements => true, :requiresAllQubitsMeasurement => false, :supportedPragmas => Any[], :supportPhysicalQubits => false, :supportsPartialVerbatimBox => true, :forbiddenPragmas => Any[], :requiresContiguousQubitIndices => false, :disabledQubitRewiringSupported => false, :forbiddenArrayOperations => Any[])
 
+struct OpenQASMProgramSetDeviceActionProperties <: DeviceActionProperties
+    version::Vector{String}
+    actionType::String
+    maximumExecutables::Int
+    maximumTotalShots::Int
+    minimumTotalShots::Union{Nothing, Int}
+end
+StructTypes.StructType(::Type{OpenQASMProgramSetDeviceActionProperties}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{OpenQASMProgramSetDeviceActionProperties}) = Dict{Symbol, Any}(:minimumTotalShots => nothing)
+
 struct ContinuousVariableQpuParadigmProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
     modes::Dict{String, Float64}
@@ -1041,6 +1052,7 @@ struct DeviceServiceProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
     executionWindows::Vector{DeviceExecutionWindow}
     shotsRange::Tuple{Int, Int}
+    reservationShotsRange::Union{Nothing, Tuple{Int, Int}}
     deviceCost::Union{Nothing, DeviceCost}
     deviceDocumentation::Union{Nothing, DeviceDocumentation}
     deviceLocation::Union{Nothing, String}
@@ -1048,7 +1060,7 @@ struct DeviceServiceProperties <: BraketSchemaBase
     getTaskPollIntervalMillis::Union{Nothing, Int}
 end
 StructTypes.StructType(::Type{DeviceServiceProperties}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{DeviceServiceProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.device_service_properties", "1"))
+StructTypes.defaults(::Type{DeviceServiceProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.device_service_properties", "1"), :reservationShotsRange => nothing)
 
 struct GateModelParameters <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -1057,6 +1069,13 @@ struct GateModelParameters <: BraketSchemaBase
 end
 StructTypes.StructType(::Type{GateModelParameters}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{GateModelParameters}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.gate_model_parameters", "1"), :disableQubitRewiring => false)
+
+struct GateModelDeviceParameters <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    paradigmParameters::GateModelParameters
+end
+StructTypes.StructType(::Type{GateModelDeviceParameters}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{GateModelDeviceParameters}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.common.gate_model_device_parameters", "1"))
 
 struct GateModelQpuParadigmProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -1077,11 +1096,11 @@ StructTypes.defaults(::Type{OpenQasmProgram}) = Dict{Symbol, Any}(:braketSchemaH
 
 struct StandardizedGateModelQpuDeviceProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
-    oneQubitProperties::Dict{String, OneQubitProperties}
-    twoQubitProperties::Dict{String, TwoQubitProperties}
+    oneQubitProperties::Union{Nothing, Dict{String, OneQubitProperties}}
+    twoQubitProperties::Union{Nothing, Dict{String, TwoQubitProperties}}
 end
 StructTypes.StructType(::Type{StandardizedGateModelQpuDeviceProperties}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{StandardizedGateModelQpuDeviceProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.standardized_gate_model_qpu_device_properties", "1"))
+StructTypes.defaults(::Type{StandardizedGateModelQpuDeviceProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.standardized_gate_model_qpu_device_properties", "1"), :oneQubitProperties => nothing, :twoQubitProperties => nothing)
 
 struct DwaveProviderLevelParameters <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -1220,14 +1239,60 @@ StructTypes.defaults(::Type{IonqProviderProperties}) = Dict{Symbol, Any}(:braket
 
 struct IonqDeviceCapabilities <: BraketSchemaBase
     service::DeviceServiceProperties
-    action::Dict{Union{DeviceActionType, String}, OpenQASMDeviceActionProperties}
+    action::Dict{Union{DeviceActionType, String}, Union{OpenQASMDeviceActionProperties, OpenQASMProgramSetDeviceActionProperties}}
     deviceParameters::Dict
     braketSchemaHeader::braketSchemaHeader
     paradigm::GateModelQpuParadigmProperties
     provider::Union{Nothing, IonqProviderProperties}
+    standardized::Union{Nothing, StandardizedGateModelQpuDeviceProperties}
 end
 StructTypes.StructType(::Type{IonqDeviceCapabilities}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{IonqDeviceCapabilities}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.ionq.ionq_device_capabilities", "1"))
+StructTypes.defaults(::Type{IonqDeviceCapabilities}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.ionq.ionq_device_capabilities", "1"), :standardized => nothing)
+
+# AQT device schemas
+struct GateFidelity
+    value::Float64
+    uncertainty::Float64
+end
+StructTypes.StructType(::Type{GateFidelity}) = StructTypes.UnorderedStruct()
+
+struct PositiveFloatValueWithUncertainty
+    value::Float64
+    uncertainty::Float64
+end
+StructTypes.StructType(::Type{PositiveFloatValueWithUncertainty}) = StructTypes.UnorderedStruct()
+
+struct Characterisation
+    single_qubit_gate_fidelity::Dict{String, GateFidelity}
+    mean_two_qubit_gate_fidelity::GateFidelity
+    spam_fidelity_lower_bound::Float64
+    t2_coherence_time_s::PositiveFloatValueWithUncertainty
+    t1_s::PositiveFloatValueWithUncertainty
+    readout_time_micros::Float64
+    single_qubit_gate_duration_micros::Float64
+    two_qubit_gate_duration_micros::Float64
+    updated_at::String
+end
+StructTypes.StructType(::Type{Characterisation}) = StructTypes.UnorderedStruct()
+
+struct AqtProviderProperties <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    properties::Characterisation
+end
+StructTypes.StructType(::Type{AqtProviderProperties}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{AqtProviderProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.aqt.aqt_provider_properties", "1"))
+
+struct AqtDeviceCapabilities <: BraketSchemaBase
+    service::DeviceServiceProperties
+    action::Dict{Union{DeviceActionType, String}, Union{OpenQASMDeviceActionProperties, OpenQASMProgramSetDeviceActionProperties}}
+    deviceParameters::Dict
+    braketSchemaHeader::braketSchemaHeader
+    paradigm::GateModelQpuParadigmProperties
+    provider::AqtProviderProperties
+    standardized::StandardizedGateModelQpuDeviceProperties
+end
+StructTypes.StructType(::Type{AqtDeviceCapabilities}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{AqtDeviceCapabilities}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.aqt.aqt_device_capabilities", "1"))
 
 struct IonqDeviceParameters <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -1336,7 +1401,7 @@ StructTypes.defaults(::Type{QueraDeviceCapabilities}) = Dict{Symbol, Any}(:brake
 
 struct RigettiProviderProperties <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
-    specs::Dict{String, Dict{String, Dict{String, Float64}}}
+    specs::Dict{String, Any}
 end
 StructTypes.StructType(::Type{RigettiProviderProperties}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{RigettiProviderProperties}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.device_schema.rigetti.rigetti_provider_properties", "1"))
@@ -1473,17 +1538,20 @@ end
 StructTypes.StructType(::Type{AnnealingTaskResult}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{AnnealingTaskResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.annealing_task_result", "1"))
 
+const OutputValue = Any
+
 struct GateModelTaskResult <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
     measurements::Union{Nothing, Vector{Vector{Int}}}
     measurementProbabilities::Union{Nothing, Dict{String, Float64}}
     resultTypes::Union{Nothing, Vector{ResultTypeValue}}
     measuredQubits::Union{Nothing, Vector{Int}}
+    outputs::Union{Nothing, Vector{Dict{String, OutputValue}}}
     taskMetadata::TaskMetadata
     additionalMetadata::AdditionalMetadata
 end
 StructTypes.StructType(::Type{GateModelTaskResult}) = StructTypes.UnorderedStruct()
-StructTypes.defaults(::Type{GateModelTaskResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.gate_model_task_result", "1"))
+StructTypes.defaults(::Type{GateModelTaskResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.gate_model_task_result", "1"), :outputs => nothing)
 
 struct PhotonicModelTaskResult <: BraketSchemaBase
     braketSchemaHeader::braketSchemaHeader
@@ -1493,6 +1561,99 @@ struct PhotonicModelTaskResult <: BraketSchemaBase
 end
 StructTypes.StructType(::Type{PhotonicModelTaskResult}) = StructTypes.UnorderedStruct()
 StructTypes.defaults(::Type{PhotonicModelTaskResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.photonic_model_task_result", "1"))
+
+# AQT metadata
+struct AqtMetadata <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    compiledProgram::String
+end
+StructTypes.StructType(::Type{AqtMetadata}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{AqtMetadata}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.aqt_metadata", "1"))
+
+# OpenQASM Program Set IR
+struct ProgramSet <: AbstractProgram
+    braketSchemaHeader::braketSchemaHeader
+    programs::Vector{OpenQasmProgram}
+end
+StructTypes.StructType(::Type{ProgramSet}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{ProgramSet}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.ir.openqasm.program_set", "1"))
+
+# Program Set task results
+@enum FailureCategory COMPILATION DEVICE SERVICE
+StructTypes.StructType(::Type{FailureCategory}) = StructTypes.StringType()
+
+struct ProgramSetExecutableCancellationMetadata
+    status::String
+end
+StructTypes.StructType(::Type{ProgramSetExecutableCancellationMetadata}) = StructTypes.UnorderedStruct()
+
+struct ProgramSetExecutableFailureMetadata
+    failureReason::String
+    retryable::Bool
+    category::FailureCategory
+end
+StructTypes.StructType(::Type{ProgramSetExecutableFailureMetadata}) = StructTypes.UnorderedStruct()
+
+struct ProgramSetExecutableFailure <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    inputsIndex::Int
+    failureMetadata::ProgramSetExecutableFailureMetadata
+end
+StructTypes.StructType(::Type{ProgramSetExecutableFailure}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{ProgramSetExecutableFailure}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.program_set_executable_failure", "1"))
+
+struct ProgramSetExecutableResultMetadata
+end
+StructTypes.StructType(::Type{ProgramSetExecutableResultMetadata}) = StructTypes.UnorderedStruct()
+
+struct ProgramSetExecutableResult <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    inputsIndex::Int
+    measurements::Union{Nothing, Vector{Vector{Int}}}
+    measurementProbabilities::Union{Nothing, Dict{String, Float64}}
+    measuredQubits::Union{Nothing, Vector{Int}}
+end
+StructTypes.StructType(::Type{ProgramSetExecutableResult}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{ProgramSetExecutableResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.program_set_executable_result", "1"))
+
+struct ProgramMetadata
+    executables::Vector{Union{ProgramSetExecutableFailureMetadata, ProgramSetExecutableResultMetadata, ProgramSetExecutableCancellationMetadata}}
+end
+StructTypes.StructType(::Type{ProgramMetadata}) = StructTypes.UnorderedStruct()
+
+struct ProgramSetTaskMetadata <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    id::String
+    deviceId::String
+    requestedShots::Int
+    successfulShots::Int
+    programMetadata::Vector{ProgramMetadata}
+    deviceParameters::Union{Nothing, GateModelSimulatorDeviceParameters, IonqDeviceParameters, IqmDeviceParameters, RigettiDeviceParameters, GateModelDeviceParameters}
+    createdAt::Union{Nothing, String}
+    endedAt::Union{Nothing, String}
+    status::Union{Nothing, String}
+    totalFailedExecutables::Int
+end
+StructTypes.StructType(::Type{ProgramSetTaskMetadata}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{ProgramSetTaskMetadata}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.program_set_task_metadata", "1"), :deviceParameters => nothing, :createdAt => nothing, :endedAt => nothing, :status => nothing)
+
+struct ProgramResult <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    executableResults::Union{Vector{String}, Vector{Union{ProgramSetExecutableResult, ProgramSetExecutableFailure}}}
+    source::Union{String, OpenQasmProgram}
+    additionalMetadata::AdditionalMetadata
+end
+StructTypes.StructType(::Type{ProgramResult}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{ProgramResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.program_result", "1"))
+
+struct ProgramSetTaskResult <: BraketSchemaBase
+    braketSchemaHeader::braketSchemaHeader
+    programResults::Union{Vector{String}, Vector{ProgramResult}}
+    taskMetadata::Union{String, ProgramSetTaskMetadata}
+    s3Location::Union{Nothing, Tuple{String, String}}
+end
+StructTypes.StructType(::Type{ProgramSetTaskResult}) = StructTypes.UnorderedStruct()
+StructTypes.defaults(::Type{ProgramSetTaskResult}) = Dict{Symbol, Any}(:braketSchemaHeader => braketSchemaHeader("braket.task_result.program_set_task_result", "1"), :s3Location => nothing)
 
 struct Debias <: ErrorMitigationScheme
     type::String
@@ -1506,8 +1667,8 @@ struct GenericDeviceActionProperties <: DeviceActionProperties
 end
 StructTypes.StructType(::Type{GenericDeviceActionProperties}) = StructTypes.UnorderedStruct()
 
-const type_dict   = Dict{String, DataType}("braket.device_schema.gate_model_qpu_paradigm_properties_v1"=>GateModelQpuParadigmProperties, "braket.device_schema.oqc.oqc_device_capabilities_v1"=>OqcDeviceCapabilities, "braket.device_schema.iqm.iqm_device_capabilities_v1"=>IqmDeviceCapabilities, "braket.device_schema.dwave.dwave_advantage_device_level_parameters_v1"=>DwaveAdvantageDeviceLevelParameters, "braket.device_schema.ionq.ionq_device_capabilities_v1"=>IonqDeviceCapabilities, "braket.device_schema.ionq.ionq_device_parameters_v1"=>IonqDeviceParameters, "braket.device_schema.quera.quera_device_capabilities_v1"=>QueraDeviceCapabilities, "braket.device_schema.standardized_gate_model_qpu_device_properties_v1"=>StandardizedGateModelQpuDeviceProperties, "braket.device_schema.xanadu.xanadu_device_capabilities_v1"=>XanaduDeviceCapabilities, "braket.device_schema.dwave.dwave_device_parameters_v1"=>DwaveDeviceParameters, "braket.task_result.dwave_metadata_v1"=>DwaveMetadata, "braket.device_schema.dwave.dwave_2000Q_device_level_parameters_v1"=>Dwave2000QDeviceLevelParameters, "braket.task_result.quera_metadata_v1"=>QueraMetadata, "braket.device_schema.oqc.oqc_provider_properties_v1"=>OqcProviderProperties, "braket.device_schema.iqm.iqm_provider_properties_v1"=>IqmProviderProperties, "braket.device_schema.device_service_properties_v1"=>DeviceServiceProperties, "braket.device_schema.xanadu.xanadu_device_parameters_v1"=>XanaduDeviceParameters, "braket.ir.blackbird.program_v1"=>BlackbirdProgram, "braket.device_schema.dwave.dwave_provider_properties_v1"=>DwaveProviderProperties, "braket.device_schema.rigetti.rigetti_device_capabilities_v1"=>RigettiDeviceCapabilities, "braket.task_result.annealing_task_result_v1"=>AnnealingTaskResult, "braket.device_schema.dwave.dwave_provider_level_parameters_v1"=>DwaveProviderLevelParameters, "braket.device_schema.pulse.pulse_device_action_properties_v1"=>PulseDeviceActionProperties, "braket.device_schema.ionq.ionq_provider_properties_v1"=>IonqProviderProperties, "braket.task_result.photonic_model_task_result_v1"=>PhotonicModelTaskResult, "braket.device_schema.continuous_variable_qpu_paradigm_properties_v1"=>ContinuousVariableQpuParadigmProperties, "braket.device_schema.xanadu.xanadu_provider_properties_v1"=>XanaduProviderProperties, "braket.device_schema.pulse.native_gate_calibrations_v1"=>NativeGateCalibrations, "braket.device_schema.dwave.dwave_advantage_device_parameters_v1"=>DwaveAdvantageDeviceParameters, "braket.device_schema.rigetti.rigetti_device_parameters_v1"=>RigettiDeviceParameters, "braket.ir.ahs.program_v1"=>AHSProgram, "braket.task_result.task_metadata_v1"=>TaskMetadata, "braket.task_result.analog_hamiltonian_simulation_task_result_v1"=>AnalogHamiltonianSimulationTaskResult, "braket.device_schema.simulators.gate_model_simulator_paradigm_properties_v1"=>GateModelSimulatorParadigmProperties, "braket.task_result.gate_model_task_result_v1"=>GateModelTaskResult, "braket.task_result.ionq_metadata_v1"=>IonQMetadata, "braket.device_schema.rigetti.rigetti_provider_properties_v1"=>RigettiProviderProperties, "braket.device_schema.oqc.oqc_device_parameters_v1"=>OqcDeviceParameters, "braket.device_schema.iqm.iqm_device_parameters_v1"=>IqmDeviceParameters, "braket.device_schema.simulators.gate_model_simulator_device_capabilities_v1"=>GateModelSimulatorDeviceCapabilities, "braket.task_result.xanadu_metadata_v1"=>XanaduMetadata, "braket.device_schema.gate_model_parameters_v1"=>GateModelParameters, "braket.device_schema.simulators.gate_model_simulator_device_parameters_v1"=>GateModelSimulatorDeviceParameters, "braket.task_result.oqc_metadata_v1"=>OqcMetadata, "braket.task_result.iqm_metadata_v1"=>IqmMetadata, "braket.device_schema.dwave.dwave_device_capabilities_v1"=>DwaveDeviceCapabilities, "braket.device_schema.quera.quera_ahs_paradigm_properties_v1"=>QueraAhsParadigmProperties, "braket.jobs_data.persisted_job_data_v1"=>PersistedJobData, "braket.task_result.rigetti_metadata_v1"=>RigettiMetadata, "braket.task_result.simulator_metadata_v1"=>SimulatorMetadata, "braket.ir.annealing.problem_v1"=>Problem, "braket.device_schema.dwave.dwave_2000Q_device_parameters_v1"=>Dwave2000QDeviceParameters, "braket.ir.openqasm.program_v1"=>OpenQasmProgram)
-const header_dict = Dict{DataType, braketSchemaHeader}(GateModelQpuParadigmProperties=>braketSchemaHeader("braket.device_schema.gate_model_qpu_paradigm_properties", "1"), OqcDeviceCapabilities=>braketSchemaHeader("braket.device_schema.oqc.oqc_device_capabilities", "1"), IqmDeviceCapabilities=>braketSchemaHeader("braket.device_schema.iqm.iqm_device_capabilities", "1"), DwaveAdvantageDeviceLevelParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_advantage_device_level_parameters", "1"), IonqDeviceCapabilities=>braketSchemaHeader("braket.device_schema.ionq.ionq_device_capabilities", "1"), IonqDeviceParameters=>braketSchemaHeader("braket.device_schema.ionq.ionq_device_parameters", "1"), QueraDeviceCapabilities=>braketSchemaHeader("braket.device_schema.quera.quera_device_capabilities", "1"), StandardizedGateModelQpuDeviceProperties=>braketSchemaHeader("braket.device_schema.standardized_gate_model_qpu_device_properties", "1"), XanaduDeviceCapabilities=>braketSchemaHeader("braket.device_schema.xanadu.xanadu_device_capabilities", "1"), DwaveDeviceParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_device_parameters", "1"), DwaveMetadata=>braketSchemaHeader("braket.task_result.dwave_metadata", "1"), Dwave2000QDeviceLevelParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_2000Q_device_level_parameters", "1"), QueraMetadata=>braketSchemaHeader("braket.task_result.quera_metadata", "1"), OqcProviderProperties=>braketSchemaHeader("braket.device_schema.oqc.oqc_provider_properties", "1"), IqmProviderProperties=>braketSchemaHeader("braket.device_schema.iqm.iqm_provider_properties", "1"), DeviceServiceProperties=>braketSchemaHeader("braket.device_schema.device_service_properties", "1"), XanaduDeviceParameters=>braketSchemaHeader("braket.device_schema.xanadu.xanadu_device_parameters", "1"), BlackbirdProgram=>braketSchemaHeader("braket.ir.blackbird.program", "1"), DwaveProviderProperties=>braketSchemaHeader("braket.device_schema.dwave.dwave_provider_properties", "1"), RigettiDeviceCapabilities=>braketSchemaHeader("braket.device_schema.rigetti.rigetti_device_capabilities", "1"), AnnealingTaskResult=>braketSchemaHeader("braket.task_result.annealing_task_result", "1"), DwaveProviderLevelParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_provider_level_parameters", "1"), PulseDeviceActionProperties=>braketSchemaHeader("braket.device_schema.pulse.pulse_device_action_properties", "1"), IonqProviderProperties=>braketSchemaHeader("braket.device_schema.ionq.ionq_provider_properties", "1"), PhotonicModelTaskResult=>braketSchemaHeader("braket.task_result.photonic_model_task_result", "1"), ContinuousVariableQpuParadigmProperties=>braketSchemaHeader("braket.device_schema.continuous_variable_qpu_paradigm_properties", "1"), XanaduProviderProperties=>braketSchemaHeader("braket.device_schema.xanadu.xanadu_provider_properties", "1"), NativeGateCalibrations=>braketSchemaHeader("braket.device_schema.pulse.native_gate_calibrations", "1"), DwaveAdvantageDeviceParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_advantage_device_parameters", "1"), RigettiDeviceParameters=>braketSchemaHeader("braket.device_schema.rigetti.rigetti_device_parameters", "1"), AHSProgram=>braketSchemaHeader("braket.ir.ahs.program", "1"), TaskMetadata=>braketSchemaHeader("braket.task_result.task_metadata", "1"), AnalogHamiltonianSimulationTaskResult=>braketSchemaHeader("braket.task_result.analog_hamiltonian_simulation_task_result", "1"), GateModelSimulatorParadigmProperties=>braketSchemaHeader("braket.device_schema.simulators.gate_model_simulator_paradigm_properties", "1"), GateModelTaskResult=>braketSchemaHeader("braket.task_result.gate_model_task_result", "1"), IonQMetadata=>braketSchemaHeader("braket.task_result.ionq_metadata", "1"), RigettiProviderProperties=>braketSchemaHeader("braket.device_schema.rigetti.rigetti_provider_properties", "1"), OqcDeviceParameters=>braketSchemaHeader("braket.device_schema.oqc.oqc_device_parameters", "1"), IqmDeviceParameters=>braketSchemaHeader("braket.device_schema.iqm.iqm_device_parameters", "1"), GateModelSimulatorDeviceCapabilities=>braketSchemaHeader("braket.device_schema.simulators.gate_model_simulator_device_capabilities", "1"), XanaduMetadata=>braketSchemaHeader("braket.task_result.xanadu_metadata", "1"), GateModelParameters=>braketSchemaHeader("braket.device_schema.gate_model_parameters", "1"), GateModelSimulatorDeviceParameters=>braketSchemaHeader("braket.device_schema.simulators.gate_model_simulator_device_parameters", "1"), OqcMetadata=>braketSchemaHeader("braket.task_result.oqc_metadata", "1"), IqmMetadata=>braketSchemaHeader("braket.task_result.iqm_metadata", "1"), DwaveDeviceCapabilities=>braketSchemaHeader("braket.device_schema.dwave.dwave_device_capabilities", "1"), QueraAhsParadigmProperties=>braketSchemaHeader("braket.device_schema.quera.quera_ahs_paradigm_properties", "1"), PersistedJobData=>braketSchemaHeader("braket.jobs_data.persisted_job_data", "1"), RigettiMetadata=>braketSchemaHeader("braket.task_result.rigetti_metadata", "1"), SimulatorMetadata=>braketSchemaHeader("braket.task_result.simulator_metadata", "1"), Problem=>braketSchemaHeader("braket.ir.annealing.problem", "1"), Dwave2000QDeviceParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_2000Q_device_parameters", "1"), OpenQasmProgram=>braketSchemaHeader("braket.ir.openqasm.program", "1"))
+const type_dict   = Dict{String, DataType}("braket.device_schema.gate_model_qpu_paradigm_properties_v1"=>GateModelQpuParadigmProperties, "braket.device_schema.oqc.oqc_device_capabilities_v1"=>OqcDeviceCapabilities, "braket.device_schema.iqm.iqm_device_capabilities_v1"=>IqmDeviceCapabilities, "braket.device_schema.dwave.dwave_advantage_device_level_parameters_v1"=>DwaveAdvantageDeviceLevelParameters, "braket.device_schema.ionq.ionq_device_capabilities_v1"=>IonqDeviceCapabilities, "braket.device_schema.ionq.ionq_device_parameters_v1"=>IonqDeviceParameters, "braket.device_schema.quera.quera_device_capabilities_v1"=>QueraDeviceCapabilities, "braket.device_schema.standardized_gate_model_qpu_device_properties_v1"=>StandardizedGateModelQpuDeviceProperties, "braket.device_schema.xanadu.xanadu_device_capabilities_v1"=>XanaduDeviceCapabilities, "braket.device_schema.dwave.dwave_device_parameters_v1"=>DwaveDeviceParameters, "braket.task_result.dwave_metadata_v1"=>DwaveMetadata, "braket.device_schema.dwave.dwave_2000Q_device_level_parameters_v1"=>Dwave2000QDeviceLevelParameters, "braket.task_result.quera_metadata_v1"=>QueraMetadata, "braket.device_schema.oqc.oqc_provider_properties_v1"=>OqcProviderProperties, "braket.device_schema.iqm.iqm_provider_properties_v1"=>IqmProviderProperties, "braket.device_schema.device_service_properties_v1"=>DeviceServiceProperties, "braket.device_schema.xanadu.xanadu_device_parameters_v1"=>XanaduDeviceParameters, "braket.ir.blackbird.program_v1"=>BlackbirdProgram, "braket.device_schema.dwave.dwave_provider_properties_v1"=>DwaveProviderProperties, "braket.device_schema.rigetti.rigetti_device_capabilities_v1"=>RigettiDeviceCapabilities, "braket.task_result.annealing_task_result_v1"=>AnnealingTaskResult, "braket.device_schema.dwave.dwave_provider_level_parameters_v1"=>DwaveProviderLevelParameters, "braket.device_schema.pulse.pulse_device_action_properties_v1"=>PulseDeviceActionProperties, "braket.device_schema.ionq.ionq_provider_properties_v1"=>IonqProviderProperties, "braket.task_result.photonic_model_task_result_v1"=>PhotonicModelTaskResult, "braket.device_schema.continuous_variable_qpu_paradigm_properties_v1"=>ContinuousVariableQpuParadigmProperties, "braket.device_schema.xanadu.xanadu_provider_properties_v1"=>XanaduProviderProperties, "braket.device_schema.pulse.native_gate_calibrations_v1"=>NativeGateCalibrations, "braket.device_schema.dwave.dwave_advantage_device_parameters_v1"=>DwaveAdvantageDeviceParameters, "braket.device_schema.rigetti.rigetti_device_parameters_v1"=>RigettiDeviceParameters, "braket.ir.ahs.program_v1"=>AHSProgram, "braket.task_result.task_metadata_v1"=>TaskMetadata, "braket.task_result.analog_hamiltonian_simulation_task_result_v1"=>AnalogHamiltonianSimulationTaskResult, "braket.device_schema.simulators.gate_model_simulator_paradigm_properties_v1"=>GateModelSimulatorParadigmProperties, "braket.task_result.gate_model_task_result_v1"=>GateModelTaskResult, "braket.task_result.ionq_metadata_v1"=>IonQMetadata, "braket.device_schema.rigetti.rigetti_provider_properties_v1"=>RigettiProviderProperties, "braket.device_schema.oqc.oqc_device_parameters_v1"=>OqcDeviceParameters, "braket.device_schema.iqm.iqm_device_parameters_v1"=>IqmDeviceParameters, "braket.device_schema.simulators.gate_model_simulator_device_capabilities_v1"=>GateModelSimulatorDeviceCapabilities, "braket.task_result.xanadu_metadata_v1"=>XanaduMetadata, "braket.device_schema.gate_model_parameters_v1"=>GateModelParameters, "braket.device_schema.simulators.gate_model_simulator_device_parameters_v1"=>GateModelSimulatorDeviceParameters, "braket.task_result.oqc_metadata_v1"=>OqcMetadata, "braket.task_result.iqm_metadata_v1"=>IqmMetadata, "braket.device_schema.dwave.dwave_device_capabilities_v1"=>DwaveDeviceCapabilities, "braket.device_schema.quera.quera_ahs_paradigm_properties_v1"=>QueraAhsParadigmProperties, "braket.jobs_data.persisted_job_data_v1"=>PersistedJobData, "braket.task_result.rigetti_metadata_v1"=>RigettiMetadata, "braket.task_result.simulator_metadata_v1"=>SimulatorMetadata, "braket.ir.annealing.problem_v1"=>Problem, "braket.device_schema.dwave.dwave_2000Q_device_parameters_v1"=>Dwave2000QDeviceParameters, "braket.ir.openqasm.program_v1"=>OpenQasmProgram, "braket.device_schema.aqt.aqt_device_capabilities_v1"=>AqtDeviceCapabilities, "braket.device_schema.aqt.aqt_provider_properties_v1"=>AqtProviderProperties, "braket.task_result.aqt_metadata_v1"=>AqtMetadata, "braket.device_schema.common.gate_model_device_parameters_v1"=>GateModelDeviceParameters, "braket.device_schema.rigetti.rigetti_device_capabilities_v2"=>RigettiDeviceCapabilities, "braket.device_schema.rigetti.rigetti_provider_properties_v2"=>RigettiProviderProperties, "braket.ir.openqasm.program_set_v1"=>ProgramSet, "braket.task_result.program_result_v1"=>ProgramResult, "braket.task_result.program_set_executable_failure_v1"=>ProgramSetExecutableFailure, "braket.task_result.program_set_executable_result_v1"=>ProgramSetExecutableResult, "braket.task_result.program_set_task_metadata_v1"=>ProgramSetTaskMetadata, "braket.task_result.program_set_task_result_v1"=>ProgramSetTaskResult)
+const header_dict = Dict{DataType, braketSchemaHeader}(GateModelQpuParadigmProperties=>braketSchemaHeader("braket.device_schema.gate_model_qpu_paradigm_properties", "1"), OqcDeviceCapabilities=>braketSchemaHeader("braket.device_schema.oqc.oqc_device_capabilities", "1"), IqmDeviceCapabilities=>braketSchemaHeader("braket.device_schema.iqm.iqm_device_capabilities", "1"), DwaveAdvantageDeviceLevelParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_advantage_device_level_parameters", "1"), IonqDeviceCapabilities=>braketSchemaHeader("braket.device_schema.ionq.ionq_device_capabilities", "1"), IonqDeviceParameters=>braketSchemaHeader("braket.device_schema.ionq.ionq_device_parameters", "1"), QueraDeviceCapabilities=>braketSchemaHeader("braket.device_schema.quera.quera_device_capabilities", "1"), StandardizedGateModelQpuDeviceProperties=>braketSchemaHeader("braket.device_schema.standardized_gate_model_qpu_device_properties", "1"), XanaduDeviceCapabilities=>braketSchemaHeader("braket.device_schema.xanadu.xanadu_device_capabilities", "1"), DwaveDeviceParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_device_parameters", "1"), DwaveMetadata=>braketSchemaHeader("braket.task_result.dwave_metadata", "1"), Dwave2000QDeviceLevelParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_2000Q_device_level_parameters", "1"), QueraMetadata=>braketSchemaHeader("braket.task_result.quera_metadata", "1"), OqcProviderProperties=>braketSchemaHeader("braket.device_schema.oqc.oqc_provider_properties", "1"), IqmProviderProperties=>braketSchemaHeader("braket.device_schema.iqm.iqm_provider_properties", "1"), DeviceServiceProperties=>braketSchemaHeader("braket.device_schema.device_service_properties", "1"), XanaduDeviceParameters=>braketSchemaHeader("braket.device_schema.xanadu.xanadu_device_parameters", "1"), BlackbirdProgram=>braketSchemaHeader("braket.ir.blackbird.program", "1"), DwaveProviderProperties=>braketSchemaHeader("braket.device_schema.dwave.dwave_provider_properties", "1"), RigettiDeviceCapabilities=>braketSchemaHeader("braket.device_schema.rigetti.rigetti_device_capabilities", "1"), AnnealingTaskResult=>braketSchemaHeader("braket.task_result.annealing_task_result", "1"), DwaveProviderLevelParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_provider_level_parameters", "1"), PulseDeviceActionProperties=>braketSchemaHeader("braket.device_schema.pulse.pulse_device_action_properties", "1"), IonqProviderProperties=>braketSchemaHeader("braket.device_schema.ionq.ionq_provider_properties", "1"), PhotonicModelTaskResult=>braketSchemaHeader("braket.task_result.photonic_model_task_result", "1"), ContinuousVariableQpuParadigmProperties=>braketSchemaHeader("braket.device_schema.continuous_variable_qpu_paradigm_properties", "1"), XanaduProviderProperties=>braketSchemaHeader("braket.device_schema.xanadu.xanadu_provider_properties", "1"), NativeGateCalibrations=>braketSchemaHeader("braket.device_schema.pulse.native_gate_calibrations", "1"), DwaveAdvantageDeviceParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_advantage_device_parameters", "1"), RigettiDeviceParameters=>braketSchemaHeader("braket.device_schema.rigetti.rigetti_device_parameters", "1"), AHSProgram=>braketSchemaHeader("braket.ir.ahs.program", "1"), TaskMetadata=>braketSchemaHeader("braket.task_result.task_metadata", "1"), AnalogHamiltonianSimulationTaskResult=>braketSchemaHeader("braket.task_result.analog_hamiltonian_simulation_task_result", "1"), GateModelSimulatorParadigmProperties=>braketSchemaHeader("braket.device_schema.simulators.gate_model_simulator_paradigm_properties", "1"), GateModelTaskResult=>braketSchemaHeader("braket.task_result.gate_model_task_result", "1"), IonQMetadata=>braketSchemaHeader("braket.task_result.ionq_metadata", "1"), RigettiProviderProperties=>braketSchemaHeader("braket.device_schema.rigetti.rigetti_provider_properties", "1"), OqcDeviceParameters=>braketSchemaHeader("braket.device_schema.oqc.oqc_device_parameters", "1"), IqmDeviceParameters=>braketSchemaHeader("braket.device_schema.iqm.iqm_device_parameters", "1"), GateModelSimulatorDeviceCapabilities=>braketSchemaHeader("braket.device_schema.simulators.gate_model_simulator_device_capabilities", "1"), XanaduMetadata=>braketSchemaHeader("braket.task_result.xanadu_metadata", "1"), GateModelParameters=>braketSchemaHeader("braket.device_schema.gate_model_parameters", "1"), GateModelSimulatorDeviceParameters=>braketSchemaHeader("braket.device_schema.simulators.gate_model_simulator_device_parameters", "1"), OqcMetadata=>braketSchemaHeader("braket.task_result.oqc_metadata", "1"), IqmMetadata=>braketSchemaHeader("braket.task_result.iqm_metadata", "1"), DwaveDeviceCapabilities=>braketSchemaHeader("braket.device_schema.dwave.dwave_device_capabilities", "1"), QueraAhsParadigmProperties=>braketSchemaHeader("braket.device_schema.quera.quera_ahs_paradigm_properties", "1"), PersistedJobData=>braketSchemaHeader("braket.jobs_data.persisted_job_data", "1"), RigettiMetadata=>braketSchemaHeader("braket.task_result.rigetti_metadata", "1"), SimulatorMetadata=>braketSchemaHeader("braket.task_result.simulator_metadata", "1"), Problem=>braketSchemaHeader("braket.ir.annealing.problem", "1"), Dwave2000QDeviceParameters=>braketSchemaHeader("braket.device_schema.dwave.dwave_2000Q_device_parameters", "1"), OpenQasmProgram=>braketSchemaHeader("braket.ir.openqasm.program", "1"), AqtDeviceCapabilities=>braketSchemaHeader("braket.device_schema.aqt.aqt_device_capabilities", "1"), AqtProviderProperties=>braketSchemaHeader("braket.device_schema.aqt.aqt_provider_properties", "1"), AqtMetadata=>braketSchemaHeader("braket.task_result.aqt_metadata", "1"), GateModelDeviceParameters=>braketSchemaHeader("braket.device_schema.common.gate_model_device_parameters", "1"), ProgramSet=>braketSchemaHeader("braket.ir.openqasm.program_set", "1"), ProgramResult=>braketSchemaHeader("braket.task_result.program_result", "1"), ProgramSetExecutableFailure=>braketSchemaHeader("braket.task_result.program_set_executable_failure", "1"), ProgramSetExecutableResult=>braketSchemaHeader("braket.task_result.program_set_executable_result", "1"), ProgramSetTaskMetadata=>braketSchemaHeader("braket.task_result.program_set_task_metadata", "1"), ProgramSetTaskResult=>braketSchemaHeader("braket.task_result.program_set_task_result", "1"))
 
 
 lookup_type(header::braketSchemaHeader) = type_dict[header.name * "_v" * header.version]
@@ -1529,6 +1690,7 @@ function StructTypes.constructfrom(::Type{AbstractProgram}, obj)
     header = obj[:braketSchemaHeader]
     occursin("braket.ir.blackbird", header[:name]) && return StructTypes.constructfrom(BlackbirdProgram, obj)
     occursin("braket.ir.ahs", header[:name]) && return StructTypes.constructfrom(AHSProgram, obj)
+    occursin("braket.ir.openqasm.program_set", header[:name]) && return StructTypes.constructfrom(ProgramSet, obj)
     occursin("braket.ir.openqasm", header[:name]) && return StructTypes.constructfrom(OpenQasmProgram, obj)
     occursin("braket.ir.annealing", header[:name]) && return StructTypes.constructfrom(Problem, obj)
 

@@ -13,6 +13,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         ResultTypeValue(IR.Variance(["y"], [0], "variance"), 0.1),
     ],
     [0,1],
+    nothing,
     task_mtd,
     add_mtd,
 )

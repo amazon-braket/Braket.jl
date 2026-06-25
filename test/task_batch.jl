@@ -7,6 +7,7 @@ mock_result(c) = Braket.GateModelTaskResult(
             nothing,
             [Braket.ResultTypeValue(Braket.IR.Amplitude(["011000"], "amplitude"), Dict("011000"=>0.9999999999999982))],
             collect(0:5),
+            nothing,
             Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 0, "arn1", nothing, nothing, nothing, nothing, nothing),
             Braket.AdditionalMetadata(Braket.ir(c, Val(:OpenQASM)), nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
         )

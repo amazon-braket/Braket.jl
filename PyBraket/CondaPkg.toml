@@ -2,7 +2,7 @@
 python = ">=3.11,<3.14"
 pydantic = ""
 scipy = ""
-numpy = ""
+numpy = "<2.5"
 
 [pip.deps]
 amazon-braket-sdk = ">=1.81.0"

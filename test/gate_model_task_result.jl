@@ -15,6 +15,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     nothing,
     map(r->ResultTypeValue(StructTypes.lower(r[1]), r[2]), exact_results),
     [0,1],
+    nothing,
     task_mtd,
     add_mtd,
 )
@@ -25,6 +26,7 @@ non_zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     Dict("011000"=>0.9999999999999982),
     nothing,
     collect(0:5),
+    nothing,
     task_mtd,
     add_mtd)
 
@@ -83,6 +85,7 @@ end
         nothing,
         result_types_input,
         [0, 1, 2, 3],
+        nothing,
         task_metadata_shots,
         additional_metadata,
     )
@@ -108,6 +111,7 @@ end
         nothing,
         result_types_input,
         [0, 1, 2, 3],
+        nothing,
         task_metadata_shots,
         additional_metadata,
     )
@@ -124,6 +128,7 @@ end
             nothing,
             nothing,
             [0, 1, 2, 3],
+            nothing,
             task_metadata_shots,
             additional_metadata,
         )
@@ -139,6 +144,7 @@ end
             nothing,
             result_types_bad,
             [0, 1, 2, 3],
+            nothing,
             task_metadata_shots,
             additional_metadata,
         )
