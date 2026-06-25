@@ -1,8 +1,8 @@
 [deps]
-python = ">=3.7,<=3.9"
-pydantic=""
+python = ">=3.11,<3.14"
+pydantic = ""
 scipy = ""
 numpy = ""
 
 [pip.deps]
-amazon-braket-sdk = ">=1.35.0"
+amazon-braket-sdk = ">=1.81.0"
