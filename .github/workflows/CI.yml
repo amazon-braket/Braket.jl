@@ -49,6 +49,8 @@ jobs:
       - name: "Dev PyBraket package on OSX"
         if: ${{ matrix.os == 'macOS-latest' }}
         run: |
+          # macosx_12_0_arm64 wheels need this so pixi/uv accepts them
+          echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
           julia --project -e 'using Pkg; Pkg.develop(path=joinpath(pwd(), "PyBraket"))'
       - name: "Run tests"
         uses: julia-actions/julia-runtest@v1
