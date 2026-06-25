@@ -8,42 +8,36 @@ struct CustomNoise <: Braket.Noise end
         n = noise(0.1)
         @test qubit_count(n) == 1
         ix = Instruction(n, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.Parametrized()
     end
     @testset "noise = PauliChannel" begin
         n = PauliChannel(0.1, 0.2, 0.1)
         @test qubit_count(n) == 1
         ix = Instruction(n, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.Parametrized()
     end
     @testset "noise = MultiQubitPauliChannel{1}" begin
         n = MultiQubitPauliChannel{1}(Dict("X"=>0.1, "Y"=>0.2))
         @test qubit_count(n) == 1
         ix = Instruction(n, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.Parametrized()
     end
     @testset "noise = TwoQubitPauliChannel" begin
         n = TwoQubitPauliChannel(Dict("XX"=>0.1, "YY"=>0.2))
         @test qubit_count(n) == 2
         ix = Instruction(n, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.Parametrized()
     end
     @testset for noise in (TwoQubitDephasing, TwoQubitDepolarizing)
         n = noise(0.4)
         @test qubit_count(n) == 2
         ix = Instruction(n, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.Parametrized()
     end
     @testset "noise = GeneralizedAmplitudeDamping" begin
         n = GeneralizedAmplitudeDamping(0.1, 0.2)
         @test qubit_count(n) == 1
         ix = Instruction(n, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.Parametrized()
     end
     @testset "noise = Kraus" begin
@@ -51,7 +45,6 @@ struct CustomNoise <: Braket.Noise end
         n = Kraus([mat])
         @test qubit_count(n) == 1
         ix = Instruction(n, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(n) == Braket.NonParametrized()
     end
     @testset "fallback" begin

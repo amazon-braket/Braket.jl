@@ -259,8 +259,6 @@ function Base.show(io::IO, s::Sum)
     return
 end
 StructTypes.lower(s::Sum) = [StructTypes.lower(summand) for summand in s.summands]
-ir(s::Sum, target::Vector{QubitSet}, ::Val{:JAQCD}; kwargs...) = throw(ErrorException("Sum observables are not supported in JAQCD."))
-ir(s::Sum, target::Vector{<:IntOrQubit}, ::Val{:JAQCD}; kwargs...) = throw(ErrorException("Sum observables are not supported in JAQCD."))
 function ir(s::Sum, target::Vector{QubitSet}, ::Val{:OpenQASM}; kwargs...)
     length(s.summands) == length(target) || throw(DimensionMismatch("number of summands ($(length(s.summands))) must match length of targets vector ($(length(targets)))."))
     for (ii, (term, term_target)) in enumerate(zip(s.summands, target))

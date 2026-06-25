@@ -11,7 +11,7 @@ mutable struct AwsQuantumTaskBatch
     _results::Union{Nothing, Vector}
     _unsuccessful::Set{String}
     _device_arn::String
-    _task_specifications::Vector{<:Union{Circuit, Program, OpenQasmProgram}}
+    _task_specifications::Vector{<:Union{Circuit, OpenQasmProgram}}
     _s3_destination_folder::Tuple{String, String}
     _shots::Int
     _poll_timeout_seconds::Int

@@ -19,7 +19,7 @@ using Braket, Braket.IR, Test, JSON3, StructTypes
         @test_throws ErrorException StructTypes.constructfrom(Braket.AbstractProgram, Dict(:braketSchemaHeader=>Dict(:name=>"not_a_program")))
     end
 
-    @testset "Reading and writing JAQCD instructions" begin
+    @testset "Reading and writing IR instructions" begin
         for T in (IR.I, IR.X, IR.Y, IR.Z, IR.H, IR.S, IR.Si, IR.V, IR.Vi, IR.T, IR.Ti)
             targ = 0
             raw_str = """{"target": $targ}"""

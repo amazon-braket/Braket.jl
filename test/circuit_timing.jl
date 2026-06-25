@@ -37,10 +37,6 @@ using Braket: Instruction, VIRTUAL, PHYSICAL, OpenQASMSerializationProperties
                                       (Reset(), "reset"),
                                       (Delay(Second(1)), "delay[1s]"),
                                      )
-        @testset "Invalid ir_type $ir_type" for (ir_type, message) in ((:JAQCD, "$str instructions are not supported with JAQCD."),
-                                                                      )
-            @test_throws ErrorException(message) ir(t, QubitSet([0]), Val(ir_type))
-        end
         @testset "OpenQASM, target $target, serialization properties $sps" for (target, sps, expected_ir) in (
                                                                                                               ([0], OpenQASMSerializationProperties(qubit_reference_type=VIRTUAL), "$str q[0];"),
                                                                                                               ([4], OpenQASMSerializationProperties(qubit_reference_type=PHYSICAL), "$str \$4;"),

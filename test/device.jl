@@ -19,8 +19,8 @@ MOCK_GATE_MODEL_QPU_CAPABILITIES_1 = """{
         "shotsRange": [1, 10]
     },
     "action": {
-        "braket.ir.jaqcd.program": {
-            "actionType": "braket.ir.jaqcd.program",
+        "braket.ir.openqasm.program": {
+            "actionType": "braket.ir.openqasm.program",
             "version": ["1"],
             "supportedOperations": ["H"]
         }
@@ -58,8 +58,8 @@ MOCK_GATE_MODEL_QPU_CAPABILITIES_2 = """{
         "shotsRange": [1, 10]
     },
     "action": {
-        "braket.ir.jaqcd.program": {
-            "actionType": "braket.ir.jaqcd.program",
+        "braket.ir.openqasm.program": {
+            "actionType": "braket.ir.openqasm.program",
             "version": ["1"],
             "supportedOperations": ["H"]
         }

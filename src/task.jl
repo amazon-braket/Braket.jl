@@ -73,7 +73,6 @@ Launches an [`AwsQuantumTask`](@ref) based on `task_spec` on the device associat
   - `OpenQASMProgram`
   - `BlackbirdProgram`
   - `Problem`
-  - `Program`
   - [`Circuit`](@ref)
   - `AHSProgram`
   - [`AnalogHamiltonianSimulation`](@ref)
@@ -206,18 +205,6 @@ function prepare_task_input(circuit::Circuit, device_arn::String, s3_folder::Tup
     device_parameters = _device_parameters_from_dict(device_params, device_arn, paradigm_parameters) 
     client_token = string(uuid1())
     action       = JSON3.write(oq3_program)
-    dev_params   = JSON3.write(device_parameters)
-    tags         = get(kwargs, :tags, Dict{String,String}())
-    extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)
-    return merge((action=action, client_token=client_token, extra_opts=extra_opts), common)
-end
-
-function prepare_task_input(circuit::Program, device_arn::String, s3_folder::Tuple{String, String}, shots::Int, device_params::Dict{String, Any}, disable_qubit_rewiring::Bool=false; kwargs...)
-    common = _create_common_params(device_arn, s3_folder, shots; kwargs...)
-    paradigm_parameters = GateModelParameters(header_dict[GateModelParameters], qubit_count(circuit), disable_qubit_rewiring)
-    client_token = string(uuid1())
-    action       = JSON3.write(circuit)
-    device_parameters = _device_parameters_from_dict(device_params, device_arn, paradigm_parameters) 
     dev_params   = JSON3.write(device_parameters)
     tags         = get(kwargs, :tags, Dict{String,String}())
     extra_opts   = Dict("deviceParameters"=>dev_params, "tags"=>tags)

@@ -269,12 +269,6 @@ QubitSet with 2 elements:
 ```
 """
 qubits(c::Circuit) = (qs = union!(copy(c.moments._qubits), c.qubit_observable_set); QubitSet(qs))
-function qubits(p::Program)
-    inst_qubits = mapreduce(ix->ix.target, union, p.instructions, init=Set{Int}())
-    bri_qubits  = mapreduce(ix->ix.target, union, p.basis_rotation_instructions, init=Set{Int}())
-    res_qubits  = mapreduce(ix->(hasproperty(ix, :targets) && !isnothing(ix.targets)) ? reduce(vcat, ix.targets) : Set{Int}(), union, p.results, init=Set{Int}())
-    return union(inst_qubits, bri_qubits, res_qubits)
-end
 """
     qubit_count(c::Circuit) -> Int
 
@@ -293,14 +287,8 @@ julia> qubit_count(c)
 ```
 """
 qubit_count(c::Circuit) = length(qubits(c))
-qubit_count(p::Program) = length(qubits(p))
 
 (rt::Result)(c::Circuit) = add_result_type!(c, rt)
-
-Base.convert(::Type{Circuit}, p::Program) = Circuit(Moments(p.instructions), p.instructions, Result[StructTypes.constructfrom(Result, r) for r in p.results], p.basis_rotation_instructions)
-Base.convert(::Type{Program}, c::Circuit) = (basis_rotation_instructions!(c); return Program(braketSchemaHeader("braket.ir.jaqcd.program" ,"1"), c.instructions, ir.(c.result_types, Val(:JAQCD)), c.basis_rotation_instructions))
-Circuit(p::Program) = convert(Circuit, p)
-Program(c::Circuit) = convert(Program, c)
 
 function _add_measure!(c::Circuit, target_qubits::QubitSet)
     for (idx, target) in enumerate(target_qubits)
@@ -440,7 +428,7 @@ end
 Convert a [`Circuit`](@ref) into IR that can be consumed by the
 Amazon Braket service, whether local simulators, on-demand simulators, or QPUs.
 The IR format to convert to by default is controlled by the global variable [`IRType`](@ref),
-which can be modified. Currently `:JAQCD` and `:OpenQASM` are supported for `Circuit`s.
+which can be modified. Currently only `:OpenQASM` is supported for `Circuit`s.
 If writing to `OpenQASM` IR, optional [`OpenQASMSerializationProperties`](@ref) may be specified.
 """
 ir(c::Circuit; serialization_properties::SerializationProperties=OpenQASMSerializationProperties()) = ir(c, Val(IRType[]), serialization_properties=serialization_properties)
@@ -454,9 +442,6 @@ function ir(c::Circuit, ::Val{:OpenQASM}; serialization_properties::Serializatio
     end
     return OpenQasmProgram(header_dict[OpenQasmProgram], join(vcat(header, ixs, rts), "\n"), nothing)
 end
-ir(c::Circuit, ::Val{:JAQCD}; kwargs...) = convert(Program, c)
-ir(p::Program, ::Val{:JAQCD}; kwargs...) = p
-ir(p::Program; kwargs...) = ir(p, Val(:JAQCD); kwargs...)
 
 # convenience ctor for OpenQasmProgram
 OpenQasmProgram(source::String; inputs::Union{Nothing, Dict}=nothing) = OpenQasmProgram(header_dict[OpenQasmProgram], source, inputs)

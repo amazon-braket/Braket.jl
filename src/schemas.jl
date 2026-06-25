@@ -31,7 +31,6 @@ Instruction(cd::CD) where {CD<:CompilerDirective} = Instruction{CD}(cd, Int[])
 operator(ix::Instruction{O}) where {O<:Operator} = ix.operator
 StructTypes.StructType(::Type{Instruction{O}}) where {O} = StructTypes.CustomStruct()
 StructTypes.StructType(::Type{Instruction}) = StructTypes.CustomStruct()
-StructTypes.lower(x::Instruction{O}) where {O<:Operator} = isempty(x.target) ? ir(x.operator, Val(:JAQCD)) : ir(x.operator, x.target, Val(:JAQCD))
 ir(x::Instruction{O}, ::Val{:OpenQASM}; kwargs...) where {O<:Operator} = isempty(x.target) ? ir(x.operator, Val(:OpenQASM); kwargs...) : ir(x.operator, x.target, Val(:OpenQASM); kwargs...)
 
 conc_types = filter(Base.isconcretetype, vcat(subtypes(AbstractIR), subtypes(CompilerDirective)))
@@ -87,15 +86,3 @@ bind_value!(ix::Instruction{O}, param_values::Dict{Symbol, Number}) where {O<:Op
 remap(@nospecialize(ix::Instruction{O}), mapping::Dict{<:Integer, <:Integer}) where {O} = Instruction{O}(copy(ix.operator), [mapping[q] for q in ix.target])
 remap(@nospecialize(ix::Instruction{O}), target::VecOrQubitSet) where {O} = Instruction{O}(copy(ix.operator), target[1:length(ix.target)])
 remap(@nospecialize(ix::Instruction{O}), target::IntOrQubit) where {O} = Instruction{O}(copy(ix.operator), target)
-
-function StructTypes.constructfrom(::Type{Program}, obj)
-    new_obj = copy(obj)
-    for (i, k) in enumerate(fieldnames(Program))
-        if !haskey(new_obj, k) || (haskey(StructTypes.defaults(Program), k) && isnothing(new_obj[k]))
-            new_obj[k] = StructTypes.defaults(Program)[k]
-        end
-    end
-    new_obj[:instructions] = StructTypes.constructfrom(Vector{Instruction}, new_obj[:instructions])
-    return StructTypes.constructfrom(StructTypes.StructType(Program), Program, new_obj)
-end
-

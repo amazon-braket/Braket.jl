@@ -39,56 +39,6 @@ using Braket, Test
                     }
                 }
                 """
-        jaqcd() = """{
-                    "braketSchemaHeader": {
-                        "name": "braket.device_schema.rigetti.rigetti_device_capabilities",
-                        "version": "1"
-                    },
-                    "service": {
-                        "braketSchemaHeader": {
-                            "name": "braket.device_schema.device_service_properties",
-                            "version": "1"
-                        },
-                        "executionWindows": [
-                            {"executionDay": "Everyday", "windowStartHour": "11:00", "windowEndHour": "12:00"}
-                        ],
-                        "shotsRange": [1, 10],
-                        "deviceCost": {"price": 0.25, "unit": "minute"},
-                        "deviceDocumentation": {
-                            "imageUrl": "image_url",
-                            "summary": "Summary on the device",
-                            "externalDocumentationUrl": "exter doc link"
-                        },
-                        "deviceLocation": "us-east-1",
-                        "updatedAt": "2020-06-16T19:28:02.869136"
-                    },
-                    "action": {
-                        "braket.ir.jaqcd.program": {
-                            "actionType": "braket.ir.jaqcd.program",
-                            "version": ["1"],
-                            "supportedOperations": ["x", "y"],
-                            "supportedResultTypes": [
-                                {
-                                    "name": "resultType1",
-                                    "observables": ["observable1"],
-                                    "minShots": 2,
-                                    "maxShots": 4
-                                }
-                            ]
-                        }
-                    },
-                    "paradigm": {
-                        "braketSchemaHeader": {
-                            "name": "braket.device_schema.gate_model_qpu_paradigm_properties",
-                            "version": "1"
-                        },
-                        "qubitCount": 32,
-                        "nativeGateSet": ["ccnot", "cy"],
-                        "connectivity": {"fullyConnected": false, "connectivityGraph": {"1": ["2", "3"]}}
-                    },
-                    "deviceParameters": {},
-                    "standardized": $props 
-                }"""
         openqasm() = """{
                         "braketSchemaHeader": {
                             "name": "braket.device_schema.rigetti.rigetti_device_capabilities",
@@ -147,7 +97,7 @@ using Braket, Test
                         "deviceParameters": {}
                     }
                     """
-        @testset for format in [jaqcd, openqasm]
+        @testset for format in [openqasm]
             @test Braket.parse_raw_schema(format()) isa Braket.RigettiDeviceCapabilities
         end
     end

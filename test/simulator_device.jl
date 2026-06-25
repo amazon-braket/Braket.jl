@@ -26,20 +26,7 @@ using Braket, Test
             "updatedAt": "2020-06-16T19:28:02.869136"
         },
         "action": {
-            "braket.ir.jaqcd.program": {
-                "actionType": "braket.ir.jaqcd.program",
-                "version": ["1"],
-                "supportedOperations": ["x", "y"],
-                "supportedResultTypes": [
-                    {
-                        "name": "resultType1",
-                        "observables": ["observable1"],
-                        "minShots": 2,
-                        "maxShots": 4
-                    }
-                ]
-            },
-            "braket.ir.openqasm.program": {
+                        "braket.ir.openqasm.program": {
                 "actionType": "braket.ir.openqasm.program",
                 "version": ["1"],
                 "supportedOperations": ["x", "y"],

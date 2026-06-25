@@ -20,7 +20,6 @@ struct Kraus <: Noise
 end
 Kraus(mats::Vector{Vector{Vector{Vector{Float64}}}}) = Kraus(complex_matrix_from_ir.(mats))
 Base.:(==)(k1::Kraus, k2::Kraus) = k1.matrices == k2.matrices
-ir(g::Kraus, target::QubitSet, ::Val{:JAQCD}; kwargs...) = IR.Kraus(collect(target), [complex_matrix_to_ir(mat) for mat in g.matrices], "kraus")
 function ir(g::Kraus, target::QubitSet, ::Val{:OpenQASM}; serialization_properties::SerializationProperties=OpenQASMSerializationProperties())
     t   = format_qubits(collect(target), serialization_properties)
     ms  = join(format_matrix.(g.matrices), ", ")
@@ -194,7 +193,6 @@ Pauli channel noise operation on two qubits.
 TwoQubitPauliChannel = MultiQubitPauliChannel{2} 
 qubit_count(g::MultiQubitPauliChannel{N}) where {N} = N
 Parametrizable(g::MultiQubitPauliChannel) = Parametrized()
-ir(g::MultiQubitPauliChannel{N}, target::QubitSet, ::Val{:JAQCD}; kwargs...) where {N} = IR.MultiQubitPauliChannel(g.probabilities, collect(target), "multi_qubit_pauli_channel")
 function MultiQubitPauliChannel(probabilities::Dict{String, <:Union{Float64, FreeParameter}})
     N = length(first(keys(probabilities)))
     return MultiQubitPauliChannel{N}(probabilities)
@@ -205,11 +203,6 @@ n_controls(n::Noise) = Val(0)
 targets_and_controls(n::N, target::QubitSet) where {N<:Noise} = targets_and_controls(n_controls(n), n_targets(n), target)
 for (N, IRN, label) in zip((:BitFlip, :PhaseFlip, :PauliChannel, :AmplitudeDamping, :PhaseDamping, :Depolarizing, :TwoQubitDephasing, :TwoQubitDepolarizing, :GeneralizedAmplitudeDamping), (:(IR.BitFlip), :(IR.PhaseFlip), :(IR.PauliChannel), :(IR.AmplitudeDamping), :(IR.PhaseDamping), :(IR.Depolarizing), :(IR.TwoQubitDephasing), :(IR.TwoQubitDepolarizing), :(IR.GeneralizedAmplitudeDamping)), ("bit_flip", "phase_flip", "pauli_channel", "amplitude_damping", "phase_damping", "depolarizing", "two_qubit_dephasing", "two_qubit_depolarizing", "generalized_amplitude_damping"))
     @eval begin
-        function ir(n::$N, target::QubitSet, ::Val{:JAQCD}; kwargs...)
-            t_c = targets_and_controls(n, target)
-            ir_args = (getproperty(n, fn) for fn in fieldnames($N))
-            return $IRN(ir_args..., t_c[2], $label)
-        end
         function ir(n::$N, target::QubitSet, ::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties())
             t   = format_qubits(target, serialization_properties)
             ir_args = join([repr(getproperty(n, fn)) for fn in fieldnames($N)], ", ")

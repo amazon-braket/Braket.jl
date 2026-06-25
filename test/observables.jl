@@ -3,7 +3,6 @@ using Braket: VIRTUAL, PHYSICAL, OpenQASMSerializationProperties, PauliEigenvalu
 using LinearAlgebra: eigvals
 
 @testset "Observables" begin
-    Braket.IRType[] = :JAQCD
     @testset "pauli eigenvalues" begin
         z = [1.0 0.0; 0.0 -1.0]
         @test PauliEigenvalues(Val(1))[1] == 1.0
@@ -25,14 +24,11 @@ using LinearAlgebra: eigvals
         rt = Expectation(o, [0])
         read_rt = JSON3.read(JSON3.write(rt), Braket.Result)
         @test read_rt == rt
-        @test ir(o) isa IRObservable
         mult_h = 2.0 * o
         @test mult_h.matrix == 2.0 * m
     end
     @testset "TensorProduct" begin
         tp = Observables.TensorProduct(["x", "y", "z"])
-        @test ir(tp) == ["x", "y", "z"]
-        @test JSON3.write(tp) == JSON3.write(ir(tp))
         @test qubit_count(tp) == 3
         rt = Expectation(tp, [0, 1, 2])
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
@@ -48,7 +44,6 @@ using LinearAlgebra: eigvals
         @test qubit_count(tp) == 2
         rt = Expectation(tp, [0, 2])
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
-        @test ir(tp) isa IRObservable
     end
     @testset "TensorProduct mixed types" begin
         m = [1. -im; im -1.]
@@ -56,7 +51,6 @@ using LinearAlgebra: eigvals
         tp = Observables.TensorProduct([Observables.X(), o, Observables.Z()])
         @test qubit_count(tp) == 3
         rt = Expectation(tp, [0, 1, 2])
-        @test ir(tp) isa IRObservable
         @test JSON3.read(JSON3.write(rt), Braket.Result) == rt
     end
     @testset "TensorProduct doesn't accept Sum" begin
@@ -68,8 +62,6 @@ using LinearAlgebra: eigvals
         @test length(s) == 2
         @test s.summands[1].coefficient == 2.0
         @test s.summands[2].coefficient == 3.0
-        @test_throws ErrorException ir(s, [1, 2], Val(:JAQCD))
-        @test_throws ErrorException ir(s, [QubitSet(1, 2)], Val(:JAQCD))
         @test Braket.chars(s) == ("Sum",)
         s2 = -1.0 * s
         @test length(s2) == 2
@@ -87,13 +79,9 @@ using LinearAlgebra: eigvals
     m = [1 -im; im -1]
     HO = Observables.HermitianObservable(m)
     @test Braket.chars(HO) == ("Hermitian",)
-    HO_ir = ir(HO)
-    @test JSON3.write(HO) == JSON3.write(ir(HO)) 
-    @test StructTypes.constructfrom(Observables.Observable, convert(IRObservable, HO_ir)) == HO
     @test copy(HO) == HO
     for (typ, char) in zip((Observables.H, Observables.I, Observables.Z, Observables.X, Observables.Y), ("H", "I", "Z", "X", "Y"))
         @test copy(typ()) == typ()
-        @test JSON3.write(typ()) == JSON3.write(ir(typ()))
         @test ishermitian(typ())
         @test Braket.chars(typ()) == (char,)
     end
