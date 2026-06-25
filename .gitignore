@@ -1,0 +1,25 @@
+# Julia build artifacts
+Manifest.toml
+*.cov
+coverage/
+lcov.info
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+
+# Julia project local environments
+/.julia/
+docs/build/
+docs/site/
+docs/Manifest.toml
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db

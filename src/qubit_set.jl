@@ -107,6 +107,14 @@ function Base.intersect(qs1::QubitSet, qs2::QubitSet)
     return qs
 end
 
+function Base.intersect(qs::QubitSet, itr)
+    out = QubitSet()
+    for q in qs
+        (q in itr) && union!(out, q)
+    end
+    return out
+end
+
 function Base.show(io::IO, qs::QubitSet)
     print(io, "QubitSet(")
     print(io, join([sprint(show, q) for q in qs], ", "))
