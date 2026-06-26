@@ -3,6 +3,8 @@ python = ">=3.11,<3.14"
 pydantic = ""
 scipy = ""
 numpy = "<2.5"
+numba = ""
+llvmlite = ""
 
 [pip.deps]
 amazon-braket-sdk = ">=1.81.0"
