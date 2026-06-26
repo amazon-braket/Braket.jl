@@ -13,8 +13,9 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     Braket.header_dict[Braket.GateModelTaskResult],
     nothing,
     nothing,
-    map(r->ResultTypeValue(ir(r[1], Val(:JAQCD)), r[2]), exact_results),
+    map(r->ResultTypeValue(StructTypes.lower(r[1]), r[2]), exact_results),
     [0,1],
+    nothing,
     task_mtd,
     add_mtd,
 )
@@ -25,12 +26,13 @@ non_zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     Dict("011000"=>0.9999999999999982),
     nothing,
     collect(0:5),
+    nothing,
     task_mtd,
     add_mtd)
 
 @testset "GateModelQuantumTaskResult" begin
     c = CNot(Circuit(), 0, 1)
-    action = Braket.Program(c)
+    action = Braket.ir(c, Val(:OpenQASM))
     @testset for (shots, result) in zip([0, 100], [zero_shots_result, non_zero_shots_result])
         task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", shots, "arn1", nothing, nothing, nothing, nothing, nothing)
         additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
@@ -65,25 +67,25 @@ end
     ]
     mat = [1 0; 0 -1]
     ho = Braket.Observables.HermitianObservable(mat)
-    samp = ir(Braket.Sample(ho, Int[2]), Val(:JAQCD))
-    action = Braket.Program(Braket.header_dict[Braket.Program],
-                            [Braket.IR.CNot(0, 1, "cnot"), Braket.IR.CNot(2, 3, "cnot")],
-                            [Braket.IR.Probability([1], "probability"),
-                             Braket.IR.Expectation(["z"], nothing, "expectation"),
-                             Braket.IR.Variance(["x", "x"], [0, 2], "variance"),
-                             samp,
-                             Braket.IR.Sample(["z"], [1], "sample"),
-                             Braket.IR.Sample(["x", "y"], [1, 2], "sample"),
-                             Braket.IR.Sample(["z"], nothing, "sample"),
-                            ],
-                            [])
+    samp = StructTypes.lower(Braket.Sample(ho, Int[2]))
+    action = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], "", nothing)
+    result_types_input = Braket.ResultTypeValue[
+        Braket.ResultTypeValue(Braket.IR.Probability([1], "probability"), Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Expectation(["z"], nothing, "expectation"), Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Variance(["x", "x"], [0, 2], "variance"), Float64[]),
+        Braket.ResultTypeValue(samp, Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Sample(["z"], [1], "sample"), Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Sample(["x", "y"], [1, 2], "sample"), Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Sample(["z"], nothing, "sample"), Float64[]),
+    ]
     task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
     additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
         measurements,
         nothing,
-        nothing,
+        result_types_input,
         [0, 1, 2, 3],
+        nothing,
         task_metadata_shots,
         additional_metadata,
     )
@@ -96,20 +98,20 @@ end
     @test quantum_task_result.result_types[2].type == Braket.IR.Expectation(["z"], nothing, "expectation")
     
 
-    action = Braket.Program(Braket.header_dict[Braket.Program],
-                            [Braket.IR.H(0, "h"), Braket.IR.H(1, "h"), Braket.IR.H(2, "h"), Braket.IR.H(3, "h")],
-                            [Braket.IR.Sample("z", [1], "sample"),
-                             Braket.IR.Sample(["x", "y"], [1, 2], "sample"),
-                             Braket.IR.Sample("z", nothing, "sample"),
-                            ],
-                            [])
+    action = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], "", nothing)
+    result_types_input = Braket.ResultTypeValue[
+        Braket.ResultTypeValue(Braket.IR.Sample("z", [1], "sample"), Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Sample(["x", "y"], [1, 2], "sample"), Float64[]),
+        Braket.ResultTypeValue(Braket.IR.Sample("z", nothing, "sample"), Float64[]),
+    ]
     task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
     additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
         measurements,
         nothing,
-        nothing,
+        result_types_input,
         [0, 1, 2, 3],
+        nothing,
         task_metadata_shots,
         additional_metadata,
     )
@@ -126,20 +128,23 @@ end
             nothing,
             nothing,
             [0, 1, 2, 3],
+            nothing,
             task_metadata_shots,
             additional_metadata,
         )
         @test_throws ErrorException Braket.format_result(task_result)
     end
     @testset "bad result type in results for shots > 0" begin
-        action = Braket.Program(Braket.header_dict[Braket.Program], [Braket.IR.CNot(0, 1, "cnot"), Braket.IR.CNot(2, 3, "cnot")], [Braket.IR.DensityMatrix([1,3], "densitymatrix")], [])
+        action = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], "", nothing)
+        result_types_bad = Braket.ResultTypeValue[Braket.ResultTypeValue(Braket.IR.DensityMatrix([1,3], "densitymatrix"), Float64[])]
         task_metadata_shots = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", length(measurements), "arn1", nothing, nothing, nothing, nothing, nothing)
         additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
         task_result = Braket.GateModelTaskResult(Braket.header_dict[Braket.GateModelTaskResult],
             measurements,
             nothing,
-            nothing,
+            result_types_bad,
             [0, 1, 2, 3],
+            nothing,
             task_metadata_shots,
             additional_metadata,
         )

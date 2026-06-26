@@ -13,6 +13,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         ResultTypeValue(IR.Variance(["y"], [0], "variance"), 0.1),
     ],
     [0,1],
+    nothing,
     task_mtd,
     add_mtd,
 )
@@ -63,7 +64,7 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
         end
 
         c = CNot(Circuit(), 0, 1)
-        action = Braket.Program(c)
+        action = Braket.ir(c, Val(:OpenQASM))
         task_metadata = Braket.TaskMetadata(Braket.header_dict[Braket.TaskMetadata], "task_arn", 0, "arn1", nothing, nothing, nothing, nothing, nothing)
         additional_metadata = Braket.AdditionalMetadata(action, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
         s3_req_str = JSON3.write(zero_shots_result(task_metadata, additional_metadata))
@@ -112,12 +113,11 @@ zero_shots_result(task_mtd, add_mtd) = Braket.GateModelTaskResult(
     """
     oq3_program() = Braket.OpenQasmProgram(Braket.header_dict[Braket.OpenQasmProgram], bell_qasm, nothing)
     bell_circ()   = (c = Circuit(); c=H(c, 0); c=CNot(c, 0, 1); return c)
-    bell_prog()   = Braket.Program(bell_circ())
     RIGETTI_ARN = "arn:aws:braket:::device/qpu/rigetti/Ankaa-2"
     IONQ_ARN = "arn:aws:braket:::device/qpu/ionq/ionQdevice"
     SV1_ARN = "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
     IQM_ARN = "arn:aws:braket:eu-north-1::device/qpu/iqm/Garnet"
-    @testset for program in (bell_circ, bell_prog), arn in (SV1_ARN, IQM_ARN, RIGETTI_ARN, IONQ_ARN)
+    @testset for program in (bell_circ,), arn in (SV1_ARN, IQM_ARN, RIGETTI_ARN, IONQ_ARN)
         shots = 100
         device_params = Dict("fake_param_1"=>2, "fake_param_2"=>"hello")
         s3_folder = ("fake_bucket", "fake_folder")

@@ -72,7 +72,6 @@ chars(::Type{Measure}) = ("M",)
 chars(::Measure) = chars(Measure)
 qubit_count(::Type{Measure}) = 1
 qubit_count(::Measure) = qubit_count(Measure)
-ir(m::Measure, target::QubitSet, ::Val{:JAQCD}; kwargs...) = error("measure instructions are not supported with JAQCD.") 
 function ir(m::Measure, target::QubitSet, ::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties())
     instructions = Vector{String}(undef, length(target))
     for (idx, qubit) in enumerate(target)
@@ -127,7 +126,6 @@ label(d::Microsecond) = "$(d.value)ms"
 label(d::Nanosecond)  = "$(d.value)ns"
 label(d::Second)      = "$(d.value)s"
 
-ir(ix::Union{Reset, Barrier, Delay}, target::QubitSet, ::Val{:JAQCD}; kwargs...) = error("$(label(ix)) instructions are not supported with JAQCD.") 
 function ir(ix::Union{Reset, Barrier, Delay}, target::QubitSet, v::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties())
     return join(("$(label(ix)) $(format_qubits(qubit, serialization_properties));" for qubit in target), "\n")
 end

@@ -262,7 +262,6 @@ StructTypes.lower(x::StateVector) = Braket.IR.StateVector("statevector")
 StructTypes.lowertype(::Type{StateVector}) = @NamedTuple{type::String}
 StateVector(x::@NamedTuple{type::String}) = StateVector()
 
-ir(r::Result, ::Val{:JAQCD}; kwargs...) = StructTypes.lower(r)
 ir(r::Result; kwargs...) = ir(r, Val(IRType[]); kwargs...)
 StructTypes.StructType(::Type{Result}) = StructTypes.AbstractType()
 StructTypes.subtypes(::Type{Result}) = (amplitude=Amplitude, expectation=Expectation, probability=Probability, statevector=StateVector, variance=Variance, sample=Sample, densitymatrix=DensityMatrix, adjoint_gradient=AdjointGradient)
@@ -289,7 +288,7 @@ function Base.getindex(r::GateModelQuantumTaskResult, rt::AdjointGradient)
 end
 
 function Base.getindex(r::GateModelQuantumTaskResult, rt::Result)
-    ix = findfirst(rt_->rt_.type==ir(rt, Val(:JAQCD)), r.result_types)
+    ix = findfirst(rt_->rt_.type==StructTypes.lower(rt), r.result_types)
     isnothing(ix) && throw(KeyError(rt))
     return r.values[ix]
 end

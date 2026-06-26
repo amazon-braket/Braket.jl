@@ -19,7 +19,6 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     @testset for g in (H(), Braket.I(), X(), Y(), Z(), S(), Si(), T(), Ti(), V(), Vi())
         @test qubit_count(g) == 1
         ix = Instruction(g, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(g) == Braket.NonParametrized()
         @test Braket.parameters(g) == Braket.FreeParameter[]
     end
@@ -35,7 +34,6 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     @testset for g in (CNot(), Swap(), ISwap(), CV(), CY(), CZ(), ECR())
         @test qubit_count(g) == 2
         ix = Instruction(g, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(g) == Braket.NonParametrized()
         @test Braket.parameters(g) == Braket.FreeParameter[]
     end
@@ -51,7 +49,6 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
     @testset for g in (CCNot(), CSwap())
         @test qubit_count(g) == 3
         ix = Instruction(g, [0, 1, 2])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         @test Braket.Parametrizable(g) == Braket.NonParametrized()
         @test Braket.parameters(g) == Braket.FreeParameter[]
     end
@@ -86,7 +83,6 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             pg = g(α)
             @test Braket.parameters(pg) == [α]
             ix = Instruction(g(angle1), 0)
-            @test JSON3.read(JSON3.write(ix), Instruction) == Instruction(g(Float64(angle1)), 0)
         end
         @testset for g in (PSwap(angle1), XY(angle1), CPhaseShift(angle1), CPhaseShift00(angle1), CPhaseShift01(angle1), CPhaseShift10(angle1), XX(angle1), YY(angle1), ZZ(angle1))
             @test qubit_count(g) == 2
@@ -104,7 +100,6 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
             pg = g(α)
             @test Braket.parameters(pg) == [α]
             ix = Instruction(g(angle1), [0, 1])
-            @test JSON3.read(JSON3.write(ix), Instruction) == Instruction(g(Float64(angle1)), [0, 1])
         end
         @testset for g in (PRx(angle1, angle2),)
             @test qubit_count(g) == 1
@@ -193,15 +188,12 @@ T_mat = round.(reduce(hcat, [[1.0, 0], [0, 0.70710678 + 0.70710678im]]), digits=
         g = Unitary(X)
         @test qubit_count(g) == 1
         ix = Instruction(g, 0)
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         g = Unitary(kron(X, X))
         @test qubit_count(g) == 2
         ix = Instruction(g, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         g = Unitary(kron(Y, Y))
         @test qubit_count(g) == 2
         ix = Instruction(g, [0, 1])
-        @test JSON3.read(JSON3.write(ix), Instruction) == ix
         c = Circuit()
         c = Unitary(c, 0, X)
         @test c.instructions == [Instruction(Unitary(X), 0)]

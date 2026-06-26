@@ -318,7 +318,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
         @testset "Basic" begin
             circ = Circuit([(H, 0), (CNot, 0, 1)])
             circ(Sample, Observables.X(), 0)
-            p = Braket.Program(circ)
+            Braket.basis_rotation_instructions!(circ); p = (instructions=circ.instructions, results=[StructTypes.lower(rt) for rt in circ.result_types], basis_rotation_instructions=circ.basis_rotation_instructions)
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["x"], [0], "sample")]
             expected_bris = [Instruction(H(), 0)]
@@ -329,7 +329,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             
             circ = Circuit([(H, 0), (CNot, 0, 1)])
             circ(Sample, Observables.Y(), 0)
-            p = Braket.Program(circ)
+            Braket.basis_rotation_instructions!(circ); p = (instructions=circ.instructions, results=[StructTypes.lower(rt) for rt in circ.result_types], basis_rotation_instructions=circ.basis_rotation_instructions)
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["y"], [0], "sample")]
             expected_bris = [Instruction(Z(), 0), Instruction(S(), 0), Instruction(H(), 0)]
@@ -340,7 +340,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
             
             circ = Circuit([(H, 0), (CNot, 0, 1)])
             circ(Sample, Observables.Z(), 0)
-            p = Braket.Program(circ)
+            Braket.basis_rotation_instructions!(circ); p = (instructions=circ.instructions, results=[StructTypes.lower(rt) for rt in circ.result_types], basis_rotation_instructions=circ.basis_rotation_instructions)
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["z"], [0], "sample")]
             expected_bris = Instruction[]
@@ -351,7 +351,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
 
             circ = Circuit([(H, 0), (CNot, 0, 1)])
             circ(Sample, Observables.I(), 0)
-            p = Braket.Program(circ)
+            Braket.basis_rotation_instructions!(circ); p = (instructions=circ.instructions, results=[StructTypes.lower(rt) for rt in circ.result_types], basis_rotation_instructions=circ.basis_rotation_instructions)
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["i"], [0], "sample")]
             expected_bris = Instruction[]
@@ -362,7 +362,7 @@ using Braket: Instruction, Result, VIRTUAL, PHYSICAL, OpenQASMSerializationPrope
 
             circ = Circuit([(H, 0), (CNot, 0, 1)])
             circ(Sample, Observables.TensorProduct(["x", "h"]), 0, 1)
-            p = Braket.Program(circ)
+            Braket.basis_rotation_instructions!(circ); p = (instructions=circ.instructions, results=[StructTypes.lower(rt) for rt in circ.result_types], basis_rotation_instructions=circ.basis_rotation_instructions)
             expected_ixs = [Instruction(H(), 0), Instruction(CNot(), [0, 1])]
             expected_rts = [Braket.IR.Sample(["x", "h"], [0, 1], "sample")]
             expected_bris = [Instruction(H(), 0), Instruction(Ry(-π/4), 1)]

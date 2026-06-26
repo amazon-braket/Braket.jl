@@ -19,8 +19,8 @@ MOCK_GATE_MODEL_QPU_CAPABILITIES_1 = """{
         "shotsRange": [1, 10]
     },
     "action": {
-        "braket.ir.jaqcd.program": {
-            "actionType": "braket.ir.jaqcd.program",
+        "braket.ir.openqasm.program": {
+            "actionType": "braket.ir.openqasm.program",
             "version": ["1"],
             "supportedOperations": ["H"]
         }
@@ -58,8 +58,8 @@ MOCK_GATE_MODEL_QPU_CAPABILITIES_2 = """{
         "shotsRange": [1, 10]
     },
     "action": {
-        "braket.ir.jaqcd.program": {
-            "actionType": "braket.ir.jaqcd.program",
+        "braket.ir.openqasm.program": {
+            "actionType": "braket.ir.openqasm.program",
             "version": ["1"],
             "supportedOperations": ["H"]
         }
@@ -163,7 +163,7 @@ MOCK_DWAVE_QPU() = """{
         @test sprint(show, dev) == "AwsDevice(arn=fake:arn)"
     end
     execution_window = Braket.DeviceExecutionWindow("everyday",Dates.Time("00:00:00"),Dates.Time("23:59:59"))
-    dsp = Braket.DeviceServiceProperties(Braket.header_dict[Braket.DeviceServiceProperties], [execution_window], (0, 1000), nothing, nothing, nothing, nothing, nothing)
+    dsp = Braket.DeviceServiceProperties(Braket.header_dict[Braket.DeviceServiceProperties], [execution_window], (0, 1000), nothing, nothing, nothing, nothing, nothing, nothing)
     paradigm = Braket.GateModelSimulatorParadigmProperties(Braket.header_dict[Braket.GateModelSimulatorParadigmProperties], 100)
     dev_capa = Braket.GateModelSimulatorDeviceCapabilities(dsp, Dict(), Dict(), Braket.header_dict[Braket.GateModelSimulatorDeviceCapabilities], paradigm)
     resp_dict = Dict{String, Any}("devices"=>[Dict{String, Any}(

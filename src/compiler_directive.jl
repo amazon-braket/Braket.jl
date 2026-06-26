@@ -23,8 +23,6 @@ will not be modified by any further compilation steps.
 struct EndVerbatimBox <: CompilerDirective end
 counterpart(s::StartVerbatimBox) = EndVerbatimBox()
 counterpart(e::EndVerbatimBox)   = StartVerbatimBox()
-ir(s::StartVerbatimBox, ::Val{:JAQCD}; kwargs...)    = IR.StartVerbatimBox("StartVerbatimBox", "start_verbatim_box")
-ir(s::EndVerbatimBox,   ::Val{:JAQCD}; kwargs...)    = IR.EndVerbatimBox("EndVerbatimBox", "end_verbatim_box")
 ir(s::StartVerbatimBox, ::Val{:OpenQASM}; kwargs...) = "#pragma braket verbatim\nbox{"
 ir(s::EndVerbatimBox,   ::Val{:OpenQASM}; kwargs...) = "}"
 ir(c::CompilerDirective; kwargs...)                  = ir(c, Val(IRType[]); kwargs...)

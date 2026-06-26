@@ -124,14 +124,6 @@ targets_and_controls(::Val{1}, ::Val{1}, target::QubitSet)           = (target[1
 targets_and_controls(::Val{1}, ::Val{N}, target::QubitSet) where {N} = (target[1], target[2:end])
 targets_and_controls(::Val{NC}, ::Val{1}, target::QubitSet) where {NC} = (target[1:NC], target[NC+1])
 targets_and_controls(::Val{NC}, ::Val{NT}, target::QubitSet) where {NC, NT} = (target[1:NC], target[NC+1:NC+NT])
-function ir(g::G, target::QubitSet, ::Val{:JAQCD}; kwargs...) where {G<:Gate}
-    t_c = targets_and_controls(g, target)
-    if isempty(t_c[1])
-        return ir_typ(g)(angles(g)..., t_c[2], label(g))
-    else
-        return ir_typ(g)(angles(g)..., t_c[1], t_c[2], label(g))
-    end
-end
 function ir(g::G, target::QubitSet, ::Val{:OpenQASM}; serialization_properties=OpenQASMSerializationProperties()) where {G<:Gate}
     t = format_qubits(target, serialization_properties)
     ir_string = ir_str(g) * " " * t
@@ -161,10 +153,6 @@ n_targets(g::Unitary)   = qubit_count(g)
 n_controls(g::Unitary)  = 0
 
 ir_str(g::Unitary) = "#pragma braket unitary(" * format_matrix(g.matrix) * ")"
-function ir(g::Unitary, target::QubitSet, ::Val{:JAQCD}; kwargs...)
-    mat = complex_matrix_to_ir(g.matrix) 
-    return IR.Unitary(collect(target), mat, "unitary")
-end
 
 """
     GPhase <: Gate
@@ -183,7 +171,6 @@ ir_typ(::Type{GPhase}) = IR.UndefinedGate
 label(::Type{GPhase})  = "gphase"
 n_targets(g::GPhase)   = 0 
 n_controls(g::GPhase)  = 0
-ir(g::GPhase, target::QubitSet, ::Val{:JAQCD}; kwargs...) = throw(MethodError(ir, (g, target, Val(:JAQCD))))
 targets_and_controls(g::GPhase, target::QubitSet) = ((), tuple(target...)) 
 StructTypes.StructType(::Type{<:Gate}) = StructTypes.Struct()
 

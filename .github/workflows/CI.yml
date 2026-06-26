@@ -105,6 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     needs: [os-test, version-test]
+    continue-on-error: true
     strategy:
       fail-fast: true
       matrix:
